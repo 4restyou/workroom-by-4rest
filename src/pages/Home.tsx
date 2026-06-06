@@ -30,12 +30,6 @@ const features = [
   },
 ];
 
-const roomNotes = [
-  "예약제로 조용하게 운영",
-  "개인 작업과 작은 모임 중심",
-  "신청 후 확인 연락으로 확정",
-];
-
 export default function Home() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
 
@@ -81,23 +75,6 @@ export default function Home() {
               예약하기
             </Link>
           </div>
-        </div>
-
-        <div className="mt-8 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-          <ul className="grid gap-2 rounded-card bg-white/70 p-4 shadow-soft sm:grid-cols-3">
-            {roomNotes.map((note) => (
-              <li className="flex items-center gap-3 text-sm font-bold text-workroom-muted" key={note}>
-                <span className="h-1.5 w-1.5 rounded-full bg-workroom-text" />
-                <span>{note}</span>
-              </li>
-            ))}
-          </ul>
-          <Link className="rounded-full bg-white/80 px-5 py-4 text-center font-black text-workroom-muted shadow-soft" to="/login">
-            회원가입
-          </Link>
-          <a className="rounded-full bg-transparent px-5 py-4 text-center font-black text-workroom-muted underline underline-offset-4" href="#space">
-            공간 소개 보기
-          </a>
         </div>
       </section>
 

@@ -1,4 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { getCurrentProfile } from "../lib/profiles";
+import { supabase } from "../lib/supabase";
+import type { Profile } from "../lib/types";
 import logoSig from "../../assets/logo/logo_sig.png";
 
 type HeaderProps = {
@@ -6,6 +10,26 @@ type HeaderProps = {
 };
 
 export default function Header({ isAdmin }: HeaderProps) {
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (!supabase) return;
+      const loadedProfile = await getCurrentProfile();
+      setProfile(loadedProfile);
+    }
+
+    void loadProfile();
+    const {
+      data: { subscription },
+    } =
+      supabase?.auth.onAuthStateChange(() => {
+        void loadProfile();
+      }) ?? { data: { subscription: null } };
+
+    return () => subscription?.unsubscribe();
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 border-b border-workroom-line bg-workroom-background/90 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3.5">
@@ -25,7 +49,8 @@ export default function Header({ isAdmin }: HeaderProps) {
               <a href="/#space">공간</a>
               <a href="/#pricing">이용권</a>
               <Link to="/reserve">예약</Link>
-              <Link to="/account">내정보</Link>
+              {profile?.role === "admin" ? <Link to="/admin/reservations">관리자</Link> : null}
+              <Link to={profile ? "/account" : "/login"}>{profile ? "내정보" : "로그인"}</Link>
             </>
           )}
         </nav>
