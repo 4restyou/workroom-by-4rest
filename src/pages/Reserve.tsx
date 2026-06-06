@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
-import { todayValue } from "../lib/format";
+import { formatPrice, todayValue } from "../lib/format";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import type { Pass, ReservationInsert } from "../lib/types";
 
@@ -94,26 +94,35 @@ export default function Reserve() {
 
   return (
     <main className="pb-10">
-      <Section eyebrow="Reserve" title="먼저 이용권부터 골라주세요">
+      <Section eyebrow="Reserve" title="오늘 쓸 만큼만 가볍게">
+        <div className="mb-5 rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
+          예약 신청 후 확인 연락을 드립니다. 아직 준비 중인 공간이라 확정 전까지 시간은 조금 조정될 수 있습니다.
+        </div>
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <div className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch">
             <h2 className="mb-4 text-xl font-black">1. 이용권</h2>
             <div className="grid gap-3">
-              {[...passes.map((pass) => pass.name), "기타 문의"].map((passName) => (
+              {[...passes, { id: "custom-inquiry", name: "기타 문의", description: "촬영, 모임, 장기 이용 상담", price: 0 }].map((pass) => (
                 <label
                   className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 border-workroom-line px-4 py-3 font-black ${
-                    form.pass_type === passName ? "bg-workroom-yellow" : "bg-white"
+                    form.pass_type === pass.name ? "bg-workroom-yellow" : "bg-white"
                   }`}
-                  key={passName}
+                  key={pass.id}
                 >
-                  <span>{passName}</span>
+                  <span className="min-w-0">
+                    <span className="block text-base">{pass.name}</span>
+                    <span className="mt-1 block text-xs text-workroom-muted">
+                      {pass.description}
+                      {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
+                    </span>
+                  </span>
                   <input
-                    checked={form.pass_type === passName}
+                    checked={form.pass_type === pass.name}
                     className="h-5 w-5 accent-black"
                     name="pass_type"
-                    onChange={() => updateField("pass_type", passName)}
+                    onChange={() => updateField("pass_type", pass.name)}
                     type="radio"
-                    value={passName}
+                    value={pass.name}
                   />
                 </label>
               ))}
