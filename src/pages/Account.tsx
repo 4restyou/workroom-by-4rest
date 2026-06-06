@@ -110,17 +110,16 @@ export default function Account() {
       return;
     }
 
-    const { data: savedProfile, error: updateError } = await supabase
+    const { data: savedProfiles, error: updateError } = await supabase
       .from("profiles")
-      .upsert({
-        id: user.id,
-        email: user.email ?? profile.email,
+      .update({
         full_name: nextProfile.full_name,
         phone: nextProfile.phone,
         address: nextProfile.address,
       })
+      .eq("id", user.id)
       .select("*")
-      .maybeSingle();
+      .limit(1);
     setIsSaving(false);
 
     if (updateError) {
@@ -128,6 +127,7 @@ export default function Account() {
       return;
     }
 
+    const savedProfile = savedProfiles?.[0];
     if (!savedProfile) {
       setError("내정보가 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.");
       return;
