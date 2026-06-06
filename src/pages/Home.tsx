@@ -6,7 +6,7 @@ import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import type { Pass } from "../lib/types";
-import heroImage from "../../assets/logo/mainlogo.png";
+import heroImage from "../../assets/logo/simbol.png";
 import captionImage from "../../assets/logo/caption.png";
 
 const features = [
@@ -60,45 +60,44 @@ export default function Home() {
 
   return (
     <main className="pb-24 sm:pb-0">
-      <section className="mx-auto grid max-w-5xl gap-8 px-4 pb-8 pt-10 sm:grid-cols-[1.02fr_0.98fr] sm:items-center sm:py-16">
+      <section className="mx-auto grid max-w-5xl gap-8 px-4 pb-8 pt-10 sm:grid-cols-[0.95fr_1.05fr] sm:items-center sm:py-16">
         <div>
           <p className="mb-4 inline-flex rounded-full bg-workroom-purple px-3 py-1 text-xs font-black">
             Chungjang-ro work lounge
           </p>
-          <h1 className="text-5xl font-black leading-[0.95] sm:text-7xl">
-            WORKROOM
-            <span className="mt-2 block text-2xl sm:text-4xl">by 4REST</span>
+          <h1 className="max-w-xl text-4xl font-black leading-tight sm:text-6xl">
+            충장로에서 조용히 일할 자리
           </h1>
-          <p className="mt-5 text-xl font-black leading-tight sm:text-2xl">Out of office, Into Workroom.</p>
           <p className="mt-5 max-w-md text-lg font-bold leading-8 text-workroom-muted sm:text-xl">
             카페보다 조용하고,
             <br />
             사무실보다 느슨한
             <br />
-            충장로의 작은 작업 라운지.
+            예약제로 운영하는 작은 작업 라운지.
           </p>
-          <ul className="mt-7 grid gap-2 text-sm font-bold text-workroom-muted sm:grid-cols-3">
+          <ul className="mt-7 divide-y divide-workroom-line rounded-card bg-white/70 px-4 shadow-soft">
             {roomNotes.map((note) => (
-              <li className="rounded-full bg-white px-3 py-2 text-center shadow-soft" key={note}>
-                {note}
+              <li className="flex items-center gap-3 py-3 text-sm font-bold text-workroom-muted" key={note}>
+                <span className="h-1.5 w-1.5 rounded-full bg-workroom-text" />
+                <span>{note}</span>
               </li>
             ))}
           </ul>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <Link className="rounded-full bg-workroom-text px-6 py-4 text-center font-black text-white shadow-soft" to="/reserve">
+            <Link className="rounded-full bg-workroom-text px-8 py-4 text-center text-lg font-black text-white shadow-sketch" to="/reserve">
               예약하기
             </Link>
-            <Link className="rounded-full bg-white px-6 py-4 text-center font-black shadow-soft" to="/login">
+            <Link className="rounded-full bg-white/80 px-5 py-4 text-center font-black text-workroom-muted shadow-soft" to="/login">
               회원가입
             </Link>
-            <a className="rounded-full bg-workroom-yellow px-6 py-4 text-center font-black shadow-soft" href="#space">
+            <a className="rounded-full bg-transparent px-5 py-4 text-center font-black text-workroom-muted underline underline-offset-4" href="#space">
               공간 소개 보기
             </a>
           </div>
         </div>
 
         <figure className="relative overflow-hidden rounded-card bg-workroom-surface shadow-sketch">
-          <img className="aspect-[4/5] w-full object-contain p-5 sm:aspect-[5/6] sm:p-8" src={heroImage} alt="WORKROOM by 4REST 로고 이미지" />
+          <img className="aspect-[4/5] w-full object-contain p-5 sm:aspect-[5/6] sm:p-8" src={heroImage} alt="작업 라운지에 편하게 앉아 있는 일러스트" />
           <figcaption className="absolute bottom-4 left-4 right-4 rounded-card bg-workroom-yellow px-4 py-3 text-sm font-black shadow-soft">
             슬렁슬렁 들어와도 되는, 오래 앉아도 되는 자리.
           </figcaption>
