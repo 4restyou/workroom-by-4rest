@@ -6,8 +6,6 @@ import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import type { Pass } from "../lib/types";
-import heroImage from "../../assets/logo/simbol.png";
-import captionImage from "../../assets/logo/caption.png";
 
 const features = [
   {
@@ -35,7 +33,7 @@ const features = [
 const roomNotes = [
   "예약제로 조용하게 운영",
   "개인 작업과 작은 모임 중심",
-  "초기 운영 기간에는 확인 연락 후 확정",
+  "신청 후 확인 연락으로 확정",
 ];
 
 export default function Home() {
@@ -60,68 +58,67 @@ export default function Home() {
 
   return (
     <main className="pb-24 sm:pb-0">
-      <section className="mx-auto grid max-w-5xl gap-8 px-4 pb-8 pt-10 sm:grid-cols-[0.95fr_1.05fr] sm:items-center sm:py-16">
-        <div>
-          <p className="mb-4 inline-flex rounded-full bg-workroom-purple px-3 py-1 text-xs font-black">
-            Chungjang-ro work lounge
-          </p>
-          <h1 className="max-w-xl text-4xl font-black leading-tight sm:text-6xl">
-            충장로에서 조용히 일할 자리
-          </h1>
-          <p className="mt-5 max-w-md text-lg font-bold leading-8 text-workroom-muted sm:text-xl">
-            카페보다 조용하고,
-            <br />
-            사무실보다 느슨한
-            <br />
-            예약제로 운영하는 작은 작업 라운지.
-          </p>
-          <ul className="mt-7 divide-y divide-workroom-line rounded-card bg-white/70 px-4 shadow-soft">
+      <section className="mx-auto max-w-5xl px-4 pb-8 pt-12 sm:py-16">
+        <div className="grid gap-8 sm:grid-cols-[1fr_320px] sm:items-end">
+          <div>
+            <p className="mb-4 inline-flex rounded-full bg-workroom-purple px-3 py-1 text-xs font-black">
+              예약제 작업 라운지
+            </p>
+            <h1 className="max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
+              필요한 시간만큼 머무는 조용한 작업 공간
+            </h1>
+            <p className="mt-5 max-w-xl text-lg font-bold leading-8 text-workroom-muted sm:text-xl">
+              카페보다 조용하고, 사무실보다 느슨하게.
+              <br />
+              혼자 일하거나 작은 모임을 갖기 좋은 자리입니다.
+            </p>
+          </div>
+
+          <div className="rounded-card bg-white/75 p-5 shadow-soft">
+            <p className="text-sm font-black text-workroom-muted">Reservation</p>
+            <p className="mt-2 text-2xl font-black leading-tight">예약 신청 후 확정 연락을 드립니다.</p>
+            <Link className="mt-5 block rounded-full bg-workroom-yellow px-8 py-4 text-center text-lg font-black text-workroom-text shadow-sketch" to="/reserve">
+              예약하기
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+          <ul className="grid gap-2 rounded-card bg-white/70 p-4 shadow-soft sm:grid-cols-3">
             {roomNotes.map((note) => (
-              <li className="flex items-center gap-3 py-3 text-sm font-bold text-workroom-muted" key={note}>
+              <li className="flex items-center gap-3 text-sm font-bold text-workroom-muted" key={note}>
                 <span className="h-1.5 w-1.5 rounded-full bg-workroom-text" />
                 <span>{note}</span>
               </li>
             ))}
           </ul>
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <Link className="rounded-full bg-workroom-text px-8 py-4 text-center text-lg font-black text-white shadow-sketch" to="/reserve">
-              예약하기
-            </Link>
-            <Link className="rounded-full bg-white/80 px-5 py-4 text-center font-black text-workroom-muted shadow-soft" to="/login">
-              회원가입
-            </Link>
-            <a className="rounded-full bg-transparent px-5 py-4 text-center font-black text-workroom-muted underline underline-offset-4" href="#space">
-              공간 소개 보기
-            </a>
-          </div>
+          <Link className="rounded-full bg-white/80 px-5 py-4 text-center font-black text-workroom-muted shadow-soft" to="/login">
+            회원가입
+          </Link>
+          <a className="rounded-full bg-transparent px-5 py-4 text-center font-black text-workroom-muted underline underline-offset-4" href="#space">
+            공간 소개 보기
+          </a>
         </div>
-
-        <figure className="relative overflow-hidden rounded-card bg-workroom-surface shadow-sketch">
-          <img className="aspect-[4/5] w-full object-contain p-5 sm:aspect-[5/6] sm:p-8" src={heroImage} alt="작업 라운지에 편하게 앉아 있는 일러스트" />
-          <figcaption className="absolute bottom-4 left-4 right-4 rounded-card bg-workroom-yellow px-4 py-3 text-sm font-black shadow-soft">
-            슬렁슬렁 들어와도 되는, 오래 앉아도 되는 자리.
-          </figcaption>
-        </figure>
       </section>
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤">
         <div className="max-w-3xl text-base font-semibold leading-8 text-workroom-muted sm:text-lg">
           <p>
             카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만
-            가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
+            가끔은 너무 딱딱하고,
+            <br />
+            집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
           </p>
           <p className="mt-5">
             WORKROOM은 그 사이 어딘가의 공간을 생각하며 준비하고 있습니다. 슬렁슬렁
-            들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수
-            있는 곳입니다.
+            들어와도 되고,
+            <br />
+            조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
           </p>
         </div>
       </Section>
 
       <Section eyebrow="Features" title="작업이 너무 커지지 않게">
-        <div className="mb-5 rounded-card bg-workroom-surface p-4 shadow-soft">
-          <img className="mx-auto h-auto max-h-20 w-full object-contain" src={captionImage} alt="Out of office, Into Workroom." />
-        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map((feature) => (
             <FeatureCard key={feature.title} {...feature} />
@@ -136,7 +133,7 @@ export default function Home() {
           ))}
         </div>
         <p className="mt-4 rounded-card bg-workroom-purple px-4 py-3 text-sm font-black">
-          가격은 초기 운영 기준입니다. 운영 방식에 따라 조금씩 다듬어질 수 있습니다.
+          이용권을 선택하면 예약 신청으로 바로 이어집니다.
         </p>
       </Section>
 
@@ -167,7 +164,7 @@ export default function Home() {
           ))}
         </ol>
         <p className="mt-4 rounded-card bg-workroom-yellow px-4 py-3 text-sm font-black">
-          초기 운영 기간에는 예약 신청 후 확인 연락을 드립니다. 결제는 계좌이체 또는 현장결제로 진행됩니다.
+          예약 신청 후 확정되면 연락드립니다.
         </p>
       </Section>
 

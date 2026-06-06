@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, todayValue } from "../lib/format";
@@ -20,12 +20,19 @@ const emptyForm = {
 };
 
 export default function Reserve() {
+  const location = useLocation();
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [form, setForm] = useState(emptyForm);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const selectedPass = new URLSearchParams(location.search).get("pass");
+    if (!selectedPass) return;
+    setForm((current) => ({ ...current, pass_type: selectedPass }));
+  }, [location.search]);
 
   useEffect(() => {
     async function loadPasses() {
@@ -116,7 +123,7 @@ export default function Reserve() {
     <main className="pb-10">
       <Section eyebrow="Reserve" title="오늘 쓸 만큼만 가볍게">
         <div className="mb-5 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
-          예약 신청 후 확인 연락을 드립니다. 아직 준비 중인 공간이라 확정 전까지 시간은 조금 조정될 수 있습니다.
+          예약 신청 후 확인 연락을 드립니다. 확정 전까지 시간은 조금 조정될 수 있습니다.
           {profile ? <span className="mt-2 block">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
         </div>
         <form className="grid gap-5" onSubmit={handleSubmit}>
@@ -200,7 +207,7 @@ export default function Reserve() {
               <p>예약 신청이 접수되었습니다.</p>
               <p>확인 후 연락드릴게요.</p>
               <p className="mt-3 text-sm">
-                WORKROOM은 아직 준비 중이거나 초기 운영 중일 수 있어, 예약 확정 전까지는 일정이 조정될 수 있습니다.
+                확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.
               </p>
             </div>
           ) : null}
