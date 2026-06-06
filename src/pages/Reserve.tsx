@@ -40,7 +40,7 @@ export default function Reserve() {
       if (!hasSupabaseConfig || !supabase) return;
       const { data, error: passError } = await supabase
         .from("passes")
-        .select("id,name,description,price,is_active,sort_order")
+        .select("id,name,description,price,seat_type_id,is_active,sort_order")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
@@ -93,8 +93,34 @@ export default function Reserve() {
       return;
     }
 
+    const selectedPass = passes.find((pass) => pass.name === form.pass_type);
+    if (selectedPass?.seat_type_id) {
+      const { data: capacityRows, error: capacityError } = await supabase.rpc("check_reservation_capacity", {
+        p_date: form.date,
+        p_start_time: form.start_time,
+        p_end_time: form.end_time,
+        p_seat_type_id: selectedPass.seat_type_id,
+        p_people: Number(form.people),
+      });
+
+      if (capacityError) {
+        setError(capacityError.message);
+        return;
+      }
+
+      const capacity = capacityRows?.[0];
+      if (capacity && !capacity.available) {
+        setError(`선택한 시간대의 잔여 좌석이 부족합니다. 현재 잔여 ${capacity.remaining}석입니다.`);
+        return;
+      }
+    }
+
     const payload: ReservationInsert = {
       profile_id: profile?.id ?? null,
+      pass_id: selectedPass?.id ?? null,
+      pass_name_snapshot: selectedPass?.name ?? form.pass_type,
+      price_at_booking: selectedPass?.price ?? null,
+      seat_type_id: selectedPass?.seat_type_id ?? null,
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim() || null,

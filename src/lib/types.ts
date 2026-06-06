@@ -17,13 +17,52 @@ export type Pass = {
   name: string;
   description: string | null;
   price: number;
+  seat_type_id?: string | null;
   is_active?: boolean;
   sort_order?: number;
+};
+
+export type SeatType = {
+  id: string;
+  name: string;
+  capacity: number;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+};
+
+export type BusinessHour = {
+  id: string;
+  weekday: number;
+  open_time: string;
+  close_time: string;
+  is_closed: boolean;
+};
+
+export type SpaceSetting = {
+  key: string;
+  value: string;
+  updated_at?: string;
+};
+
+export type ReservationNotification = {
+  id: string;
+  profile_id: string | null;
+  reservation_id: string | null;
+  type: string;
+  title: string;
+  body: string;
+  is_read: boolean;
+  created_at: string;
 };
 
 export type Reservation = {
   id: string;
   profile_id: string | null;
+  pass_id: string | null;
+  pass_name_snapshot: string | null;
+  price_at_booking: number | null;
+  seat_type_id: string | null;
   name: string;
   phone: string;
   email: string | null;
@@ -40,6 +79,10 @@ export type Reservation = {
 
 export type ReservationInsert = {
   profile_id?: string | null;
+  pass_id?: string | null;
+  pass_name_snapshot?: string | null;
+  price_at_booking?: number | null;
+  seat_type_id?: string | null;
   name: string;
   phone: string;
   email?: string | null;

@@ -79,7 +79,7 @@ export default function AdminStats() {
   const summary = useMemo(() => {
     const activeReservations = reservations.filter((reservation) => reservation.status !== "canceled");
     const paidReservations = reservations.filter((reservation) => reservation.status === "confirmed" || reservation.status === "completed");
-    const estimatedRevenue = paidReservations.reduce((total, reservation) => total + (priceByPassName.get(reservation.pass_type) ?? 0), 0);
+    const estimatedRevenue = paidReservations.reduce((total, reservation) => total + reservationRevenue(reservation, priceByPassName), 0);
 
     return {
       total: reservations.length,
@@ -103,13 +103,27 @@ export default function AdminStats() {
       if (reservation.status === "completed") current.completed += 1;
       if (reservation.status === "canceled") current.canceled += 1;
       if (reservation.status === "confirmed" || reservation.status === "completed") {
-        current.revenue += priceByPassName.get(reservation.pass_type) ?? 0;
+        current.revenue += reservationRevenue(reservation, priceByPassName);
       }
       groups.set(key, current);
     });
 
     return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 14);
   }, [period, priceByPassName, reservations]);
+
+  const passStats = useMemo(() => {
+    const groups = new Map<string, { name: string; count: number; revenue: number }>();
+    reservations.forEach((reservation) => {
+      const name = reservation.pass_name_snapshot || reservation.pass_type;
+      const current = groups.get(name) ?? { name, count: 0, revenue: 0 };
+      current.count += 1;
+      if (reservation.status === "confirmed" || reservation.status === "completed") {
+        current.revenue += reservationRevenue(reservation, priceByPassName);
+      }
+      groups.set(name, current);
+    });
+    return Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
+  }, [priceByPassName, reservations]);
 
   return (
     <main className="pb-12">
@@ -175,9 +189,27 @@ export default function AdminStats() {
             </table>
           </div>
         </section>
+
+        <section className="mt-5 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <h2 className="mb-4 text-xl font-black">이용권별 예약/매출</h2>
+          <div className="grid gap-2">
+            {passStats.map((stat) => (
+              <div className="grid gap-2 rounded-card bg-white p-4 text-sm font-black sm:grid-cols-[1fr_100px_160px]" key={stat.name}>
+                <p>{stat.name}</p>
+                <p>{stat.count}건</p>
+                <p>{formatPrice(stat.revenue)}</p>
+              </div>
+            ))}
+            {!passStats.length ? <p className="rounded-card bg-white p-4 text-sm font-black">집계할 예약이 없습니다.</p> : null}
+          </div>
+        </section>
       </Section>
     </main>
   );
+}
+
+function reservationRevenue(reservation: Reservation, priceByPassName: Map<string, number>) {
+  return reservation.price_at_booking ?? priceByPassName.get(reservation.pass_name_snapshot || reservation.pass_type) ?? 0;
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {

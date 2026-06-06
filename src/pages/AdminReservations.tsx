@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
-import { formatDate, formatTimeRange, statusLabel, todayValue } from "../lib/format";
+import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import type { Reservation, ReservationStatus } from "../lib/types";
@@ -240,7 +240,7 @@ function ReservationListItem({
           <p className="mt-1 text-xs font-bold text-workroom-muted">
             {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
           </p>
-          <p className="mt-1 text-xs font-bold text-workroom-muted">{reservation.pass_type}</p>
+          <p className="mt-1 text-xs font-bold text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}</p>
         </div>
         <StatusBadge status={reservation.status} />
       </div>
@@ -278,7 +278,9 @@ function ReservationCard({
 
       <dl className="mt-5 grid grid-cols-[86px_1fr] gap-x-3 gap-y-2 text-sm">
         <dt className="font-black text-workroom-muted">이용권</dt>
-        <dd className="font-black">{reservation.pass_type}</dd>
+        <dd className="font-black">{reservation.pass_name_snapshot || reservation.pass_type}</dd>
+        <dt className="font-black text-workroom-muted">예약가</dt>
+        <dd className="font-black">{reservation.price_at_booking ? formatPrice(reservation.price_at_booking) : "-"}</dd>
         <dt className="font-black text-workroom-muted">날짜</dt>
         <dd className="font-black">{formatDate(reservation.date)}</dd>
         <dt className="font-black text-workroom-muted">시간</dt>

@@ -6,6 +6,7 @@ import Account from "./pages/Account";
 import AdminLogin from "./pages/AdminLogin";
 import AdminMembers from "./pages/AdminMembers";
 import AdminReservations from "./pages/AdminReservations";
+import AdminSettings from "./pages/AdminSettings";
 import AdminStats from "./pages/AdminStats";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="admin" element={<AdminLogin />} />
           <Route path="admin/members" element={<AdminMembers />} />
           <Route path="admin/reservations" element={<AdminReservations />} />
+          <Route path="admin/settings" element={<AdminSettings />} />
           <Route path="admin/stats" element={<AdminStats />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

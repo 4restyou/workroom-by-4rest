@@ -5,12 +5,22 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatTimeRange, statusLabel } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { Profile, Reservation } from "../lib/types";
+import type { Profile, Reservation, ReservationNotification } from "../lib/types";
+
+type AccountTab = "profile" | "reservations" | "notifications";
+
+const tabLabels: Record<AccountTab, string> = {
+  profile: "회원정보",
+  reservations: "예약현황",
+  notifications: "알림",
+};
 
 export default function Account() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [dbNotifications, setDbNotifications] = useState<ReservationNotification[]>([]);
+  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,15 +51,24 @@ export default function Account() {
           address: loadedProfile?.address ?? "",
         });
 
-        const { data, error: reservationsError } = await supabase
-          .from("reservations")
-          .select("*")
-          .eq("profile_id", user.id)
-          .order("date", { ascending: false })
-          .order("created_at", { ascending: false });
+        const [{ data, error: reservationsError }, { data: notificationData, error: notificationError }] = await Promise.all([
+          supabase
+            .from("reservations")
+            .select("*")
+            .eq("profile_id", user.id)
+            .order("date", { ascending: false })
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("reservation_notifications")
+            .select("*")
+            .eq("profile_id", user.id)
+            .order("created_at", { ascending: false }),
+        ]);
 
         if (reservationsError) throw reservationsError;
+        if (notificationError) throw notificationError;
         setReservations((data ?? []) as Reservation[]);
+        setDbNotifications((notificationData ?? []) as ReservationNotification[]);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "내정보를 불러오지 못했습니다.");
       } finally {
@@ -76,8 +95,12 @@ export default function Account() {
       }
     });
 
+    dbNotifications.forEach((notification) => {
+      items.push(`${notification.title} ${notification.body}`);
+    });
+
     return items;
-  }, [profile, reservations]);
+  }, [dbNotifications, profile, reservations]);
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -131,59 +154,75 @@ export default function Account() {
 
   return (
     <main className="pb-12">
-      <Section eyebrow="My Page" title="내정보와 알림">
+      <Section eyebrow="My Page" title="내정보">
         {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">내정보를 불러오는 중입니다.</p> : null}
         {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
 
         {!isLoading && profile ? (
-          <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-            <form className="grid gap-4 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-workroom-muted">회원 상태</p>
-                  <p className="mt-1 text-2xl font-black">
-                    {profile.membership_status === "approved" ? "이용 가능" : profile.membership_status === "rejected" ? "보류" : "확인 필요"}
-                  </p>
-                </div>
-                <button className="rounded-full border border-workroom-line bg-white px-4 py-2 text-sm font-black" onClick={signOut} type="button">
-                  로그아웃
+          <div>
+            <div className="mb-5 flex flex-wrap gap-2 rounded-card bg-white/70 p-2 shadow-soft">
+              {(Object.keys(tabLabels) as AccountTab[]).map((tab) => (
+                <button
+                  className={`rounded-full px-5 py-3 text-sm font-black ${activeTab === tab ? "bg-workroom-yellow text-workroom-text" : "text-workroom-muted"}`}
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  type="button"
+                >
+                  {tabLabels[tab]}
+                  {tab === "notifications" && notifications.length ? ` ${notifications.length}` : ""}
                 </button>
-              </div>
-              {profile.role === "admin" ? (
-                <Link className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 text-center font-black" to="/admin/reservations">
-                  관리자 페이지로 이동
-                </Link>
-              ) : null}
+              ))}
+            </div>
 
-              <label className="grid gap-2 text-sm font-black">
-                이메일
-                <input disabled value={profile.email} />
-              </label>
-              <label className="grid gap-2 text-sm font-black">
-                이름
-                <input required value={form.full_name} onChange={(event) => updateField("full_name", event.target.value)} />
-              </label>
-              <label className="grid gap-2 text-sm font-black">
-                연락처
-                <input required placeholder="010-0000-0000" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
-              </label>
-              <label className="grid gap-2 text-sm font-black">
-                주소
-                <input placeholder="선택 입력" value={form.address} onChange={(event) => updateField("address", event.target.value)} />
-              </label>
-              {success ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-3 text-sm font-black">{success}</p> : null}
-              <button className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white" disabled={isSaving} type="submit">
-                {isSaving ? "저장 중" : "내정보 저장"}
-              </button>
-            </form>
+            {activeTab === "profile" ? (
+              <form className="mx-auto grid max-w-2xl gap-4 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-workroom-muted">회원 상태</p>
+                    <p className="mt-1 text-2xl font-black">
+                      {profile.membership_status === "approved" ? "이용 가능" : profile.membership_status === "rejected" ? "보류" : "확인 필요"}
+                    </p>
+                  </div>
+                  <button className="rounded-full border border-workroom-line bg-white px-4 py-2 text-sm font-black" onClick={signOut} type="button">
+                    로그아웃
+                  </button>
+                </div>
+                {profile.role === "admin" ? (
+                  <Link className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 text-center font-black" to="/admin/reservations">
+                    관리자 페이지로 이동
+                  </Link>
+                ) : null}
 
-            <div className="grid gap-5">
+                <label className="grid gap-2 text-sm font-black">
+                  이메일
+                  <input disabled value={profile.email} />
+                </label>
+                <label className="grid gap-2 text-sm font-black">
+                  이름
+                  <input required value={form.full_name} onChange={(event) => updateField("full_name", event.target.value)} />
+                </label>
+                <label className="grid gap-2 text-sm font-black">
+                  연락처
+                  <input required placeholder="010-0000-0000" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
+                </label>
+                <label className="grid gap-2 text-sm font-black">
+                  주소
+                  <input placeholder="선택 입력" value={form.address} onChange={(event) => updateField("address", event.target.value)} />
+                </label>
+                {success ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-3 text-sm font-black">{success}</p> : null}
+                <button className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white" disabled={isSaving} type="submit">
+                  {isSaving ? "저장 중" : "내정보 저장"}
+                </button>
+              </form>
+            ) : null}
+
+            {activeTab === "notifications" ? (
               <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
                 <h2 className="text-xl font-black">알림</h2>
                 <div className="mt-4 grid gap-2">
                   {notifications.length ? (
-                    notifications.map((notification) => (
-                      <p className="rounded-card border border-workroom-line bg-workroom-yellow px-4 py-3 text-sm font-black" key={notification}>
+                    notifications.map((notification, index) => (
+                      <p className="rounded-card border border-workroom-line bg-workroom-yellow px-4 py-3 text-sm font-black" key={`${notification}-${index}`}>
                         {notification}
                       </p>
                     ))
@@ -192,7 +231,9 @@ export default function Account() {
                   )}
                 </div>
               </section>
+            ) : null}
 
+            {activeTab === "reservations" ? (
               <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-black">내 예약</h2>
@@ -206,7 +247,7 @@ export default function Account() {
                       <article className="rounded-card border border-workroom-line bg-white p-4" key={reservation.id}>
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-black">{reservation.pass_type}</p>
+                            <p className="font-black">{reservation.pass_name_snapshot || reservation.pass_type}</p>
                             <p className="mt-1 text-sm font-bold text-workroom-muted">
                               {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
                             </p>
@@ -221,7 +262,7 @@ export default function Account() {
                   )}
                 </div>
               </section>
-            </div>
+            ) : null}
           </div>
         ) : null}
       </Section>

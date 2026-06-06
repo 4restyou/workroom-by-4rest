@@ -43,6 +43,7 @@ export default function Header({ isAdmin }: HeaderProps) {
               <NavLink to="/admin/reservations">예약관리</NavLink>
               <NavLink to="/admin/stats">통계</NavLink>
               <NavLink to="/admin/members">회원관리</NavLink>
+              <NavLink to="/admin/settings">운영설정</NavLink>
               <NavLink to="/">사이트</NavLink>
             </>
           ) : (
