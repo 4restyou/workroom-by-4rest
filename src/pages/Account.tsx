@@ -102,14 +102,25 @@ export default function Account() {
       address: form.address.trim() || null,
     };
 
-    const { error: updateError } = await supabase
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (!user) {
+      setIsSaving(false);
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    const { data: savedProfile, error: updateError } = await supabase
       .from("profiles")
-      .update({
+      .upsert({
+        id: user.id,
+        email: user.email ?? profile.email,
         full_name: nextProfile.full_name,
         phone: nextProfile.phone,
         address: nextProfile.address,
       })
-      .eq("id", profile.id);
+      .select("*")
+      .maybeSingle();
     setIsSaving(false);
 
     if (updateError) {
@@ -117,7 +128,12 @@ export default function Account() {
       return;
     }
 
-    setProfile(nextProfile);
+    if (!savedProfile) {
+      setError("내정보가 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    setProfile(savedProfile as Profile);
     setSuccess("내정보를 저장했습니다.");
   }
 
