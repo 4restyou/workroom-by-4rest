@@ -1,0 +1,209 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Section from "../components/Section";
+import { defaultPasses } from "../lib/defaultPasses";
+import { formatPrice } from "../lib/format";
+import { getCurrentProfile } from "../lib/profiles";
+import { supabase } from "../lib/supabase";
+import type { Pass, Reservation } from "../lib/types";
+
+type Period = "day" | "week" | "month" | "year";
+
+const periodLabels: Record<Period, string> = {
+  day: "일별",
+  week: "주별",
+  month: "월별",
+  year: "년도별",
+};
+
+export default function AdminStats() {
+  const navigate = useNavigate();
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [passes, setPasses] = useState<Pass[]>(defaultPasses);
+  const [period, setPeriod] = useState<Period>("day");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function checkAndLoad() {
+      if (!supabase) {
+        setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
+        setIsLoading(false);
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        navigate("/admin", { replace: true });
+        return;
+      }
+
+      const profile = await getCurrentProfile();
+      if (profile?.role !== "admin") {
+        navigate("/account", { replace: true });
+        return;
+      }
+
+      await loadStats();
+    }
+
+    void checkAndLoad();
+  }, [navigate]);
+
+  async function loadStats() {
+    if (!supabase) return;
+    setIsLoading(true);
+    setError("");
+
+    const [reservationResult, passResult] = await Promise.all([
+      supabase.from("reservations").select("*").order("date", { ascending: false }),
+      supabase.from("passes").select("id,name,description,price,is_active,sort_order").order("sort_order", { ascending: true }),
+    ]);
+
+    setIsLoading(false);
+
+    if (reservationResult.error) {
+      setError(reservationResult.error.message);
+      return;
+    }
+
+    if (!passResult.error && passResult.data?.length) {
+      setPasses(passResult.data);
+    }
+
+    setReservations((reservationResult.data ?? []) as Reservation[]);
+  }
+
+  const priceByPassName = useMemo(() => new Map(passes.map((pass) => [pass.name, pass.price])), [passes]);
+
+  const summary = useMemo(() => {
+    const activeReservations = reservations.filter((reservation) => reservation.status !== "canceled");
+    const paidReservations = reservations.filter((reservation) => reservation.status === "confirmed" || reservation.status === "completed");
+    const estimatedRevenue = paidReservations.reduce((total, reservation) => total + (priceByPassName.get(reservation.pass_type) ?? 0), 0);
+
+    return {
+      total: reservations.length,
+      pending: reservations.filter((reservation) => reservation.status === "pending").length,
+      confirmed: reservations.filter((reservation) => reservation.status === "confirmed").length,
+      completed: reservations.filter((reservation) => reservation.status === "completed").length,
+      canceled: reservations.filter((reservation) => reservation.status === "canceled").length,
+      active: activeReservations.length,
+      estimatedRevenue,
+    };
+  }, [priceByPassName, reservations]);
+
+  const groupedStats = useMemo(() => {
+    const groups = new Map<string, { key: string; count: number; confirmed: number; completed: number; canceled: number; revenue: number }>();
+
+    reservations.forEach((reservation) => {
+      const key = periodKey(reservation.date, period);
+      const current = groups.get(key) ?? { key, count: 0, confirmed: 0, completed: 0, canceled: 0, revenue: 0 };
+      current.count += 1;
+      if (reservation.status === "confirmed") current.confirmed += 1;
+      if (reservation.status === "completed") current.completed += 1;
+      if (reservation.status === "canceled") current.canceled += 1;
+      if (reservation.status === "confirmed" || reservation.status === "completed") {
+        current.revenue += priceByPassName.get(reservation.pass_type) ?? 0;
+      }
+      groups.set(key, current);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 14);
+  }, [period, priceByPassName, reservations]);
+
+  return (
+    <main className="pb-12">
+      <Section eyebrow="Admin" title="운영 통계">
+        <div className="mb-5 grid gap-3 rounded-card border border-workroom-line bg-workroom-surface p-4 shadow-soft sm:grid-cols-[1fr_auto_auto] sm:items-end">
+          <label className="grid gap-2 text-sm font-black">
+            집계 기준
+            <select value={period} onChange={(event) => setPeriod(event.target.value as Period)}>
+              {Object.entries(periodLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 font-black" onClick={loadStats} type="button">
+            새로고침
+          </button>
+          <Link className="rounded-full border border-workroom-line bg-white px-5 py-3 text-center font-black" to="/admin/reservations">
+            예약관리
+          </Link>
+        </div>
+
+        {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">통계를 불러오는 중입니다.</p> : null}
+        {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="전체 예약" value={`${summary.total}건`} />
+          <StatCard label="대기" value={`${summary.pending}건`} />
+          <StatCard label="확정/이용완료" value={`${summary.confirmed + summary.completed}건`} />
+          <StatCard label="예상 매출" value={formatPrice(summary.estimatedRevenue)} />
+        </div>
+
+        <section className="mt-5 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black">{periodLabels[period]} 예약 흐름</h2>
+            <p className="text-sm font-bold text-workroom-muted">최근 {groupedStats.length}개 구간</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] border-separate border-spacing-y-2 text-left text-sm">
+              <thead className="text-workroom-muted">
+                <tr>
+                  <th className="px-3 py-2">기간</th>
+                  <th className="px-3 py-2">예약</th>
+                  <th className="px-3 py-2">확정</th>
+                  <th className="px-3 py-2">이용완료</th>
+                  <th className="px-3 py-2">취소</th>
+                  <th className="px-3 py-2">예상 매출</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedStats.map((group) => (
+                  <tr className="bg-white font-black" key={group.key}>
+                    <td className="rounded-l-card px-3 py-3">{group.key}</td>
+                    <td className="px-3 py-3">{group.count}</td>
+                    <td className="px-3 py-3">{group.confirmed}</td>
+                    <td className="px-3 py-3">{group.completed}</td>
+                    <td className="px-3 py-3">{group.canceled}</td>
+                    <td className="rounded-r-card px-3 py-3">{formatPrice(group.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </Section>
+    </main>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <article className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+      <p className="text-sm font-black text-workroom-muted">{label}</p>
+      <p className="mt-2 text-3xl font-black">{value}</p>
+    </article>
+  );
+}
+
+function periodKey(dateValue: string, period: Period) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  if (period === "year") return `${year}`;
+  if (period === "month") return `${year}-${month}`;
+  if (period === "week") return `${year}-W${String(getWeekNumber(date)).padStart(2, "0")}`;
+  return dateValue;
+}
+
+function getWeekNumber(date: Date) {
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNumber = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - dayNumber);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  return Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}

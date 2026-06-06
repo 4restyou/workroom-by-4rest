@@ -63,9 +63,9 @@ export default function Account() {
   const notifications = useMemo(() => {
     const items: string[] = [];
     if (!profile?.phone) items.push("연락처를 입력하면 예약 신청 때 자동으로 채워집니다.");
-    if (profile?.membership_status === "pending") items.push("회원 신청이 접수되어 관리자 확인을 기다리고 있습니다.");
-    if (profile?.membership_status === "approved") items.push("회원 승인이 완료되었습니다.");
-    if (profile?.membership_status === "rejected") items.push("회원 신청이 보류되었습니다. 공간 운영자에게 문의해 주세요.");
+    if (profile?.membership_status === "pending") items.push("회원 상태 확인이 필요합니다.");
+    if (profile?.membership_status === "approved") items.push("회원 정보가 활성화되어 있습니다.");
+    if (profile?.membership_status === "rejected") items.push("회원 상태가 보류되었습니다. 공간 운영자에게 문의해 주세요.");
 
     reservations.slice(0, 5).forEach((reservation) => {
       if (reservation.status === "confirmed") {
@@ -142,7 +142,7 @@ export default function Account() {
                 <div>
                   <p className="text-sm font-black text-workroom-muted">회원 상태</p>
                   <p className="mt-1 text-2xl font-black">
-                    {profile.membership_status === "approved" ? "승인 완료" : profile.membership_status === "rejected" ? "보류" : "승인 대기"}
+                    {profile.membership_status === "approved" ? "이용 가능" : profile.membership_status === "rejected" ? "보류" : "확인 필요"}
                   </p>
                 </div>
                 <button className="rounded-full border border-workroom-line bg-white px-4 py-2 text-sm font-black" onClick={signOut} type="button">

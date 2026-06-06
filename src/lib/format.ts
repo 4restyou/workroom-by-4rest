@@ -26,5 +26,34 @@ export function formatTimeRange(start?: string | null, end?: string | null) {
 }
 
 export function todayValue() {
-  return new Date().toISOString().slice(0, 10);
+  return formatDateInputValue(new Date());
+}
+
+export function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function currentReservationWindow() {
+  const start = new Date();
+  start.setMinutes(start.getMinutes() <= 30 ? 30 : 60, 0, 0);
+
+  const end = new Date(start);
+  end.setHours(end.getHours() + 2);
+  if (end.getDate() !== start.getDate()) {
+    end.setTime(start.getTime());
+    end.setHours(23, 59, 0, 0);
+  }
+
+  return {
+    date: formatDateInputValue(start),
+    start_time: formatTimeInputValue(start),
+    end_time: formatTimeInputValue(end),
+  };
+}
+
+function formatTimeInputValue(date: Date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }

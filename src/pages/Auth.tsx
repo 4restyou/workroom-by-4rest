@@ -29,7 +29,7 @@ export default function Auth() {
             </p>
           ) : null}
           <p className="text-base font-black leading-7">
-            이메일과 이름은 구글 계정에서 받아오고, 연락처는 가입 후 내정보에서 한 번만 입력합니다.
+            이메일과 이름은 구글 계정에서 받아오고, 연락처는 로그인 후 내정보에서 한 번만 입력합니다.
             주소와 추가 요청 정보는 선택 입력입니다.
           </p>
           <button

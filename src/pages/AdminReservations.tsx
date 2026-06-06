@@ -12,8 +12,9 @@ const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", 
 export default function AdminReservations() {
   const navigate = useNavigate();
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState(todayValue());
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -77,6 +78,18 @@ export default function AdminReservations() {
       });
   }, [dateFilter, reservations, statusFilter]);
 
+  useEffect(() => {
+    if (!visibleReservations.length) {
+      setSelectedReservationId(null);
+      return;
+    }
+
+    const selectedStillVisible = visibleReservations.some((reservation) => reservation.id === selectedReservationId);
+    if (!selectedStillVisible) {
+      setSelectedReservationId(visibleReservations[0].id);
+    }
+  }, [selectedReservationId, visibleReservations]);
+
   async function updateStatus(id: string, status: ReservationStatus) {
     if (!supabase) return;
     const { error: updateError } = await supabase.from("reservations").update({ status }).eq("id", id);
@@ -117,11 +130,12 @@ export default function AdminReservations() {
   }
 
   const pendingCount = reservations.filter((reservation) => reservation.status === "pending").length;
+  const selectedReservation = visibleReservations.find((reservation) => reservation.id === selectedReservationId) ?? null;
 
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리">
-        <div className="mb-5 grid gap-3 rounded-card border border-workroom-line bg-workroom-surface p-4 shadow-soft sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+        <div className="mb-5 grid gap-3 rounded-card border border-workroom-line bg-workroom-surface p-4 shadow-soft lg:grid-cols-[1fr_1fr_auto_auto_auto] lg:items-end">
           <label className="grid gap-2 text-sm font-black">
             날짜별 필터
             <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
@@ -140,17 +154,23 @@ export default function AdminReservations() {
           <button className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 font-black" onClick={loadReservations} type="button">
             새로고침
           </button>
+          <button className="rounded-full border border-workroom-line bg-white px-5 py-3 font-black" onClick={() => setDateFilter("")} type="button">
+            전체 날짜
+          </button>
           <button className="rounded-full border border-workroom-line bg-white px-5 py-3 font-black" onClick={signOut} type="button">
             로그아웃
           </button>
         </div>
 
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
           <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
             확인이 필요한 예약 {pendingCount}건
           </p>
+          <Link className="rounded-card border border-workroom-line bg-white p-4 text-center text-sm font-black shadow-soft" to="/admin/stats">
+            통계 보기
+          </Link>
           <Link className="rounded-card border border-workroom-line bg-white p-4 text-center text-sm font-black shadow-soft" to="/admin/members">
-            회원 신청 관리로 이동
+            회원 관리로 이동
           </Link>
         </div>
 
@@ -160,19 +180,71 @@ export default function AdminReservations() {
           <p className="rounded-card border border-workroom-line bg-workroom-surface p-6 text-center font-black shadow-sketch">조건에 맞는 예약이 없습니다.</p>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {visibleReservations.map((reservation) => (
+        <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+          <section className="rounded-card border border-workroom-line bg-workroom-surface p-3 shadow-soft">
+            <div className="mb-3 flex items-center justify-between gap-3 px-2">
+              <h2 className="text-lg font-black">예약 목록</h2>
+              <span className="text-sm font-black text-workroom-muted">{visibleReservations.length}건</span>
+            </div>
+            <div className="grid max-h-[680px] gap-2 overflow-y-auto pr-1">
+              {visibleReservations.map((reservation) => (
+                <ReservationListItem
+                  isSelected={reservation.id === selectedReservationId}
+                  key={reservation.id}
+                  onSelect={() => setSelectedReservationId(reservation.id)}
+                  reservation={reservation}
+                />
+              ))}
+            </div>
+          </section>
+
+          {selectedReservation ? (
             <ReservationCard
-              key={reservation.id}
-              reservation={reservation}
-              onDelete={() => void deleteReservation(reservation.id)}
-              onNote={(note) => void updateNote(reservation.id, note)}
-              onStatus={(status) => void updateStatus(reservation.id, status)}
+              key={selectedReservation.id}
+              reservation={selectedReservation}
+              onDelete={() => void deleteReservation(selectedReservation.id)}
+              onNote={(note) => void updateNote(selectedReservation.id, note)}
+              onStatus={(status) => void updateStatus(selectedReservation.id, status)}
             />
-          ))}
+          ) : (
+            <p className="rounded-card border border-workroom-line bg-workroom-surface p-6 text-center font-black shadow-soft">
+              왼쪽 목록에서 예약을 선택하면 상세가 표시됩니다.
+            </p>
+          )}
         </div>
       </Section>
     </main>
+  );
+}
+
+function ReservationListItem({
+  isSelected,
+  onSelect,
+  reservation,
+}: {
+  isSelected: boolean;
+  onSelect: () => void;
+  reservation: Reservation;
+}) {
+  return (
+    <button
+      className={`rounded-card border px-4 py-3 text-left transition ${
+        isSelected ? "border-workroom-text bg-workroom-yellow" : "border-workroom-line bg-white hover:border-workroom-text"
+      }`}
+      onClick={onSelect}
+      type="button"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-black">{reservation.name}</p>
+          <p className="mt-1 text-xs font-bold text-workroom-muted">
+            {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-workroom-muted">{reservation.pass_type}</p>
+        </div>
+        <StatusBadge status={reservation.status} />
+      </div>
+    </button>
   );
 }
 

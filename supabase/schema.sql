@@ -7,14 +7,15 @@ create table if not exists profiles (
   phone text,
   address text,
   role text not null default 'user' check (role in ('admin', 'user')),
-  membership_status text not null default 'pending' check (membership_status in ('pending', 'approved', 'rejected')),
+  membership_status text not null default 'approved' check (membership_status in ('pending', 'approved', 'rejected')),
   created_at timestamp with time zone default now()
 );
 
 alter table profiles add column if not exists full_name text;
 alter table profiles add column if not exists phone text;
 alter table profiles add column if not exists address text;
-alter table profiles add column if not exists membership_status text not null default 'pending';
+alter table profiles add column if not exists membership_status text not null default 'approved';
+alter table profiles alter column membership_status set default 'approved';
 
 do $$
 begin

@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
-import { formatPrice, todayValue } from "../lib/format";
+import { currentReservationWindow, formatPrice, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import type { Pass, Profile, ReservationInsert } from "../lib/types";
@@ -31,7 +31,8 @@ export default function Reserve() {
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
     if (!selectedPass) return;
-    setForm((current) => ({ ...current, pass_type: selectedPass }));
+    const reservationWindow = currentReservationWindow();
+    setForm((current) => ({ ...current, ...reservationWindow, pass_type: selectedPass }));
   }, [location.search]);
 
   useEffect(() => {
@@ -121,7 +122,7 @@ export default function Reserve() {
 
   return (
     <main className="pb-10">
-      <Section eyebrow="Reserve" title="오늘 쓸 만큼만 가볍게">
+      <Section eyebrow="Reserve" title="예약">
         <div className="mb-5 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
           예약 신청 후 확인 연락을 드립니다. 확정 전까지 시간은 조금 조정될 수 있습니다.
           {profile ? <span className="mt-2 block">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
