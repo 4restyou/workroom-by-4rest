@@ -102,24 +102,11 @@ export default function Account() {
       address: form.address.trim() || null,
     };
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
-    if (!user) {
-      setIsSaving(false);
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    const { data: savedProfiles, error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        full_name: nextProfile.full_name,
-        phone: nextProfile.phone,
-        address: nextProfile.address,
-      })
-      .eq("id", user.id)
-      .select("*")
-      .limit(1);
+    const { data: savedProfile, error: updateError } = await supabase.rpc("update_my_profile", {
+      p_full_name: nextProfile.full_name,
+      p_phone: nextProfile.phone,
+      p_address: nextProfile.address ?? "",
+    });
     setIsSaving(false);
 
     if (updateError) {
@@ -127,7 +114,6 @@ export default function Account() {
       return;
     }
 
-    const savedProfile = savedProfiles?.[0];
     if (!savedProfile) {
       setError("내정보가 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.");
       return;
