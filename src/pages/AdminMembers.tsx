@@ -83,7 +83,7 @@ export default function AdminMembers() {
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="회원 신청 관리">
-        <div className="mb-5 grid gap-3 rounded-card border-2 border-workroom-line bg-workroom-surface p-4 shadow-soft sm:grid-cols-[1fr_auto_auto] sm:items-end">
+        <div className="mb-5 grid gap-3 rounded-card border border-workroom-line bg-workroom-surface p-4 shadow-soft sm:grid-cols-[1fr_auto_auto] sm:items-end">
           <label className="grid gap-2 text-sm font-black">
             상태별 필터
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | MemberStatus)}>
@@ -95,41 +95,41 @@ export default function AdminMembers() {
               ))}
             </select>
           </label>
-          <button className="rounded-full border-2 border-workroom-line bg-workroom-yellow px-5 py-3 font-black" onClick={loadMembers} type="button">
+          <button className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 font-black" onClick={loadMembers} type="button">
             새로고침
           </button>
-          <Link className="rounded-full border-2 border-workroom-line bg-white px-5 py-3 text-center font-black" to="/admin/reservations">
+          <Link className="rounded-full border border-workroom-line bg-white px-5 py-3 text-center font-black" to="/admin/reservations">
             예약관리
           </Link>
         </div>
 
-        <p className="mb-4 rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
+        <p className="mb-4 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
           승인 대기 회원 {pendingCount}명
         </p>
-        {isLoading ? <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 font-black">회원 신청을 불러오는 중입니다.</p> : null}
-        {error ? <p className="mb-4 rounded-card border-2 border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+        {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">회원 신청을 불러오는 중입니다.</p> : null}
+        {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
         {!isLoading && !visibleMembers.length ? (
-          <p className="rounded-card border-2 border-workroom-line bg-workroom-surface p-6 text-center font-black shadow-sketch">조건에 맞는 회원이 없습니다.</p>
+          <p className="rounded-card border border-workroom-line bg-workroom-surface p-6 text-center font-black shadow-sketch">조건에 맞는 회원이 없습니다.</p>
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
           {visibleMembers.map((member) => (
-            <article className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch" key={member.id}>
+            <article className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch" key={member.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-2xl font-black">{member.full_name || "이름 미입력"}</h2>
                   <p className="mt-1 text-sm font-bold text-workroom-muted">{member.email}</p>
                   <p className="text-sm font-bold text-workroom-muted">{member.phone || "연락처 미입력"}</p>
                 </div>
-                <span className="rounded-full border-2 border-workroom-line bg-workroom-yellow px-3 py-1 text-xs font-black">
+                <span className="rounded-full border border-workroom-line bg-workroom-yellow px-3 py-1 text-xs font-black">
                   {member.role === "admin" ? "관리자" : statusLabels[member.membership_status]}
                 </span>
               </div>
-              {member.address ? <p className="mt-4 rounded-card border-2 border-workroom-line bg-white p-3 text-sm font-black">{member.address}</p> : null}
+              {member.address ? <p className="mt-4 rounded-card border border-workroom-line bg-white p-3 text-sm font-black">{member.address}</p> : null}
               <div className="mt-5 grid grid-cols-3 gap-2">
                 {memberStatuses.map((status) => (
                   <button
-                    className={`rounded-full border-2 border-workroom-line px-3 py-2 text-sm font-black ${
+                    className={`rounded-full border border-workroom-line px-3 py-2 text-sm font-black ${
                       member.membership_status === status ? "bg-workroom-text text-white" : "bg-white"
                     }`}
                     key={status}

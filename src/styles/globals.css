@@ -20,9 +20,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 18px 18px, rgba(17, 17, 17, 0.08) 1.5px, transparent 1.5px),
-    #faf8f1;
-  background-size: 26px 26px;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(247, 243, 234, 0) 340px),
+    #f7f3ea;
 }
 
 body,
@@ -60,12 +59,12 @@ select,
 textarea {
   width: 100%;
   min-height: 48px;
-  border: 2px solid #111111;
+  border: 1px solid #d8d0c2;
   border-radius: 8px;
   background: #ffffff;
   padding: 11px 13px;
-  color: #111111;
-  font-weight: 800;
+  color: #171717;
+  font-weight: 700;
   outline: none;
 }
 
@@ -76,7 +75,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  box-shadow: 0 0 0 4px #f5e85c;
+  border-color: #171717;
+  box-shadow: 0 0 0 4px rgba(246, 231, 111, 0.5);
 }
 
 ::selection {

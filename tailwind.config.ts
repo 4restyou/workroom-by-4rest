@@ -6,18 +6,18 @@ export default {
     extend: {
       colors: {
         workroom: {
-          background: "#FAF8F1",
+          background: "#F7F3EA",
           surface: "#FFFFFF",
-          text: "#111111",
-          muted: "#666666",
-          line: "#111111",
-          yellow: "#F5E85C",
-          purple: "#C9B7F4",
+          text: "#171717",
+          muted: "#66645E",
+          line: "#D8D0C2",
+          yellow: "#F6E76F",
+          purple: "#D8E7D5",
         },
       },
       boxShadow: {
-        sketch: "5px 5px 0 #111111",
-        soft: "0 12px 30px rgba(17, 17, 17, 0.08)",
+        sketch: "0 18px 45px rgba(23, 23, 23, 0.08)",
+        soft: "0 10px 30px rgba(23, 23, 23, 0.06)",
       },
       borderRadius: {
         card: "8px",

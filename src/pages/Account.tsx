@@ -132,12 +132,12 @@ export default function Account() {
   return (
     <main className="pb-12">
       <Section eyebrow="My Page" title="내정보와 알림">
-        {isLoading ? <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 font-black">내정보를 불러오는 중입니다.</p> : null}
-        {error ? <p className="mb-4 rounded-card border-2 border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+        {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">내정보를 불러오는 중입니다.</p> : null}
+        {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
 
         {!isLoading && profile ? (
           <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-            <form className="grid gap-4 rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
+            <form className="grid gap-4 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-black text-workroom-muted">회원 상태</p>
@@ -145,12 +145,12 @@ export default function Account() {
                     {profile.membership_status === "approved" ? "승인 완료" : profile.membership_status === "rejected" ? "보류" : "승인 대기"}
                   </p>
                 </div>
-                <button className="rounded-full border-2 border-workroom-line bg-white px-4 py-2 text-sm font-black" onClick={signOut} type="button">
+                <button className="rounded-full border border-workroom-line bg-white px-4 py-2 text-sm font-black" onClick={signOut} type="button">
                   로그아웃
                 </button>
               </div>
               {profile.role === "admin" ? (
-                <Link className="rounded-full border-2 border-workroom-line bg-workroom-yellow px-5 py-3 text-center font-black" to="/admin/reservations">
+                <Link className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 text-center font-black" to="/admin/reservations">
                   관리자 페이지로 이동
                 </Link>
               ) : null}
@@ -171,39 +171,39 @@ export default function Account() {
                 주소
                 <input placeholder="선택 입력" value={form.address} onChange={(event) => updateField("address", event.target.value)} />
               </label>
-              {success ? <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-3 text-sm font-black">{success}</p> : null}
-              <button className="rounded-full border-2 border-workroom-line bg-workroom-text px-5 py-4 font-black text-white" disabled={isSaving} type="submit">
+              {success ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-3 text-sm font-black">{success}</p> : null}
+              <button className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white" disabled={isSaving} type="submit">
                 {isSaving ? "저장 중" : "내정보 저장"}
               </button>
             </form>
 
             <div className="grid gap-5">
-              <section className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-soft">
+              <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
                 <h2 className="text-xl font-black">알림</h2>
                 <div className="mt-4 grid gap-2">
                   {notifications.length ? (
                     notifications.map((notification) => (
-                      <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow px-4 py-3 text-sm font-black" key={notification}>
+                      <p className="rounded-card border border-workroom-line bg-workroom-yellow px-4 py-3 text-sm font-black" key={notification}>
                         {notification}
                       </p>
                     ))
                   ) : (
-                    <p className="rounded-card border-2 border-workroom-line bg-white px-4 py-3 text-sm font-black">새 알림이 없습니다.</p>
+                    <p className="rounded-card border border-workroom-line bg-white px-4 py-3 text-sm font-black">새 알림이 없습니다.</p>
                   )}
                 </div>
               </section>
 
-              <section className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-soft">
+              <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-black">내 예약</h2>
-                  <Link className="rounded-full border-2 border-workroom-line bg-workroom-yellow px-4 py-2 text-sm font-black" to="/reserve">
+                  <Link className="rounded-full border border-workroom-line bg-workroom-yellow px-4 py-2 text-sm font-black" to="/reserve">
                     예약하기
                   </Link>
                 </div>
                 <div className="mt-4 grid gap-3">
                   {reservations.length ? (
                     reservations.map((reservation) => (
-                      <article className="rounded-card border-2 border-workroom-line bg-white p-4" key={reservation.id}>
+                      <article className="rounded-card border border-workroom-line bg-white p-4" key={reservation.id}>
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-black">{reservation.pass_type}</p>
@@ -217,7 +217,7 @@ export default function Account() {
                       </article>
                     ))
                   ) : (
-                    <p className="rounded-card border-2 border-workroom-line bg-white px-4 py-3 text-sm font-black">아직 예약 내역이 없습니다.</p>
+                    <p className="rounded-card border border-workroom-line bg-white px-4 py-3 text-sm font-black">아직 예약 내역이 없습니다.</p>
                   )}
                 </div>
               </section>

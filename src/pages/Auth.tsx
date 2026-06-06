@@ -22,9 +22,9 @@ export default function Auth() {
   return (
     <main className="pb-12">
       <Section eyebrow="Member" title="구글 계정으로 시작하기">
-        <div className="mx-auto grid max-w-lg gap-4 rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch">
+        <div className="mx-auto grid max-w-lg gap-4 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch">
           {!hasSupabaseConfig ? (
-            <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
+            <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
               `.env`에 Supabase URL과 anon key를 넣으면 구글 로그인이 활성화됩니다.
             </p>
           ) : null}
@@ -33,14 +33,14 @@ export default function Auth() {
             주소와 추가 요청 정보는 선택 입력입니다.
           </p>
           <button
-            className="rounded-full border-2 border-workroom-line bg-workroom-text px-5 py-4 font-black text-white disabled:bg-workroom-muted"
+            className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white disabled:bg-workroom-muted"
             disabled={isSubmitting || !hasSupabaseConfig}
             onClick={() => void handleGoogleLogin()}
             type="button"
           >
             {isSubmitting ? "구글로 이동 중" : "Google로 회원가입 / 로그인"}
           </button>
-          {error ? <p className="rounded-card border-2 border-workroom-line bg-red-100 p-3 text-sm font-black">{error}</p> : null}
+          {error ? <p className="rounded-card border border-workroom-line bg-red-100 p-3 text-sm font-black">{error}</p> : null}
           <Link className="text-center text-sm font-black underline" to="/">
             홈으로 돌아가기
           </Link>

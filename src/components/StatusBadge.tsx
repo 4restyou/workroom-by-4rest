@@ -14,7 +14,7 @@ type StatusBadgeProps = {
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
   return (
-    <span className={`inline-flex rounded-full border-2 border-workroom-line px-3 py-1 text-xs font-black ${statusClass[status]}`}>
+    <span className={`inline-flex rounded-full border border-workroom-line px-3 py-1 text-xs font-black ${statusClass[status]}`}>
       {statusLabel[status]}
     </span>
   );

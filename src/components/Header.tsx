@@ -7,13 +7,13 @@ type HeaderProps = {
 
 export default function Header({ isAdmin }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b-2 border-workroom-line bg-workroom-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-workroom-line bg-workroom-background/90 backdrop-blur">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3.5">
         <Link className="flex min-w-0 items-center gap-2" to="/">
-          <img className="h-9 w-auto max-w-[132px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
+          <img className="h-8 w-auto max-w-[124px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
         </Link>
 
-        <nav className="flex items-center gap-3 text-xs font-black sm:text-sm">
+        <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-5 sm:text-sm">
           {isAdmin ? (
             <>
               <NavLink to="/admin/reservations">예약관리</NavLink>

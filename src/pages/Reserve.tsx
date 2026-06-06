@@ -115,17 +115,17 @@ export default function Reserve() {
   return (
     <main className="pb-10">
       <Section eyebrow="Reserve" title="오늘 쓸 만큼만 가볍게">
-        <div className="mb-5 rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
+        <div className="mb-5 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
           예약 신청 후 확인 연락을 드립니다. 아직 준비 중인 공간이라 확정 전까지 시간은 조금 조정될 수 있습니다.
           {profile ? <span className="mt-2 block">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
         </div>
         <form className="grid gap-5" onSubmit={handleSubmit}>
-          <div className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch">
+          <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch">
             <h2 className="mb-4 text-xl font-black">1. 이용권</h2>
             <div className="grid gap-3">
               {[...passes, { id: "custom-inquiry", name: "기타 문의", description: "촬영, 모임, 장기 이용 상담", price: 0 }].map((pass) => (
                 <label
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 border-workroom-line px-4 py-3 font-black ${
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border border-workroom-line px-4 py-3 font-black ${
                     form.pass_type === pass.name ? "bg-workroom-yellow" : "bg-white"
                   }`}
                   key={pass.id}
@@ -150,7 +150,7 @@ export default function Reserve() {
             </div>
           </div>
 
-          <div className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
             <h2 className="mb-4 text-xl font-black">2. 날짜와 시간</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="예약 날짜">
@@ -165,7 +165,7 @@ export default function Reserve() {
             </div>
           </div>
 
-          <div className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
             <h2 className="mb-4 text-xl font-black">3. 예약자 정보</h2>
             <div className="grid gap-4">
               <Field label="이름">
@@ -194,9 +194,9 @@ export default function Reserve() {
             </div>
           </div>
 
-          {error ? <p className="rounded-card border-2 border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+          {error ? <p className="rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
           {success ? (
-            <div className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-5 font-black leading-7 shadow-sketch">
+            <div className="rounded-card border border-workroom-line bg-workroom-yellow p-5 font-black leading-7 shadow-sketch">
               <p>예약 신청이 접수되었습니다.</p>
               <p>확인 후 연락드릴게요.</p>
               <p className="mt-3 text-sm">
@@ -206,7 +206,7 @@ export default function Reserve() {
           ) : null}
 
           <button
-            className="rounded-full border-2 border-workroom-line bg-workroom-text px-6 py-4 text-lg font-black text-white disabled:cursor-not-allowed disabled:bg-workroom-muted"
+            className="rounded-full border border-workroom-line bg-workroom-text px-6 py-4 text-lg font-black text-white disabled:cursor-not-allowed disabled:bg-workroom-muted"
             disabled={isSubmitting}
             type="submit"
           >

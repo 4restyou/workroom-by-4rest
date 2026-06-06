@@ -70,9 +70,9 @@ export default function AdminLogin() {
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="관리자 로그인">
-        <form className="mx-auto grid max-w-md gap-4 rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
+        <form className="mx-auto grid max-w-md gap-4 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
           {!hasSupabaseConfig ? (
-            <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
+            <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
               `.env`에 Supabase URL과 anon key를 넣으면 로그인이 활성화됩니다.
             </p>
           ) : null}
@@ -84,16 +84,16 @@ export default function AdminLogin() {
             비밀번호
             <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </label>
-          {error ? <p className="rounded-card border-2 border-workroom-line bg-red-100 p-3 text-sm font-black">{error}</p> : null}
+          {error ? <p className="rounded-card border border-workroom-line bg-red-100 p-3 text-sm font-black">{error}</p> : null}
           <button
-            className="rounded-full border-2 border-workroom-line bg-workroom-text px-5 py-4 font-black text-white disabled:bg-workroom-muted"
+            className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white disabled:bg-workroom-muted"
             disabled={isSubmitting}
             type="submit"
           >
             {isSubmitting ? "확인 중" : "로그인"}
           </button>
           <button
-            className="rounded-full border-2 border-workroom-line bg-white px-5 py-4 font-black disabled:bg-workroom-muted"
+            className="rounded-full border border-workroom-line bg-white px-5 py-4 font-black disabled:bg-workroom-muted"
             disabled={isGoogleSubmitting || !hasSupabaseConfig}
             onClick={() => void handleGoogleLogin()}
             type="button"
