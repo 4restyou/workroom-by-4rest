@@ -149,6 +149,11 @@ export default function Account() {
                   로그아웃
                 </button>
               </div>
+              {profile.role === "admin" ? (
+                <Link className="rounded-full border-2 border-workroom-line bg-workroom-yellow px-5 py-3 text-center font-black" to="/admin/reservations">
+                  관리자 페이지로 이동
+                </Link>
+              ) : null}
 
               <label className="grid gap-2 text-sm font-black">
                 이메일
