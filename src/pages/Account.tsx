@@ -95,16 +95,21 @@ export default function Account() {
     }
 
     setIsSaving(true);
-    const { data, error: updateError } = await supabase
+    const nextProfile = {
+      ...profile,
+      full_name: form.full_name.trim(),
+      phone: form.phone.trim(),
+      address: form.address.trim() || null,
+    };
+
+    const { error: updateError } = await supabase
       .from("profiles")
       .update({
-        full_name: form.full_name.trim(),
-        phone: form.phone.trim(),
-        address: form.address.trim() || null,
+        full_name: nextProfile.full_name,
+        phone: nextProfile.phone,
+        address: nextProfile.address,
       })
-      .eq("id", profile.id)
-      .select("*")
-      .single();
+      .eq("id", profile.id);
     setIsSaving(false);
 
     if (updateError) {
@@ -112,7 +117,7 @@ export default function Account() {
       return;
     }
 
-    setProfile(data as Profile);
+    setProfile(nextProfile);
     setSuccess("내정보를 저장했습니다.");
   }
 
