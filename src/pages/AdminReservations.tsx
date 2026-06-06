@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatTimeRange, statusLabel, todayValue } from "../lib/format";
+import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import type { Reservation, ReservationStatus } from "../lib/types";
 
@@ -27,6 +28,12 @@ export default function AdminReservations() {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
         navigate("/admin", { replace: true });
+        return;
+      }
+
+      const profile = await getCurrentProfile();
+      if (profile?.role !== "admin") {
+        navigate("/account", { replace: true });
         return;
       }
 
@@ -109,6 +116,8 @@ export default function AdminReservations() {
     navigate("/admin", { replace: true });
   }
 
+  const pendingCount = reservations.filter((reservation) => reservation.status === "pending").length;
+
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리">
@@ -134,6 +143,15 @@ export default function AdminReservations() {
           <button className="rounded-full border-2 border-workroom-line bg-white px-5 py-3 font-black" onClick={signOut} type="button">
             로그아웃
           </button>
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black">
+            확인이 필요한 예약 {pendingCount}건
+          </p>
+          <Link className="rounded-card border-2 border-workroom-line bg-white p-4 text-center text-sm font-black shadow-soft" to="/admin/members">
+            회원 신청 관리로 이동
+          </Link>
         </div>
 
         {isLoading ? <p className="rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 font-black">예약을 불러오는 중입니다.</p> : null}

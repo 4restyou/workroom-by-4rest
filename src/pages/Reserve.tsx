@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, todayValue } from "../lib/format";
+import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
-import type { Pass, ReservationInsert } from "../lib/types";
+import type { Pass, Profile, ReservationInsert } from "../lib/types";
 
 const emptyForm = {
   pass_type: "",
@@ -21,6 +22,7 @@ const emptyForm = {
 export default function Reserve() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [form, setForm] = useState(emptyForm);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -40,6 +42,23 @@ export default function Reserve() {
     }
 
     void loadPasses();
+  }, []);
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (!hasSupabaseConfig || !supabase) return;
+      const loadedProfile = await getCurrentProfile();
+      if (!loadedProfile) return;
+      setProfile(loadedProfile);
+      setForm((current) => ({
+        ...current,
+        name: current.name || loadedProfile.full_name || "",
+        phone: current.phone || loadedProfile.phone || "",
+        email: current.email || loadedProfile.email || "",
+      }));
+    }
+
+    void loadProfile();
   }, []);
 
   function updateField(name: keyof typeof form, value: string) {
@@ -67,6 +86,7 @@ export default function Reserve() {
     }
 
     const payload: ReservationInsert = {
+      profile_id: profile?.id ?? null,
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim() || null,
@@ -97,6 +117,7 @@ export default function Reserve() {
       <Section eyebrow="Reserve" title="오늘 쓸 만큼만 가볍게">
         <div className="mb-5 rounded-card border-2 border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
           예약 신청 후 확인 연락을 드립니다. 아직 준비 중인 공간이라 확정 전까지 시간은 조금 조정될 수 있습니다.
+          {profile ? <span className="mt-2 block">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
         </div>
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <div className="rounded-card border-2 border-workroom-line bg-workroom-surface p-5 shadow-sketch">

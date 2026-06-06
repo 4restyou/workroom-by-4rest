@@ -3,12 +3,36 @@ create extension if not exists "pgcrypto";
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
+  full_name text,
+  phone text,
+  address text,
   role text not null default 'user' check (role in ('admin', 'user')),
+  membership_status text not null default 'pending' check (membership_status in ('pending', 'approved', 'rejected')),
   created_at timestamp with time zone default now()
 );
 
+alter table profiles add column if not exists full_name text;
+alter table profiles add column if not exists phone text;
+alter table profiles add column if not exists address text;
+alter table profiles add column if not exists membership_status text not null default 'pending';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_membership_status_check'
+  ) then
+    alter table profiles
+    add constraint profiles_membership_status_check
+    check (membership_status in ('pending', 'approved', 'rejected'));
+  end if;
+end;
+$$;
+
 create table if not exists reservations (
   id uuid primary key default gen_random_uuid(),
+  profile_id uuid references profiles(id) on delete set null,
   name text not null,
   phone text not null,
   email text,
@@ -22,6 +46,8 @@ create table if not exists reservations (
   admin_note text,
   created_at timestamp with time zone default now()
 );
+
+alter table reservations add column if not exists profile_id uuid references profiles(id) on delete set null;
 
 create table if not exists passes (
   id uuid primary key default gen_random_uuid(),
@@ -51,12 +77,80 @@ as $$
   );
 $$;
 
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name')
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        full_name = coalesce(public.profiles.full_name, excluded.full_name);
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user();
+
+create or replace function public.prevent_member_privilege_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    new.role = old.role;
+    new.membership_status = old.membership_status;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_member_privilege_update on profiles;
+create trigger prevent_member_privilege_update
+before update on profiles
+for each row execute function public.prevent_member_privilege_update();
+
 drop policy if exists "profiles_select_own_or_admin" on profiles;
 create policy "profiles_select_own_or_admin"
 on profiles
 for select
 to authenticated
 using (id = auth.uid() or public.is_admin());
+
+drop policy if exists "profiles_insert_own" on profiles;
+create policy "profiles_insert_own"
+on profiles
+for insert
+to authenticated
+with check (id = auth.uid());
+
+drop policy if exists "profiles_update_own" on profiles;
+create policy "profiles_update_own"
+on profiles
+for update
+to authenticated
+using (id = auth.uid())
+with check (id = auth.uid());
+
+drop policy if exists "profiles_admin_update" on profiles;
+create policy "profiles_admin_update"
+on profiles
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "passes_public_read_active" on passes;
 create policy "passes_public_read_active"
@@ -83,7 +177,15 @@ with check (
   and name <> ''
   and phone <> ''
   and pass_type <> ''
+  and (profile_id is null or profile_id = auth.uid())
 );
+
+drop policy if exists "reservations_select_own" on reservations;
+create policy "reservations_select_own"
+on reservations
+for select
+to authenticated
+using (profile_id = auth.uid());
 
 drop policy if exists "reservations_admin_read" on reservations;
 create policy "reservations_admin_read"
@@ -119,6 +221,6 @@ values
 on conflict do nothing;
 
 -- 관리자 계정 생성 후 auth.users의 id를 확인해 아래 예시처럼 등록합니다.
--- insert into profiles (id, email, role)
--- values ('AUTH_USER_UUID', 'admin@example.com', 'admin')
--- on conflict (id) do update set role = 'admin', email = excluded.email;
+-- insert into profiles (id, email, role, membership_status)
+-- values ('AUTH_USER_UUID', 'colorfg@gmail.com', 'admin', 'approved')
+-- on conflict (id) do update set role = 'admin', email = excluded.email, membership_status = 'approved';

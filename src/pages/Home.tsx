@@ -6,7 +6,8 @@ import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import type { Pass } from "../lib/types";
-import heroImage from "../../assets/workroom-hero.png";
+import heroImage from "../../assets/logo/mainlogo.png";
+import captionImage from "../../assets/logo/caption.png";
 
 const features = [
   {
@@ -87,6 +88,9 @@ export default function Home() {
             <Link className="rounded-full border-2 border-workroom-line bg-workroom-text px-6 py-4 text-center font-black text-white" to="/reserve">
               예약하기
             </Link>
+            <Link className="rounded-full border-2 border-workroom-line bg-white px-6 py-4 text-center font-black" to="/login">
+              회원가입
+            </Link>
             <a className="rounded-full border-2 border-workroom-line bg-workroom-yellow px-6 py-4 text-center font-black" href="#space">
               공간 소개 보기
             </a>
@@ -94,7 +98,7 @@ export default function Home() {
         </div>
 
         <figure className="relative overflow-hidden rounded-card border-2 border-workroom-line bg-workroom-surface shadow-sketch">
-          <img className="aspect-[4/5] w-full object-cover grayscale sm:aspect-[5/6]" src={heroImage} alt="WORKROOM by 4REST 작업 라운지 분위기" />
+          <img className="aspect-[4/5] w-full object-contain p-5 sm:aspect-[5/6] sm:p-8" src={heroImage} alt="WORKROOM by 4REST 로고 이미지" />
           <figcaption className="absolute bottom-4 left-4 right-4 rounded-card border-2 border-workroom-line bg-workroom-yellow px-4 py-3 text-sm font-black">
             슬렁슬렁 들어와도 되는, 오래 앉아도 되는 자리.
           </figcaption>
@@ -116,6 +120,9 @@ export default function Home() {
       </Section>
 
       <Section eyebrow="Features" title="작업이 너무 커지지 않게">
+        <div className="mb-5 rounded-card border-2 border-workroom-line bg-workroom-surface p-4 shadow-soft">
+          <img className="mx-auto h-auto max-h-20 w-full object-contain" src={captionImage} alt="Out of office, Into Workroom." />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map((feature) => (
             <FeatureCard key={feature.title} {...feature} />

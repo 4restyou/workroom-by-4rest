@@ -1,4 +1,16 @@
 export type ReservationStatus = "pending" | "confirmed" | "canceled" | "completed";
+export type MemberStatus = "pending" | "approved" | "rejected";
+
+export type Profile = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  address: string | null;
+  role: "admin" | "user";
+  membership_status: MemberStatus;
+  created_at: string;
+};
 
 export type Pass = {
   id: string;
@@ -11,6 +23,7 @@ export type Pass = {
 
 export type Reservation = {
   id: string;
+  profile_id: string | null;
   name: string;
   phone: string;
   email: string | null;
@@ -26,6 +39,7 @@ export type Reservation = {
 };
 
 export type ReservationInsert = {
+  profile_id?: string | null;
   name: string;
   phone: string;
   email?: string | null;

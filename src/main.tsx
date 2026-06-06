@@ -2,8 +2,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import App from "./App";
+import Account from "./pages/Account";
 import AdminLogin from "./pages/AdminLogin";
+import AdminMembers from "./pages/AdminMembers";
 import AdminReservations from "./pages/AdminReservations";
+import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Reserve from "./pages/Reserve";
 import "./styles/globals.css";
@@ -14,8 +17,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <Routes>
         <Route element={<App />}>
           <Route index element={<Home />} />
+          <Route path="login" element={<Auth />} />
+          <Route path="account" element={<Account />} />
           <Route path="reserve" element={<Reserve />} />
           <Route path="admin" element={<AdminLogin />} />
+          <Route path="admin/members" element={<AdminMembers />} />
           <Route path="admin/reservations" element={<AdminReservations />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Section from "../components/Section";
+import { signInWithGoogle } from "../lib/profiles";
 import { configuredAdminEmails, hasSupabaseConfig, supabase } from "../lib/supabase";
 
 export default function AdminLogin() {
@@ -9,6 +10,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   useEffect(() => {
     async function redirectIfSignedIn() {
@@ -54,6 +56,17 @@ export default function AdminLogin() {
     navigate("/admin/reservations");
   }
 
+  async function handleGoogleLogin() {
+    setError("");
+    setIsGoogleSubmitting(true);
+    try {
+      await signInWithGoogle("/admin/reservations");
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "구글 로그인을 시작하지 못했습니다.");
+      setIsGoogleSubmitting(false);
+    }
+  }
+
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="관리자 로그인">
@@ -78,6 +91,14 @@ export default function AdminLogin() {
             type="submit"
           >
             {isSubmitting ? "확인 중" : "로그인"}
+          </button>
+          <button
+            className="rounded-full border-2 border-workroom-line bg-white px-5 py-4 font-black disabled:bg-workroom-muted"
+            disabled={isGoogleSubmitting || !hasSupabaseConfig}
+            onClick={() => void handleGoogleLogin()}
+            type="button"
+          >
+            {isGoogleSubmitting ? "구글로 이동 중" : "Google 관리자 로그인"}
           </button>
         </form>
       </Section>

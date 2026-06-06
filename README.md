@@ -16,11 +16,34 @@ npm run dev
 ```bash
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_ADMIN_EMAILS=admin@example.com
+VITE_ADMIN_EMAILS=colorfg@gmail.com
 ```
 
 `VITE_ADMIN_EMAILS`는 프론트엔드 UX용 보조 체크입니다. 실제 관리자 권한은 Supabase
 `profiles.role = 'admin'`과 RLS 정책으로 제어합니다.
+
+## 회원 / 관리자
+
+- 회원가입과 로그인은 `/login`에서 Google OAuth로 진행합니다.
+- 로그인한 회원은 `/account`에서 이름, 연락처, 주소를 관리하고 예약 상태 알림을 확인합니다.
+- 관리자는 `profiles.role = 'admin'`이어야 `/admin/reservations`, `/admin/members`에 접근할 수 있습니다.
+- 신규 회원은 `profiles.membership_status = 'pending'`으로 생성되며 관리자가 승인/보류 처리합니다.
+
+Supabase Auth 설정에서 Google provider를 켜고, Site URL과 Redirect URL에 배포 도메인을 등록해야 합니다.
+로컬 개발 시에는 `http://localhost:5173/account`, `http://localhost:5173/admin/reservations`도 추가합니다.
+
+## 카카오톡 알림
+
+예약 신청/확정 알림을 카카오톡으로 자동 발송하려면 프론트엔드가 아니라 서버 함수가 필요합니다.
+Kakao Developers의 카카오톡 메시지 API는 같은 서비스 사용자/친구 동의 기반 메시지에 가깝고, 고객 예약 알림은 보통
+카카오비즈니스 알림톡/상담톡 또는 비즈메시지 대행 API로 구현합니다.
+
+권장 구조:
+
+1. Supabase Edge Function에서 예약 생성/상태 변경 이벤트를 받습니다.
+2. 서버 환경 변수에 카카오/대행사 API 키를 저장합니다.
+3. 승인된 알림톡 템플릿으로 고객과 관리자에게 메시지를 보냅니다.
+4. 발송 결과를 별도 테이블에 저장해 `/account`와 관리자 화면에서 재확인합니다.
 
 ## Supabase
 
