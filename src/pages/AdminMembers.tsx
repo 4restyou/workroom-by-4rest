@@ -17,6 +17,7 @@ export default function AdminMembers() {
   const navigate = useNavigate();
   const [members, setMembers] = useState<Profile[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | MemberStatus>("all");
+  const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -64,10 +65,18 @@ export default function AdminMembers() {
     setMembers((data ?? []) as Profile[]);
   }
 
-  const visibleMembers = useMemo(
-    () => members.filter((member) => (statusFilter === "all" ? true : member.membership_status === statusFilter)),
-    [members, statusFilter],
-  );
+  const visibleMembers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
+    return members
+      .filter((member) => (statusFilter === "all" ? true : member.membership_status === statusFilter))
+      .filter((member) => {
+        if (!q) return true;
+        const haystack = `${member.full_name ?? ""} ${member.email}`.toLowerCase();
+        const phoneMatch = qDigits.length > 0 && (member.phone ?? "").replace(/\D/g, "").includes(qDigits);
+        return haystack.includes(q) || phoneMatch;
+      });
+  }, [members, query, statusFilter]);
 
   const pendingCount = members.filter((member) => member.membership_status === "pending" && member.role !== "admin").length;
 
@@ -84,24 +93,30 @@ export default function AdminMembers() {
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="회원 관리" accent="ink">
-        <div className={`mb-5 grid gap-3 ${card} p-4 sm:grid-cols-[1fr_auto_auto] sm:items-end`}>
+        <div className={`mb-5 grid gap-3 ${card} p-4`}>
           <label className="grid gap-2 text-sm font-bold">
-            상태별 필터
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | MemberStatus)}>
-              <option value="all">전체</option>
-              {memberStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {statusLabels[status]}
-                </option>
-              ))}
-            </select>
+            이름 · 이메일 · 전화 검색
+            <input placeholder="이름, 이메일 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <button className={buttonClass("accent", "md")} onClick={loadMembers} type="button">
-            새로고침
-          </button>
-          <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
-            예약관리
-          </Link>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+            <label className="grid gap-2 text-sm font-bold">
+              상태별 필터
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | MemberStatus)}>
+                <option value="all">전체</option>
+                {memberStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabels[status]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className={buttonClass("accent", "md")} onClick={loadMembers} type="button">
+              새로고침
+            </button>
+            <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
+              예약관리
+            </Link>
+          </div>
         </div>
 
         <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold`}>
@@ -117,12 +132,23 @@ export default function AdminMembers() {
           {visibleMembers.map((member) => (
             <article className={`${card} p-5`} key={member.id}>
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-2xl font-black">{member.full_name || "이름 미입력"}</h2>
-                  <p className="mt-1 text-sm font-medium text-workroom-muted">{member.email}</p>
-                  <p className="text-sm font-medium text-workroom-muted">{member.phone || "연락처 미입력"}</p>
+                  <a
+                    href={`mailto:${member.email}`}
+                    className="mt-1 block truncate text-sm font-medium text-workroom-muted underline underline-offset-2"
+                  >
+                    {member.email}
+                  </a>
+                  {member.phone ? (
+                    <a href={`tel:${member.phone}`} className="text-sm font-bold text-workroom-ink underline underline-offset-2">
+                      {member.phone}
+                    </a>
+                  ) : (
+                    <p className="text-sm font-medium text-workroom-muted">연락처 미입력</p>
+                  )}
                 </div>
-                <span className={badge("yellow")}>
+                <span className={badge(member.role === "admin" ? "ink" : "yellow")}>
                   {member.role === "admin" ? "관리자" : statusLabels[member.membership_status]}
                 </span>
               </div>

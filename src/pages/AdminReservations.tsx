@@ -19,7 +19,8 @@ const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded"];
 export default function AdminReservations() {
   const navigate = useNavigate();
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [dateFilter, setDateFilter] = useState(todayValue());
+  const [dateFilter, setDateFilter] = useState("");
+  const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,16 +75,27 @@ export default function AdminReservations() {
 
   const visibleReservations = useMemo(() => {
     const today = todayValue();
+    const q = query.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
     return reservations
       .filter((reservation) => (dateFilter ? reservation.date === dateFilter : true))
       .filter((reservation) => (statusFilter === "all" ? true : reservation.status === statusFilter))
+      .filter((reservation) => {
+        if (!q) return true;
+        const nameMatch = reservation.name.toLowerCase().includes(q);
+        const phoneMatch = qDigits.length > 0 && reservation.phone.replace(/\D/g, "").includes(qDigits);
+        return nameMatch || phoneMatch;
+      })
       .sort((a, b) => {
+        const aPending = a.status === "pending" ? 0 : 1;
+        const bPending = b.status === "pending" ? 0 : 1;
+        if (aPending !== bPending) return aPending - bPending;
         const aFuture = a.date >= today ? 0 : 1;
         const bFuture = b.date >= today ? 0 : 1;
         if (aFuture !== bFuture) return aFuture - bFuture;
         return `${a.date} ${a.start_time ?? ""}`.localeCompare(`${b.date} ${b.start_time ?? ""}`);
       });
-  }, [dateFilter, reservations, statusFilter]);
+  }, [dateFilter, query, reservations, statusFilter]);
 
   useEffect(() => {
     if (!visibleReservations.length) {
@@ -157,31 +169,40 @@ export default function AdminReservations() {
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리" accent="ink">
-        <div className={`${card} mb-5 grid gap-3 p-4 lg:grid-cols-[1fr_1fr_auto_auto_auto] lg:items-end`}>
+        <div className={`${card} mb-5 grid gap-3 p-4`}>
           <label className="grid gap-2 text-sm font-bold">
-            날짜별 필터
-            <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
+            이름 · 전화 검색
+            <input placeholder="이름 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <label className="grid gap-2 text-sm font-bold">
-            상태별 필터
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | ReservationStatus)}>
-              <option value="all">전체</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {statusLabel[status]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className={buttonClass("accent", "md")} onClick={loadReservations} type="button">
-            새로고침
-          </button>
-          <button className={buttonClass("secondary", "md")} onClick={() => setDateFilter("")} type="button">
-            전체 날짜
-          </button>
-          <button className={buttonClass("secondary", "md")} onClick={signOut} type="button">
-            로그아웃
-          </button>
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto_auto_auto] lg:items-end">
+            <label className="grid gap-2 text-sm font-bold">
+              날짜별 필터
+              <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
+            </label>
+            <label className="grid gap-2 text-sm font-bold">
+              상태별 필터
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | ReservationStatus)}>
+                <option value="all">전체</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabel[status]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className={buttonClass("accent", "md")} onClick={loadReservations} type="button">
+              새로고침
+            </button>
+            <button className={buttonClass("secondary", "md")} onClick={() => setDateFilter(todayValue())} type="button">
+              오늘
+            </button>
+            <button className={buttonClass("secondary", "md")} onClick={() => setDateFilter("")} type="button">
+              전체 날짜
+            </button>
+            <button className={buttonClass("secondary", "md")} onClick={signOut} type="button">
+              로그아웃
+            </button>
+          </div>
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
@@ -301,10 +322,24 @@ function ReservationCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-2xl font-black">{reservation.name}</h3>
-          <p className="mt-1 text-sm font-medium text-workroom-muted">{reservation.phone}</p>
+          <a
+            href={`tel:${reservation.phone}`}
+            className="mt-1 inline-block text-sm font-bold text-workroom-ink underline underline-offset-2"
+          >
+            {reservation.phone}
+          </a>
           {reservation.email ? <p className="text-sm font-medium text-workroom-muted">{reservation.email}</p> : null}
         </div>
         <StatusBadge status={reservation.status} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a className={buttonClass("secondary", "sm")} href={`tel:${reservation.phone}`}>
+          전화 걸기
+        </a>
+        <a className={buttonClass("secondary", "sm")} href={`sms:${reservation.phone}`}>
+          문자 보내기
+        </a>
       </div>
 
       <dl className="mt-5 grid grid-cols-[86px_1fr] gap-x-3 gap-y-2 text-sm">
