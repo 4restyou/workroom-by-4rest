@@ -2,11 +2,11 @@ import { statusLabel } from "../lib/format";
 import type { ReservationStatus } from "../lib/types";
 
 const statusClass: Record<ReservationStatus, string> = {
-  pending: "bg-workroom-yellow text-workroom-text",
-  confirmed: "bg-green-200 text-workroom-text",
-  canceled: "bg-zinc-200 text-workroom-muted",
-  completed: "bg-workroom-text text-white",
-  no_show: "bg-red-100 text-workroom-text",
+  pending: "bg-workroom-yellow text-workroom-ink",
+  confirmed: "bg-workroom-mint text-workroom-ink",
+  canceled: "bg-workroom-surface text-workroom-muted",
+  completed: "bg-workroom-ink text-white",
+  no_show: "bg-workroom-danger text-workroom-ink",
 };
 
 type StatusBadgeProps = {
@@ -15,7 +15,9 @@ type StatusBadgeProps = {
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
   return (
-    <span className={`inline-flex rounded-full border border-workroom-line px-3 py-1 text-xs font-black ${statusClass[status]}`}>
+    <span
+      className={`inline-flex shrink-0 items-center rounded-pill border-2 border-workroom-ink px-3 py-1 text-xs font-bold ${statusClass[status]}`}
+    >
       {statusLabel[status]}
     </span>
   );

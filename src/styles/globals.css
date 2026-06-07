@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  color: #111111;
-  background: #faf8f1;
+  color: #141414;
+  background: #f4eee1;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,9 +19,10 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(247, 243, 234, 0) 340px),
-    #f7f3ea;
+  background-color: #f4eee1;
+  background-image: radial-gradient(rgba(20, 20, 20, 0.05) 1.4px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: -11px -11px;
 }
 
 body,
@@ -59,13 +60,16 @@ select,
 textarea {
   width: 100%;
   min-height: 48px;
-  border: 1px solid #d8d0c2;
-  border-radius: 8px;
+  border: 2px solid #141414;
+  border-radius: 14px;
   background: #ffffff;
-  padding: 11px 13px;
-  color: #171717;
-  font-weight: 500;
+  padding: 11px 14px;
+  color: #141414;
+  font-weight: 600;
   outline: none;
+  transition:
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
 }
 
 input::placeholder,
@@ -81,11 +85,18 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #171717;
-  box-shadow: 0 0 0 4px rgba(246, 231, 111, 0.5);
+  box-shadow: 3px 3px 0 0 #141414;
+  transform: translate(-1px, -1px);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f1ece1;
+  color: #5c5a54;
 }
 
 ::selection {
-  background: #c9b7f4;
-  color: #111111;
+  background: #f6e76f;
+  color: #141414;
 }

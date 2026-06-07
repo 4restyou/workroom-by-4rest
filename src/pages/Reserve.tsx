@@ -5,6 +5,7 @@ import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
+import { buttonClass, card, tintCard } from "../lib/ui";
 import type { Pass, Profile, ReservationInsert } from "../lib/types";
 
 const emptyForm = {
@@ -151,48 +152,57 @@ export default function Reserve() {
     setForm({ ...emptyForm, date: todayValue() });
   }
 
-  return (
-    <main className="pb-10">
-      <Section eyebrow="Reserve" title="예약">
-        <div className="mb-5 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
-          홈페이지 예약을 기준으로 운영합니다. 예약 신청 후 전화 또는 문자로 확인 안내를 드립니다.
-          {profile ? <span className="mt-2 block">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
-        </div>
-        <form className="grid gap-5" onSubmit={handleSubmit}>
-          <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch">
-            <h2 className="mb-4 text-xl font-black">1. 이용권</h2>
-            <div className="grid gap-3">
-              {[...passes, { id: "custom-inquiry", name: "기타 문의", description: "촬영, 모임, 장기 이용 상담", price: 0 }].map((pass) => (
-                <label
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border px-4 py-3 transition ${
-                    form.pass_type === pass.name
-                      ? "border-workroom-text bg-workroom-yellow"
-                      : "border-workroom-line bg-white hover:border-workroom-text/40"
-                  }`}
-                  key={pass.id}
-                >
-                  <span className="min-w-0">
-                    <span className="block text-base font-bold">{pass.name}</span>
-                    <span className="mt-1 block text-xs font-medium text-workroom-muted">
-                      {pass.description}
-                      {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
-                    </span>
-                  </span>
-                  <input
-                    checked={form.pass_type === pass.name}
-                    className="h-5 w-5 accent-black"
-                    name="pass_type"
-                    onChange={() => selectPass(pass.name)}
-                    type="radio"
-                    value={pass.name}
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
+  const passOptions = [
+    ...passes,
+    { id: "custom-inquiry", name: "기타 문의", description: "촬영, 모임, 장기 이용 상담", price: 0 },
+  ];
 
-          <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
-            <h2 className="mb-4 text-xl font-black">2. 날짜와 시간</h2>
+  return (
+    <main className="pb-28 sm:pb-12">
+      <Section eyebrow="Reserve" title="예약" accent="yellow">
+        <div className={`mb-6 ${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>
+          홈페이지 예약을 기준으로 운영합니다. 예약 신청 후 전화 또는 문자로 확인 안내를 드립니다.
+          {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
+        </div>
+
+        <form className="grid gap-5" onSubmit={handleSubmit}>
+          <fieldset className={`${card} p-5`}>
+            <StepHeading step="1" title="이용권" />
+            <div className="grid gap-3">
+              {passOptions.map((pass) => {
+                const isSelected = form.pass_type === pass.name;
+                return (
+                  <label
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 px-4 py-3 transition-transform duration-100 active:translate-x-[2px] active:translate-y-[2px] ${
+                      isSelected
+                        ? "border-workroom-ink bg-workroom-yellow shadow-hard"
+                        : "border-workroom-ink bg-white hover:-translate-y-0.5 hover:shadow-hard"
+                    }`}
+                    key={pass.id}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-base font-black">{pass.name}</span>
+                      <span className="mt-1 block text-xs font-medium text-workroom-muted">
+                        {pass.description}
+                        {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
+                      </span>
+                    </span>
+                    <input
+                      checked={isSelected}
+                      className="h-5 w-5 shrink-0 accent-black"
+                      name="pass_type"
+                      onChange={() => selectPass(pass.name)}
+                      type="radio"
+                      value={pass.name}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <fieldset className={`${card} p-5`}>
+            <StepHeading step="2" title="날짜와 시간" />
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="예약 날짜">
                 <input required min={todayValue()} type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} />
@@ -204,10 +214,10 @@ export default function Reserve() {
                 <input required type="time" value={form.end_time} onChange={(event) => updateField("end_time", event.target.value)} />
               </Field>
             </div>
-          </div>
+          </fieldset>
 
-          <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
-            <h2 className="mb-4 text-xl font-black">3. 예약자 정보</h2>
+          <fieldset className={`${card} p-5`}>
+            <StepHeading step="3" title="예약자 정보" />
             <div className="grid gap-4">
               <Field label="이름">
                 <input required placeholder="성함 또는 팀명" value={form.name} onChange={(event) => updateField("name", event.target.value)} />
@@ -233,33 +243,38 @@ export default function Reserve() {
                 />
               </Field>
             </div>
-          </div>
+          </fieldset>
 
-          {error ? <p className="rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+          {error ? <p className={`${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
           {success ? (
-            <div className="rounded-card border border-workroom-line bg-workroom-yellow p-5 font-black leading-7 shadow-sketch">
-              <p>예약 신청이 접수되었습니다.</p>
-              <p>확인 후 연락드릴게요.</p>
-              <p className="mt-3 text-sm">
-                확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.
-              </p>
+            <div className={`${tintCard("mint")} p-5 font-bold leading-7`}>
+              <p className="text-lg font-black">예약 신청이 접수되었습니다. 🎉</p>
+              <p className="mt-1">확인 후 연락드릴게요.</p>
+              <p className="mt-3 text-sm font-medium">확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.</p>
             </div>
           ) : null}
 
-          <button
-            className="rounded-full border border-workroom-line bg-workroom-text px-6 py-4 text-lg font-bold text-white transition active:scale-[0.99] hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow disabled:cursor-not-allowed disabled:opacity-100 disabled:bg-workroom-muted"
-            disabled={isSubmitting}
-            type="submit"
-          >
-            {isSubmitting ? "보내는 중…" : "예약 신청"}
+          <button className={buttonClass("primary", "lg")} disabled={isSubmitting} type="submit">
+            {isSubmitting ? "보내는 중…" : "예약 신청 →"}
           </button>
 
-          <Link className="text-center text-sm font-black underline" to="/">
+          <Link className="text-center text-sm font-bold text-workroom-muted underline underline-offset-4 transition-colors hover:text-workroom-ink" to="/">
             소개 페이지로 돌아가기
           </Link>
         </form>
       </Section>
     </main>
+  );
+}
+
+function StepHeading({ step, title }: { step: string; title: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <span className="grid h-8 w-8 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-yellow text-sm font-black">
+        {step}
+      </span>
+      <h2 className="text-xl font-black">{title}</h2>
+    </div>
   );
 }
 

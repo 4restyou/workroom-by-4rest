@@ -5,6 +5,7 @@ import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
+import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Pass, Reservation } from "../lib/types";
 
 type Period = "day" | "week" | "month" | "year";
@@ -129,9 +130,9 @@ export default function AdminStats() {
 
   return (
     <main className="pb-12">
-      <Section eyebrow="Admin" title="운영 통계">
-        <div className="mb-5 grid gap-3 rounded-card border border-workroom-line bg-workroom-surface p-4 shadow-soft sm:grid-cols-[1fr_auto_auto] sm:items-end">
-          <label className="grid gap-2 text-sm font-black">
+      <Section eyebrow="Admin" title="운영 통계" accent="ink">
+        <div className={`mb-5 grid gap-3 ${card} p-4 sm:grid-cols-[1fr_auto_auto] sm:items-end`}>
+          <label className="grid gap-2 text-sm font-bold">
             집계 기준
             <select value={period} onChange={(event) => setPeriod(event.target.value as Period)}>
               {Object.entries(periodLabels).map(([value, label]) => (
@@ -141,16 +142,16 @@ export default function AdminStats() {
               ))}
             </select>
           </label>
-          <button className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 font-black" onClick={loadStats} type="button">
+          <button className={buttonClass("accent", "md")} onClick={loadStats} type="button">
             새로고침
           </button>
-          <Link className="rounded-full border border-workroom-line bg-white px-5 py-3 text-center font-black" to="/admin/reservations">
+          <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
             예약관리
           </Link>
         </div>
 
-        {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">통계를 불러오는 중입니다.</p> : null}
-        {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+        {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>통계를 불러오는 중입니다.</p> : null}
+        {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="전체 예약" value={`${summary.total}건`} />
@@ -160,14 +161,14 @@ export default function AdminStats() {
           <StatCard label="예상 매출" value={formatPrice(summary.estimatedRevenue)} />
         </div>
 
-        <section className="mt-5 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+        <section className={`mt-5 ${card} p-5`}>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-xl font-black">{periodLabels[period]} 예약 흐름</h2>
-            <p className="text-sm font-bold text-workroom-muted">최근 {groupedStats.length}개 구간</p>
+            <p className="text-sm font-medium text-workroom-muted">최근 {groupedStats.length}개 구간</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-sm">
-              <thead className="text-workroom-muted">
+              <thead className="text-workroom-muted font-bold">
                 <tr>
                   <th className="px-3 py-2">기간</th>
                   <th className="px-3 py-2">예약</th>
@@ -180,7 +181,7 @@ export default function AdminStats() {
               </thead>
               <tbody>
                 {groupedStats.map((group) => (
-                  <tr className="bg-white font-black" key={group.key}>
+                  <tr className="bg-workroom-surface font-bold" key={group.key}>
                     <td className="rounded-l-card px-3 py-3">{group.key}</td>
                     <td className="px-3 py-3">{group.count}</td>
                     <td className="px-3 py-3">{group.confirmed}</td>
@@ -195,17 +196,17 @@ export default function AdminStats() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+        <section className={`mt-5 ${card} p-5`}>
           <h2 className="mb-4 text-xl font-black">이용권별 예약/매출</h2>
           <div className="grid gap-2">
             {passStats.map((stat) => (
-              <div className="grid gap-2 rounded-card bg-white p-4 text-sm font-black sm:grid-cols-[1fr_100px_160px]" key={stat.name}>
+              <div className={`grid gap-2 ${cardFlat} p-4 text-sm font-bold sm:grid-cols-[1fr_100px_160px]`} key={stat.name}>
                 <p>{stat.name}</p>
                 <p>{stat.count}건</p>
                 <p>{formatPrice(stat.revenue)}</p>
               </div>
             ))}
-            {!passStats.length ? <p className="rounded-card bg-white p-4 text-sm font-black">집계할 예약이 없습니다.</p> : null}
+            {!passStats.length ? <p className={`${cardFlat} p-4 text-sm font-medium text-workroom-muted`}>집계할 예약이 없습니다.</p> : null}
           </div>
         </section>
       </Section>
@@ -219,8 +220,8 @@ function reservationRevenue(reservation: Reservation, priceByPassName: Map<strin
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
-      <p className="text-sm font-black text-workroom-muted">{label}</p>
+    <article className={`${card} p-5`}>
+      <p className="text-sm font-bold text-workroom-muted">{label}</p>
       <p className="mt-2 text-3xl font-black">{value}</p>
     </article>
   );

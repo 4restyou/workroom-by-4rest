@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
+import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import type { BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
@@ -197,33 +198,33 @@ export default function AdminSettings() {
 
   return (
     <main className="pb-12">
-      <Section eyebrow="Admin" title="운영 설정">
+      <Section accent="ink" eyebrow="Admin" title="운영 설정">
         <div className="mb-5 flex flex-wrap gap-3">
-          <button className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 font-black" disabled={isSaving} onClick={saveAll} type="button">
+          <button className={buttonClass("accent", "md")} disabled={isSaving} onClick={saveAll} type="button">
             {isSaving ? "저장 중" : "전체 저장"}
           </button>
-          <button className="rounded-full border border-workroom-line bg-white px-5 py-3 font-black" onClick={loadSettings} type="button">
+          <button className={buttonClass("secondary", "md")} onClick={loadSettings} type="button">
             새로고침
           </button>
-          <Link className="rounded-full border border-workroom-line bg-white px-5 py-3 font-black" to="/admin/reservations">
+          <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
             예약관리
           </Link>
         </div>
 
-        {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">운영 설정을 불러오는 중입니다.</p> : null}
-        {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
-        {success ? <p className="mb-4 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black">{success}</p> : null}
+        {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>운영 설정을 불러오는 중입니다.</p> : null}
+        {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
+        {success ? <p className={`mb-4 ${tintCard("mint")} p-4 text-sm font-bold`}>{success}</p> : null}
 
         <div className="grid gap-5">
-          <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">좌석 유형</h2>
             <div className="mt-4 grid gap-3">
               {seatTypes.map((seatType, index) => (
-                <div className="grid gap-3 rounded-card bg-white p-4 sm:grid-cols-[1fr_120px_110px_100px]" key={seatType.id}>
+                <div className={`grid gap-3 ${cardFlat} p-4 sm:grid-cols-[1fr_120px_110px_100px]`} key={seatType.id}>
                   <input value={seatType.name} onChange={(event) => updateSeatType(index, "name", event.target.value)} />
                   <input min={0} type="number" value={seatType.capacity} onChange={(event) => updateSeatType(index, "capacity", Number(event.target.value))} />
                   <input min={0} type="number" value={seatType.sort_order} onChange={(event) => updateSeatType(index, "sort_order", Number(event.target.value))} />
-                  <label className="flex items-center gap-2 text-sm font-black">
+                  <label className="flex items-center gap-2 text-sm font-bold">
                     <input checked={seatType.is_active} className="h-5 w-5" type="checkbox" onChange={(event) => updateSeatType(index, "is_active", event.target.checked)} />
                     노출
                   </label>
@@ -233,17 +234,17 @@ export default function AdminSettings() {
             <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_auto]" onSubmit={addSeatType}>
               <input placeholder="새 좌석 유형" value={newSeatName} onChange={(event) => setNewSeatName(event.target.value)} />
               <input min={0} type="number" value={newSeatCapacity} onChange={(event) => setNewSeatCapacity(event.target.value)} />
-              <button className="rounded-full border border-workroom-line bg-white px-5 py-3 font-black" type="submit">
+              <button className={buttonClass("primary", "md")} type="submit">
                 좌석 추가
               </button>
             </form>
           </section>
 
-          <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">이용권 / 가격</h2>
             <div className="mt-4 grid gap-3">
               {passes.map((pass, index) => (
-                <div className="grid gap-3 rounded-card bg-white p-4 lg:grid-cols-[1fr_1.3fr_130px_150px_90px_90px]" key={pass.id}>
+                <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1fr_1.3fr_130px_150px_90px_90px]`} key={pass.id}>
                   <input value={pass.name} onChange={(event) => updatePass(index, "name", event.target.value)} />
                   <input value={pass.description ?? ""} onChange={(event) => updatePass(index, "description", event.target.value)} />
                   <input min={0} type="number" value={pass.price} onChange={(event) => updatePass(index, "price", Number(event.target.value))} />
@@ -256,7 +257,7 @@ export default function AdminSettings() {
                     ))}
                   </select>
                   <input min={0} type="number" value={pass.sort_order ?? 0} onChange={(event) => updatePass(index, "sort_order", Number(event.target.value))} />
-                  <label className="flex items-center gap-2 text-sm font-black">
+                  <label className="flex items-center gap-2 text-sm font-bold">
                     <input checked={pass.is_active ?? true} className="h-5 w-5" type="checkbox" onChange={(event) => updatePass(index, "is_active", event.target.checked)} />
                     노출
                   </label>
@@ -274,21 +275,21 @@ export default function AdminSettings() {
                   </option>
                 ))}
               </select>
-              <button className="rounded-full border border-workroom-line bg-white px-5 py-3 font-black" type="submit">
+              <button className={buttonClass("primary", "md")} type="submit">
                 이용권 추가
               </button>
             </form>
           </section>
 
-          <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">운영 시간</h2>
             <div className="mt-4 grid gap-3">
               {businessHours.map((hour, index) => (
-                <div className="grid gap-3 rounded-card bg-white p-4 sm:grid-cols-[80px_1fr_1fr_110px]" key={hour.id}>
+                <div className={`grid gap-3 ${cardFlat} p-4 sm:grid-cols-[80px_1fr_1fr_110px]`} key={hour.id}>
                   <p className="self-center font-black">{weekdayLabels[hour.weekday]}</p>
                   <input type="time" value={hour.open_time.slice(0, 5)} onChange={(event) => updateBusinessHour(index, "open_time", event.target.value)} />
                   <input type="time" value={hour.close_time.slice(0, 5)} onChange={(event) => updateBusinessHour(index, "close_time", event.target.value)} />
-                  <label className="flex items-center gap-2 text-sm font-black">
+                  <label className="flex items-center gap-2 text-sm font-bold">
                     <input checked={hour.is_closed} className="h-5 w-5" type="checkbox" onChange={(event) => updateBusinessHour(index, "is_closed", event.target.checked)} />
                     휴무
                   </label>
@@ -297,7 +298,7 @@ export default function AdminSettings() {
             </div>
           </section>
 
-          <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+          <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">운영 안내</h2>
             <div className="mt-4 grid gap-4">
               {settingKeys.map((key) => (

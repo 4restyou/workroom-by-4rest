@@ -2,29 +2,51 @@ import type { Config } from "tailwindcss";
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  // These backgrounds are composed at runtime (e.g. `bg-workroom-${color}` in
+  // lib/ui.ts and FeatureCard), so Tailwind's content scanner can't see them.
+  safelist: [
+    "bg-workroom-yellow",
+    "bg-workroom-mint",
+    "bg-workroom-lilac",
+    "bg-workroom-sky",
+    "bg-workroom-coral",
+    "bg-workroom-danger",
+    "bg-workroom-ink",
+    "text-white",
+    "text-workroom-ink",
+  ],
   theme: {
     extend: {
       colors: {
         workroom: {
-          background: "#F7F3EA",
+          background: "#F4EEE1",
           surface: "#FFFFFF",
-          text: "#171717",
+          ink: "#141414",
+          text: "#141414",
           muted: "#5C5A54",
-          line: "#D8D0C2",
+          line: "#E2DAC9",
           yellow: "#F6E76F",
-          mint: "#D8E7D5",
-          lilac: "#C9B7F4",
-          // Deprecated alias: `purple` is actually the mint tone. Kept for
-          // backwards compatibility; prefer `mint` in new code.
-          purple: "#D8E7D5",
+          mint: "#CDE8D6",
+          lilac: "#DBD0F7",
+          sky: "#C3DDF2",
+          coral: "#F6CBB8",
+          danger: "#F6BDBD",
+          // Deprecated alias: `purple` is actually the mint tone.
+          purple: "#CDE8D6",
         },
       },
       boxShadow: {
-        sketch: "0 18px 45px rgba(23, 23, 23, 0.08)",
-        soft: "0 10px 30px rgba(23, 23, 23, 0.06)",
+        hard: "4px 4px 0 0 #141414",
+        "hard-sm": "2px 2px 0 0 #141414",
+        "hard-lg": "6px 6px 0 0 #141414",
+        // Legacy aliases kept so older class names still read as the new
+        // hard-offset language.
+        soft: "3px 3px 0 0 #141414",
+        sketch: "6px 6px 0 0 #141414",
       },
       borderRadius: {
-        card: "8px",
+        card: "1.25rem",
+        pill: "999px",
       },
       fontFamily: {
         sans: [
@@ -35,6 +57,15 @@ export default {
           "Segoe UI",
           "sans-serif",
         ],
+      },
+      keyframes: {
+        "pop-in": {
+          "0%": { opacity: "0", transform: "translateY(6px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "pop-in": "pop-in 0.25s ease-out both",
       },
     },
   },

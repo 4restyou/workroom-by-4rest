@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatTimeRange, statusLabel } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
+import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Profile, Reservation, ReservationNotification } from "../lib/types";
 
 type AccountTab = "profile" | "reservations" | "notifications";
@@ -156,17 +157,21 @@ export default function Account() {
   }
 
   return (
-    <main className="pb-12">
-      <Section eyebrow="My Page" title="내정보">
-        {isLoading ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-4 font-black">내정보를 불러오는 중입니다.</p> : null}
-        {error ? <p className="mb-4 rounded-card border border-workroom-line bg-red-100 p-4 text-sm font-black">{error}</p> : null}
+    <main className="pb-16">
+      <Section eyebrow="My Page" title="내정보" accent="mint">
+        {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>내정보를 불러오는 중입니다.</p> : null}
+        {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
         {!isLoading && profile ? (
           <div>
-            <div className="mb-5 flex flex-wrap gap-2 rounded-card bg-white/70 p-2 shadow-soft">
+            <div className={`mb-5 flex flex-wrap gap-2 ${cardFlat} p-2`}>
               {(Object.keys(tabLabels) as AccountTab[]).map((tab) => (
                 <button
-                  className={`rounded-full px-5 py-3 text-sm font-black ${activeTab === tab ? "bg-workroom-yellow text-workroom-text" : "text-workroom-muted"}`}
+                  className={`rounded-pill border-2 px-5 py-2.5 text-sm font-bold transition-colors ${
+                    activeTab === tab
+                      ? "border-workroom-ink bg-workroom-ink text-white"
+                      : "border-transparent text-workroom-muted hover:text-workroom-ink"
+                  }`}
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   type="button"
@@ -178,90 +183,90 @@ export default function Account() {
             </div>
 
             {activeTab === "profile" ? (
-              <form className="mx-auto grid max-w-2xl gap-4 rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch" onSubmit={handleSubmit}>
+              <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-black text-workroom-muted">회원 상태</p>
+                    <p className="text-sm font-bold text-workroom-muted">회원 상태</p>
                     <p className="mt-1 text-2xl font-black">
                       {profile.membership_status === "approved" ? "이용 가능" : profile.membership_status === "rejected" ? "보류" : "확인 필요"}
                     </p>
                   </div>
-                  <button className="rounded-full border border-workroom-line bg-white px-4 py-2 text-sm font-black" onClick={signOut} type="button">
+                  <button className={buttonClass("secondary", "sm")} onClick={signOut} type="button">
                     로그아웃
                   </button>
                 </div>
                 {profile.role === "admin" ? (
-                  <Link className="rounded-full border border-workroom-line bg-workroom-yellow px-5 py-3 text-center font-black" to="/admin/reservations">
+                  <Link className={buttonClass("accent", "md")} to="/admin/reservations">
                     관리자 페이지로 이동
                   </Link>
                 ) : null}
 
-                <label className="grid gap-2 text-sm font-black">
+                <label className="grid gap-2 text-sm font-bold">
                   이메일
                   <input disabled value={profile.email} />
                 </label>
-                <label className="grid gap-2 text-sm font-black">
+                <label className="grid gap-2 text-sm font-bold">
                   이름
                   <input required value={form.full_name} onChange={(event) => updateField("full_name", event.target.value)} />
                 </label>
-                <label className="grid gap-2 text-sm font-black">
+                <label className="grid gap-2 text-sm font-bold">
                   연락처
                   <input required placeholder="010-0000-0000" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
                 </label>
-                <label className="grid gap-2 text-sm font-black">
+                <label className="grid gap-2 text-sm font-bold">
                   주소
                   <input placeholder="선택 입력" value={form.address} onChange={(event) => updateField("address", event.target.value)} />
                 </label>
-                {success ? <p className="rounded-card border border-workroom-line bg-workroom-yellow p-3 text-sm font-black">{success}</p> : null}
-                <button className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white" disabled={isSaving} type="submit">
-                  {isSaving ? "저장 중" : "내정보 저장"}
+                {success ? <p className={`${tintCard("mint")} p-3 text-sm font-bold`}>{success}</p> : null}
+                <button className={buttonClass("primary", "lg")} disabled={isSaving} type="submit">
+                  {isSaving ? "저장 중…" : "내정보 저장"}
                 </button>
               </form>
             ) : null}
 
             {activeTab === "notifications" ? (
-              <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+              <section className={`${card} p-5`}>
                 <h2 className="text-xl font-black">알림</h2>
                 <div className="mt-4 grid gap-2">
                   {notifications.length ? (
                     notifications.map((notification, index) => (
-                      <p className="rounded-card border border-workroom-line bg-workroom-yellow px-4 py-3 text-sm font-black" key={`${notification}-${index}`}>
+                      <p className={`${tintCard("yellow")} px-4 py-3 text-sm font-bold`} key={`${notification}-${index}`}>
                         {notification}
                       </p>
                     ))
                   ) : (
-                    <p className="rounded-card border border-workroom-line bg-white px-4 py-3 text-sm font-black">새 알림이 없습니다.</p>
+                    <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>새 알림이 없습니다.</p>
                   )}
                 </div>
               </section>
             ) : null}
 
             {activeTab === "reservations" ? (
-              <section className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
+              <section className={`${card} p-5`}>
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-black">내 예약</h2>
-                  <Link className="rounded-full border border-workroom-line bg-workroom-yellow px-4 py-2 text-sm font-black" to="/reserve">
+                  <Link className={buttonClass("accent", "sm")} to="/reserve">
                     예약하기
                   </Link>
                 </div>
                 <div className="mt-4 grid gap-3">
                   {reservations.length ? (
                     reservations.map((reservation) => (
-                      <article className="rounded-card border border-workroom-line bg-white p-4" key={reservation.id}>
+                      <article className={`${cardFlat} p-4`} key={reservation.id}>
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-black">{reservation.pass_name_snapshot || reservation.pass_type}</p>
-                            <p className="mt-1 text-sm font-bold text-workroom-muted">
+                            <p className="mt-1 text-sm font-medium text-workroom-muted">
                               {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
                             </p>
                           </div>
                           <StatusBadge status={reservation.status} />
                         </div>
-                        <p className="mt-3 text-sm font-bold text-workroom-muted">{statusLabel[reservation.status]}</p>
+                        <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
                       </article>
                     ))
                   ) : (
-                    <p className="rounded-card border border-workroom-line bg-white px-4 py-3 text-sm font-black">아직 예약 내역이 없습니다.</p>
+                    <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>아직 예약 내역이 없습니다.</p>
                   )}
                 </div>
               </section>
