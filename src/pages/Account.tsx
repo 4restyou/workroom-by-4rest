@@ -256,6 +256,12 @@ export default function Account() {
                                   <p className="mt-1 text-xs font-medium text-workroom-muted">
                                     {formatDate(inquiry.created_at.slice(0, 10))} · 전달됨
                                   </p>
+                                  {inquiry.admin_reply ? (
+                                    <div className="mt-2 rounded-xl border-2 border-workroom-ink bg-white p-2.5">
+                                      <p className="text-xs font-black">운영자 답변</p>
+                                      <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.admin_reply}</p>
+                                    </div>
+                                  ) : null}
                                 </div>
                               ))}
                             <textarea

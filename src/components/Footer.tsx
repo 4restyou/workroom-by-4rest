@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import logoSig from "../../assets/logo/logo_sig.png";
+import CatSitting from "./CatSitting";
 
 const INSTAGRAM_URL = "https://instagram.com/workroom_by4rest";
 const THREADS_URL = "https://www.threads.net/@workroom_by4rest";
@@ -10,7 +11,7 @@ export default function Footer() {
   return (
     <footer className="border-t-2 border-workroom-ink bg-workroom-background">
       <div className="mx-auto max-w-5xl px-4 py-10 pb-24 sm:pb-10">
-        <div className="grid gap-8 sm:grid-cols-[1.3fr_1fr_1fr]">
+        <div className="grid items-end gap-8 sm:grid-cols-[1.3fr_1fr_1fr_auto]">
           <div>
             <img className="h-8 w-auto max-w-[140px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
             <p className="mt-3 max-w-xs text-sm font-medium leading-6 text-workroom-muted">
@@ -36,6 +37,10 @@ export default function Footer() {
                 Threads
               </a>
             </div>
+          </div>
+
+          <div className="hidden justify-self-end sm:block">
+            <CatSitting className="h-24 w-auto" />
           </div>
         </div>
 

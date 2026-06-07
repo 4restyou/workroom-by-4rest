@@ -157,6 +157,22 @@ export default function AdminReservations() {
     setReservations((current) => current.filter((reservation) => reservation.id !== id));
   }
 
+  async function replyInquiry(inquiryId: string, reply: string) {
+    if (!supabase || !reply.trim()) return;
+    const repliedAt = new Date().toISOString();
+    const { error: replyError } = await supabase
+      .from("reservation_inquiries")
+      .update({ admin_reply: reply.trim(), replied_at: repliedAt })
+      .eq("id", inquiryId);
+    if (replyError) {
+      setError(replyError.message);
+      return;
+    }
+    setInquiries((current) =>
+      current.map((inquiry) => (inquiry.id === inquiryId ? { ...inquiry, admin_reply: reply.trim(), replied_at: repliedAt } : inquiry)),
+    );
+  }
+
   async function signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -247,6 +263,7 @@ export default function AdminReservations() {
               reservation={selectedReservation}
               inquiries={inquiries}
               onDelete={() => void deleteReservation(selectedReservation.id)}
+              onReply={(inquiryId, reply) => void replyInquiry(inquiryId, reply)}
               onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
             />
           ) : (
@@ -297,13 +314,16 @@ function ReservationCard({
   reservation,
   inquiries,
   onDelete,
+  onReply,
   onSave,
 }: {
   reservation: Reservation;
   inquiries: ReservationInquiry[];
   onDelete: () => void;
+  onReply: (inquiryId: string, reply: string) => void;
   onSave: (payload: ReservationEdit) => void;
 }) {
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<ReservationStatus>(reservation.status);
   const [note, setNote] = useState(reservation.admin_note ?? "");
   const [paymentMethod, setPaymentMethod] = useState(reservation.payment_method ?? "");
@@ -368,13 +388,32 @@ function ReservationCard({
       {inquiries.length ? (
         <div className="mt-5">
           <p className="text-sm font-black">회원 문의 {inquiries.length}건</p>
-          <div className="mt-2 grid gap-2">
-            {inquiries.map((inquiry) => (
-              <div className={`${tintCard("lilac")} p-3`} key={inquiry.id}>
-                <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
-                <p className="mt-1 text-xs font-medium text-workroom-muted">{formatDate(inquiry.created_at.slice(0, 10))}</p>
-              </div>
-            ))}
+          <div className="mt-2 grid gap-3">
+            {inquiries.map((inquiry) => {
+              const draft = replyDrafts[inquiry.id] ?? inquiry.admin_reply ?? "";
+              return (
+                <div className={`${tintCard("lilac")} p-3`} key={inquiry.id}>
+                  <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
+                  <p className="mt-1 text-xs font-medium text-workroom-muted">{formatDate(inquiry.created_at.slice(0, 10))}</p>
+                  <div className="mt-2 grid gap-2">
+                    <textarea
+                      rows={2}
+                      placeholder="답변을 입력하면 회원에게 알림이 전달됩니다."
+                      value={draft}
+                      onChange={(event) => setReplyDrafts((current) => ({ ...current, [inquiry.id]: event.target.value }))}
+                    />
+                    <button
+                      className={buttonClass("primary", "sm")}
+                      disabled={!draft.trim() || draft.trim() === (inquiry.admin_reply ?? "")}
+                      onClick={() => onReply(inquiry.id, draft)}
+                      type="button"
+                    >
+                      {inquiry.admin_reply ? "답변 수정" : "답변 저장"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}

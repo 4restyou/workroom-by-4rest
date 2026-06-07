@@ -63,9 +63,14 @@ export default {
           "0%": { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        "cat-blink": {
+          "0%, 92%, 100%": { transform: "scaleY(1)" },
+          "96%": { transform: "scaleY(0.1)" },
+        },
       },
       animation: {
         "pop-in": "pop-in 0.25s ease-out both",
+        "cat-blink": "cat-blink 4.5s ease-in-out infinite",
       },
     },
   },

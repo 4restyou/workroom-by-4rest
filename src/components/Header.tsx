@@ -12,7 +12,7 @@ type HeaderProps = {
 };
 
 function adminNavClass({ isActive }: { isActive: boolean }) {
-  return `rounded-pill border-2 px-2.5 py-1 transition-colors sm:px-3 sm:py-1.5 ${
+  return `rounded-pill border-2 px-2 py-1 transition-colors sm:px-3 sm:py-1.5 ${
     isActive
       ? "border-workroom-ink bg-workroom-ink text-white"
       : "border-transparent text-workroom-muted hover:border-workroom-ink hover:text-workroom-ink"
@@ -53,6 +53,7 @@ export default function Header({ isAdmin }: HeaderProps) {
             <NavLink className={adminNavClass} to="/admin/stats">통계</NavLink>
             <NavLink className={adminNavClass} to="/admin/members">회원</NavLink>
             <NavLink className={adminNavClass} to="/admin/settings">설정</NavLink>
+            <NotificationBell />
           </nav>
         ) : (
           <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-4 sm:text-sm">

@@ -607,6 +607,53 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+alter table reservation_inquiries add column if not exists admin_reply text;
+alter table reservation_inquiries add column if not exists replied_at timestamp with time zone;
+
+-- Notify every admin when a member leaves an inquiry.
+create or replace function public.notify_inquiry_created()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.reservation_notifications (profile_id, reservation_id, type, title, body)
+  select p.id, new.reservation_id, 'inquiry', '새 문의가 도착했습니다.', left(new.body, 120)
+  from public.profiles p
+  where p.role = 'admin';
+  return new;
+end;
+$$;
+
+drop trigger if exists on_inquiry_created on reservation_inquiries;
+create trigger on_inquiry_created
+after insert on reservation_inquiries
+for each row execute function public.notify_inquiry_created();
+
+-- Notify the member when the admin posts a reply.
+create or replace function public.notify_inquiry_replied()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.admin_reply is not null and btrim(new.admin_reply) <> '' and new.admin_reply is distinct from old.admin_reply then
+    if new.profile_id is not null then
+      insert into public.reservation_notifications (profile_id, reservation_id, type, title, body)
+      values (new.profile_id, new.reservation_id, 'inquiry_reply', '문의에 답변이 등록되었습니다.', left(new.admin_reply, 120));
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_inquiry_replied on reservation_inquiries;
+create trigger on_inquiry_replied
+after update on reservation_inquiries
+for each row execute function public.notify_inquiry_replied();
+
 insert into seat_types (name, capacity, sort_order)
 values
   ('단독석', 5, 1),
