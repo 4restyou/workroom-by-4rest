@@ -11,7 +11,7 @@ export default function Footer() {
   return (
     <footer className="border-t-2 border-workroom-ink bg-workroom-background">
       <div className="mx-auto max-w-5xl px-4 py-10 pb-24 sm:pb-10">
-        <div className="grid items-end gap-8 sm:grid-cols-[1.3fr_1fr_1fr_auto]">
+        <div className="grid gap-8 sm:grid-cols-[1.3fr_1fr_1fr]">
           <div>
             <img className="h-8 w-auto max-w-[140px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
             <p className="mt-3 max-w-xs text-sm font-medium leading-6 text-workroom-muted">
@@ -27,20 +27,19 @@ export default function Footer() {
             </a>
           </div>
 
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-workroom-muted">Follow</p>
-            <div className="mt-3 grid gap-1.5 text-sm font-bold">
-              <a className="transition-colors hover:text-workroom-muted" href={INSTAGRAM_URL} rel="noreferrer" target="_blank">
-                Instagram
-              </a>
-              <a className="transition-colors hover:text-workroom-muted" href={THREADS_URL} rel="noreferrer" target="_blank">
-                Threads
-              </a>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-workroom-muted">Follow</p>
+              <div className="mt-3 grid gap-1.5 text-sm font-bold">
+                <a className="transition-colors hover:text-workroom-muted" href={INSTAGRAM_URL} rel="noreferrer" target="_blank">
+                  Instagram
+                </a>
+                <a className="transition-colors hover:text-workroom-muted" href={THREADS_URL} rel="noreferrer" target="_blank">
+                  Threads
+                </a>
+              </div>
             </div>
-          </div>
-
-          <div className="hidden justify-self-end sm:block">
-            <img className="h-28 w-auto" src={catImage} alt="WORKROOM 고양이" />
+            <img className="h-24 w-auto shrink-0" src={catImage} alt="WORKROOM 고양이" />
           </div>
         </div>
 
