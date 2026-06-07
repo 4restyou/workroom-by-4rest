@@ -137,7 +137,11 @@ export default function NotificationBell() {
       ) : null}
 
       {toast ? (
-        <div className="fixed right-3 top-[70px] z-[60] w-[min(20rem,calc(100vw-1.5rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-yellow shadow-hard">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-3 top-[70px] z-[60] w-[min(20rem,calc(100vw-1.5rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-yellow shadow-hard"
+        >
           <button type="button" onClick={() => void openDropdown()} className="block w-full p-4 pr-9 text-left">
             <p className="text-sm font-black">{toast.title}</p>
             {toast.body ? <p className="mt-1 text-sm font-medium leading-6">{toast.body}</p> : null}

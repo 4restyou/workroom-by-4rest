@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import App from "./App";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Account from "./pages/Account";
 import AdminLogin from "./pages/AdminLogin";
 import AdminMembers from "./pages/AdminMembers";
@@ -17,8 +18,9 @@ import "./styles/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <Routes>
         <Route element={<App />}>
           <Route index element={<Home />} />
           <Route path="login" element={<Auth />} />
@@ -33,7 +35,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="admin/stats" element={<AdminStats />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );
