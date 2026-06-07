@@ -9,6 +9,10 @@ import { badge, buttonClass, card, tintCard, type TintColor } from "../lib/ui";
 import type { Pass } from "../lib/types";
 import heroImage from "../../assets/workroom-hero.webp";
 
+const ADDRESS = "광주광역시 동구 충장로 10-1, 2층";
+const NAVER_MAP_URL = "https://map.naver.com/p/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C%2010-1";
+const KAKAO_MAP_URL = "https://map.kakao.com/link/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C%2010-1";
+
 const features: { title: string; body: string; mark: string; accent: TintColor }[] = [
   {
     title: "개인 작업석",
@@ -64,6 +68,23 @@ export default function Home() {
 
     void loadPasses();
   }, []);
+
+  async function shareLocation() {
+    const shareData = {
+      title: "WORKROOM by 4REST",
+      text: `WORKROOM by 4REST · ${ADDRESS}`,
+      url: NAVER_MAP_URL,
+    };
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // user dismissed the share sheet
+      }
+    } else {
+      window.open(NAVER_MAP_URL, "_blank", "noopener,noreferrer");
+    }
+  }
 
   return (
     <main className="pb-28 sm:pb-0">
@@ -224,20 +245,19 @@ export default function Home() {
             </dl>
           </div>
           <div className="grid gap-3 sm:content-start">
-            <a
-              className={buttonClass("primary", "lg")}
-              href="https://map.naver.com/p/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C%2010-1"
-              rel="noreferrer"
-              target="_blank"
-            >
+            <button className={buttonClass("mint", "lg")} onClick={() => void shareLocation()} type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+              </svg>
+              위치 공유하기
+            </button>
+            <a className={buttonClass("primary", "lg")} href={NAVER_MAP_URL} rel="noreferrer" target="_blank">
               네이버지도에서 보기
             </a>
-            <a
-              className={buttonClass("accent", "lg")}
-              href="https://map.kakao.com/link/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C%2010-1"
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a className={buttonClass("accent", "lg")} href={KAKAO_MAP_URL} rel="noreferrer" target="_blank">
               카카오맵에서 보기
             </a>
           </div>
