@@ -25,3 +25,50 @@
 - 신규 DB: `schema.sql` 1회 실행.
 - 기존 DB 업데이트: 아직 적용하지 않은 `migrations/*.sql` 을 번호 순서대로 실행
   (또는 `schema.sql` 재실행 — 멱등이라 안전).
+
+---
+
+# 예약 문자 자동발송 (Solapi / CoolSMS)
+
+`supabase/functions/reservation-sms` 가 예약 **생성/상태변경** 시 문자를 보냅니다.
+- 새 예약(INSERT) → 관리자(`ADMIN_PHONE`)에게 "새 예약 신청" 알림
+- 확정/취소/노쇼(UPDATE) → 예약자(`phone`)에게 안내
+
+> 인앱 알림(종 아이콘)은 그대로 동작하고, 그 위에 문자가 추가됩니다.
+
+## 1) Solapi 준비
+1. https://solapi.com 가입 → **API Key / API Secret** 발급
+2. **발신번호 등록**(010-4931-3298 등 본인 번호 인증)
+3. 문자 발송용 **포인트 충전**
+
+## 2) 함수 배포 (Supabase CLI)
+```bash
+supabase functions deploy reservation-sms --no-verify-jwt
+```
+
+## 3) 시크릿 설정
+```bash
+supabase secrets set \
+  SOLAPI_API_KEY=발급키 \
+  SOLAPI_API_SECRET=발급시크릿 \
+  SMS_SENDER=01049313298 \
+  ADMIN_PHONE=01049313298
+```
+> 시크릿이 없으면 함수는 **발송하지 않고 로그만** 남기므로, 웹훅을 먼저 연결해도 안전합니다.
+
+## 4) Database Webhook 연결 (대시보드)
+Supabase 대시보드 → **Database → Webhooks → Create a new hook**
+- Table: `reservations`
+- Events: **Insert**, **Update** 체크
+- Type: **Supabase Edge Functions** → `reservation-sms` 선택
+  (또는 HTTP Request, POST, URL = `https://<프로젝트ref>.functions.supabase.co/reservation-sms`)
+
+## 5) 테스트
+- 관리자에서 예약을 **확정**으로 바꾸면 예약자 번호로 문자가 가야 합니다.
+- 안 오면 함수 **Logs**(대시보드 → Edge Functions → reservation-sms → Logs)에서
+  `secrets missing` 인지 `solapi error` 인지 확인하세요.
+
+## 알림톡으로 확장
+나중에 카카오 알림톡으로 바꾸려면, 카카오 비즈니스 채널 + 알림톡 템플릿(심사)을
+Solapi에 등록한 뒤, `sendSms` 의 Solapi 호출을 `kakaoOptions`(pfId/templateId)를 포함한
+알림톡 발송으로 바꾸면 됩니다(같은 `/messages/v4/send` 엔드포인트).
