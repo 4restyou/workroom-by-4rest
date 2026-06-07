@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import logoSig from "../../assets/logo/logo_sig.png";
-import CatSitting from "./CatSitting";
+import catImage from "../../assets/cat.svg";
 
 const INSTAGRAM_URL = "https://instagram.com/workroom_by4rest";
 const THREADS_URL = "https://www.threads.net/@workroom_by4rest";
@@ -40,7 +40,7 @@ export default function Footer() {
           </div>
 
           <div className="hidden justify-self-end sm:block">
-            <CatSitting className="h-24 w-auto" />
+            <img className="h-28 w-auto" src={catImage} alt="WORKROOM 고양이" />
           </div>
         </div>
 
