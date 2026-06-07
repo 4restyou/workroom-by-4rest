@@ -9,9 +9,13 @@ export default {
           background: "#F7F3EA",
           surface: "#FFFFFF",
           text: "#171717",
-          muted: "#66645E",
+          muted: "#5C5A54",
           line: "#D8D0C2",
           yellow: "#F6E76F",
+          mint: "#D8E7D5",
+          lilac: "#C9B7F4",
+          // Deprecated alias: `purple` is actually the mint tone. Kept for
+          // backwards compatibility; prefer `mint` in new code.
           purple: "#D8E7D5",
         },
       },

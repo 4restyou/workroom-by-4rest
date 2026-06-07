@@ -28,17 +28,17 @@ export default function Auth() {
               `.env`에 Supabase URL과 anon key를 넣으면 구글 로그인이 활성화됩니다.
             </p>
           ) : null}
-          <p className="text-base font-black leading-7">
+          <p className="text-base font-medium leading-7 text-workroom-muted">
             이메일과 이름은 구글 계정에서 받아오고, 연락처는 로그인 후 내정보에서 한 번만 입력합니다.
             주소와 추가 요청 정보는 선택 입력입니다.
           </p>
           <button
-            className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-black text-white disabled:bg-workroom-muted"
+            className="rounded-full border border-workroom-line bg-workroom-text px-5 py-4 font-bold text-white transition active:scale-[0.99] hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow disabled:cursor-not-allowed disabled:bg-workroom-muted"
             disabled={isSubmitting || !hasSupabaseConfig}
             onClick={() => void handleGoogleLogin()}
             type="button"
           >
-            {isSubmitting ? "구글로 이동 중" : "Google로 회원가입 / 로그인"}
+            {isSubmitting ? "구글로 이동 중…" : "Google로 회원가입 / 로그인"}
           </button>
           {error ? <p className="rounded-card border border-workroom-line bg-red-100 p-3 text-sm font-black">{error}</p> : null}
           <Link className="text-center text-sm font-black underline" to="/">

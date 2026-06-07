@@ -164,14 +164,16 @@ export default function Reserve() {
             <div className="grid gap-3">
               {[...passes, { id: "custom-inquiry", name: "기타 문의", description: "촬영, 모임, 장기 이용 상담", price: 0 }].map((pass) => (
                 <label
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border border-workroom-line px-4 py-3 font-black ${
-                    form.pass_type === pass.name ? "bg-workroom-yellow" : "bg-white"
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border px-4 py-3 transition ${
+                    form.pass_type === pass.name
+                      ? "border-workroom-text bg-workroom-yellow"
+                      : "border-workroom-line bg-white hover:border-workroom-text/40"
                   }`}
                   key={pass.id}
                 >
                   <span className="min-w-0">
-                    <span className="block text-base">{pass.name}</span>
-                    <span className="mt-1 block text-xs text-workroom-muted">
+                    <span className="block text-base font-bold">{pass.name}</span>
+                    <span className="mt-1 block text-xs font-medium text-workroom-muted">
                       {pass.description}
                       {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
                     </span>
@@ -193,7 +195,7 @@ export default function Reserve() {
             <h2 className="mb-4 text-xl font-black">2. 날짜와 시간</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="예약 날짜">
-                <input required type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} />
+                <input required min={todayValue()} type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} />
               </Field>
               <Field label="시작 시간">
                 <input required type="time" value={form.start_time} onChange={(event) => updateField("start_time", event.target.value)} />
@@ -245,11 +247,11 @@ export default function Reserve() {
           ) : null}
 
           <button
-            className="rounded-full border border-workroom-line bg-workroom-text px-6 py-4 text-lg font-black text-white disabled:cursor-not-allowed disabled:bg-workroom-muted"
+            className="rounded-full border border-workroom-line bg-workroom-text px-6 py-4 text-lg font-bold text-white transition active:scale-[0.99] hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow disabled:cursor-not-allowed disabled:opacity-100 disabled:bg-workroom-muted"
             disabled={isSubmitting}
             type="submit"
           >
-            {isSubmitting ? "보내는 중" : "예약 신청"}
+            {isSubmitting ? "보내는 중…" : "예약 신청"}
           </button>
 
           <Link className="text-center text-sm font-black underline" to="/">
@@ -263,7 +265,7 @@ export default function Reserve() {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-2 text-sm font-black">
+    <label className="grid gap-2 text-sm font-bold">
       <span>{label}</span>
       {children}
     </label>

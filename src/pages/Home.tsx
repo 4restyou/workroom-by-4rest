@@ -61,17 +61,20 @@ export default function Home() {
             <h1 className="max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
               필요한 시간만큼 머무는 조용한 작업 공간
             </h1>
-            <p className="mt-5 max-w-xl text-lg font-bold leading-8 text-workroom-muted sm:text-xl">
+            <p className="mt-5 max-w-xl text-lg font-medium leading-8 text-workroom-muted sm:text-xl">
               카페보다 조용하고, 사무실보다 느슨하게.
               <br />
               혼자 일하거나 작은 모임을 갖기 좋은 자리입니다.
             </p>
           </div>
 
-          <div className="rounded-card bg-white/75 p-5 shadow-soft">
-            <p className="text-sm font-black text-workroom-muted">Reservation</p>
-            <p className="mt-2 text-2xl font-black leading-tight">신청 후 전화 또는 문자로 확인 안내를 드립니다.</p>
-            <Link className="mt-5 block rounded-full bg-workroom-yellow px-8 py-4 text-center text-lg font-black text-workroom-text shadow-sketch" to="/reserve">
+          <div className="rounded-card border border-workroom-line bg-white/75 p-5 shadow-soft">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-workroom-muted">Reservation</p>
+            <p className="mt-2 text-xl font-black leading-snug">바로 예약하고 시작하기</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
+              신청 후 전화 또는 문자로 확인 안내를 드립니다.
+            </p>
+            <Link className="mt-5 block rounded-full bg-workroom-yellow px-8 py-4 text-center text-lg font-bold text-workroom-text shadow-sketch transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-text/20" to="/reserve">
               예약하기
             </Link>
           </div>
@@ -79,7 +82,7 @@ export default function Home() {
       </section>
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤">
-        <div className="max-w-3xl text-base font-semibold leading-8 text-workroom-muted sm:text-lg">
+        <div className="max-w-3xl text-base font-medium leading-8 text-workroom-muted sm:text-lg">
           <p>
             카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만
             가끔은 너무 딱딱하고,
@@ -109,7 +112,7 @@ export default function Home() {
             <PriceCard key={pass.id} pass={pass} />
           ))}
         </div>
-        <p className="mt-4 rounded-card bg-workroom-purple px-4 py-3 text-sm font-black">
+        <p className="mt-4 rounded-card bg-workroom-mint px-4 py-3 text-sm font-bold">
           기본 단위는 3시간권입니다. 1시간권은 운영하지 않고, 좌석 여유가 있을 때 1시간 단위 연장이 가능합니다.
         </p>
       </Section>
@@ -124,7 +127,7 @@ export default function Home() {
             <p className="text-sm font-black text-workroom-muted">Use</p>
             <h2 className="mt-2 text-2xl font-black leading-tight">작업, 촬영, 작은 대화까지</h2>
           </article>
-          <article className="rounded-card bg-workroom-purple p-5 shadow-soft">
+          <article className="rounded-card bg-workroom-mint p-5 shadow-soft">
             <p className="text-sm font-black text-workroom-muted">Check</p>
             <h2 className="mt-2 text-2xl font-black leading-tight">신청 후 확인 연락으로 확정</h2>
           </article>
@@ -143,7 +146,7 @@ export default function Home() {
           ].map(([title, body]) => (
             <article className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft" key={title}>
               <h3 className="text-lg font-black">{title}</h3>
-              <p className="mt-2 text-sm font-semibold leading-6 text-workroom-muted">{body}</p>
+              <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">{body}</p>
             </article>
           ))}
         </div>
@@ -167,11 +170,11 @@ export default function Home() {
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
           <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
             <p className="text-xl font-black">충장로 작업 라운지</p>
-            <p className="mt-2 font-semibold text-workroom-muted">금남로5가역 도보 약 3-5분</p>
+            <p className="mt-2 font-medium text-workroom-muted">금남로5가역 도보 약 3-5분</p>
           </div>
           <div className="grid gap-3">
             <a
-              className="rounded-full bg-workroom-text px-5 py-4 text-center font-black text-white shadow-soft"
+              className="rounded-full bg-workroom-text px-5 py-4 text-center font-bold text-white shadow-soft transition active:scale-[0.99] hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow"
               href="https://map.naver.com/p/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C"
               rel="noreferrer"
               target="_blank"
@@ -179,7 +182,7 @@ export default function Home() {
               네이버지도에서 보기
             </a>
             <a
-              className="rounded-full bg-workroom-yellow px-5 py-4 text-center font-black shadow-soft"
+              className="rounded-full bg-workroom-yellow px-5 py-4 text-center font-bold shadow-soft transition active:scale-[0.99] hover:brightness-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-text/20"
               href="https://map.kakao.com/link/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C"
               rel="noreferrer"
               target="_blank"
@@ -196,7 +199,7 @@ export default function Home() {
             <p className="text-sm font-black text-workroom-yellow">Reservation</p>
             <h2 className="mt-2 text-3xl font-black">슬렁슬렁 들어올 준비가 됐다면</h2>
           </div>
-          <Link className="mt-5 block rounded-full bg-white px-6 py-4 text-center font-black text-workroom-text sm:mt-0" to="/reserve">
+          <Link className="mt-5 block rounded-full bg-white px-6 py-4 text-center font-bold text-workroom-text transition active:scale-[0.99] hover:bg-workroom-yellow sm:mt-0" to="/reserve">
             예약 신청하기
           </Link>
         </div>

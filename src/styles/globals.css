@@ -64,8 +64,14 @@ textarea {
   background: #ffffff;
   padding: 11px 13px;
   color: #171717;
-  font-weight: 700;
+  font-weight: 500;
   outline: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9b988f;
+  font-weight: 500;
 }
 
 textarea {
