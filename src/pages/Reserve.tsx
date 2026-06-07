@@ -152,8 +152,8 @@ export default function Reserve() {
       return;
     }
 
-    if (!form.pass_type || !form.name.trim() || !form.phone.trim() || !form.message.trim()) {
-      setError("이용권, 이름, 연락처, 요청사항을 입력해 주세요.");
+    if (!form.pass_type || !form.name.trim() || !form.phone.trim()) {
+      setError("이용권, 이름, 연락처를 입력해 주세요.");
       return;
     }
 
@@ -340,10 +340,9 @@ export default function Reserve() {
                   <input min={1} required type="number" value={form.people} onChange={(event) => updateField("people", event.target.value)} />
                 </Field>
               </div>
-              <Field label="요청사항">
+              <Field label="요청사항 (선택)">
                 <textarea
-                  required
-                  placeholder="방문 목적, 필요한 장비, 궁금한 점"
+                  placeholder="방문 목적, 필요한 장비, 궁금한 점 (선택 입력)"
                   rows={5}
                   value={form.message}
                   onChange={(event) => updateField("message", event.target.value)}

@@ -16,6 +16,13 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
 };
 const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded"];
 
+type ReservationEdit = {
+  status: ReservationStatus;
+  payment_method: string | null;
+  payment_status: PaymentStatus;
+  admin_note: string;
+};
+
 export default function AdminReservations() {
   const navigate = useNavigate();
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -109,39 +116,14 @@ export default function AdminReservations() {
     }
   }, [selectedReservationId, visibleReservations]);
 
-  async function updateStatus(id: string, status: ReservationStatus) {
+  async function saveReservation(id: string, payload: ReservationEdit) {
     if (!supabase) return;
-    const { error: updateError } = await supabase.from("reservations").update({ status }).eq("id", id);
+    const { error: updateError } = await supabase.from("reservations").update(payload).eq("id", id);
     if (updateError) {
       setError(updateError.message);
       return;
     }
-    setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, status } : reservation)));
-  }
-
-  async function updateNote(id: string, adminNote: string) {
-    if (!supabase) return;
-    const { error: updateError } = await supabase.from("reservations").update({ admin_note: adminNote }).eq("id", id);
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-    setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, admin_note: adminNote } : reservation)));
-  }
-
-  async function updatePayment(id: string, paymentMethod: string | null, paymentStatus: PaymentStatus) {
-    if (!supabase) return;
-    const { error: updateError } = await supabase
-      .from("reservations")
-      .update({ payment_method: paymentMethod, payment_status: paymentStatus })
-      .eq("id", id);
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-    setReservations((current) =>
-      current.map((reservation) => (reservation.id === id ? { ...reservation, payment_method: paymentMethod, payment_status: paymentStatus } : reservation)),
-    );
+    setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
   }
 
   async function deleteReservation(id: string) {
@@ -246,9 +228,7 @@ export default function AdminReservations() {
               key={selectedReservation.id}
               reservation={selectedReservation}
               onDelete={() => void deleteReservation(selectedReservation.id)}
-              onNote={(note) => void updateNote(selectedReservation.id, note)}
-              onPayment={(method, status) => void updatePayment(selectedReservation.id, method, status)}
-              onStatus={(status) => void updateStatus(selectedReservation.id, status)}
+              onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
             />
           ) : (
             <p className={`${card} p-6 text-center font-bold`}>
@@ -297,25 +277,27 @@ function ReservationListItem({
 function ReservationCard({
   reservation,
   onDelete,
-  onNote,
-  onPayment,
-  onStatus,
+  onSave,
 }: {
   reservation: Reservation;
   onDelete: () => void;
-  onNote: (note: string) => void;
-  onPayment: (method: string | null, status: PaymentStatus) => void;
-  onStatus: (status: ReservationStatus) => void;
+  onSave: (payload: ReservationEdit) => void;
 }) {
+  const [status, setStatus] = useState<ReservationStatus>(reservation.status);
   const [note, setNote] = useState(reservation.admin_note ?? "");
   const [paymentMethod, setPaymentMethod] = useState(reservation.payment_method ?? "");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(reservation.payment_status ?? "unpaid");
 
   useEffect(() => {
+    setStatus(reservation.status);
     setNote(reservation.admin_note ?? "");
     setPaymentMethod(reservation.payment_method ?? "");
     setPaymentStatus(reservation.payment_status ?? "unpaid");
-  }, [reservation.admin_note, reservation.payment_method, reservation.payment_status]);
+  }, [reservation.status, reservation.admin_note, reservation.payment_method, reservation.payment_status]);
+
+  function save() {
+    onSave({ status, payment_method: paymentMethod || null, payment_status: paymentStatus, admin_note: note });
+  }
 
   return (
     <article className={`${card} p-5`}>
@@ -365,10 +347,10 @@ function ReservationCard({
       <div className="mt-5 grid gap-3">
         <label className="grid gap-2 text-sm font-bold">
           상태 변경
-          <select value={reservation.status} onChange={(event) => onStatus(event.target.value as ReservationStatus)}>
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {statusLabel[status]}
+          <select value={status} onChange={(event) => setStatus(event.target.value as ReservationStatus)}>
+            {statusOptions.map((option) => (
+              <option key={option} value={option}>
+                {statusLabel[option]}
               </option>
             ))}
           </select>
@@ -386,9 +368,9 @@ function ReservationCard({
           <label className="grid gap-2 text-sm font-bold">
             결제 상태
             <select value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)}>
-              {paymentStatusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {paymentStatusLabels[status]}
+              {paymentStatusOptions.map((option) => (
+                <option key={option} value={option}>
+                  {paymentStatusLabels[option]}
                 </option>
               ))}
             </select>
@@ -398,27 +380,10 @@ function ReservationCard({
           관리자 메모
           <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            className={buttonClass("primary", "md")}
-            onClick={() => onPayment(paymentMethod || null, paymentStatus)}
-            type="button"
-          >
-            결제 저장
-          </button>
-          <button className={buttonClass("primary", "md")} onClick={() => onNote(note)} type="button">
-            메모 저장
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button className={buttonClass("secondary", "md")} onClick={() => onStatus("canceled")} type="button">
-            취소 처리
-          </button>
-          <button className={buttonClass("secondary", "md")} onClick={() => onStatus("no_show")} type="button">
-            노쇼 처리
-          </button>
-        </div>
-        <button className={buttonClass("primary", "md")} onClick={onDelete} type="button">
+        <button className={buttonClass("primary", "lg")} onClick={save} type="button">
+          변경사항 저장
+        </button>
+        <button className={buttonClass("secondary", "md")} onClick={onDelete} type="button">
           예약 삭제
         </button>
       </div>

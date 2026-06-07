@@ -104,7 +104,7 @@ export default function Home() {
               />
             </div>
             <div className="absolute -bottom-3 left-2 rotate-[-4deg]">
-              <span className={badge("mint", "text-sm shadow-hard")}>충장로 · 금남로4가역</span>
+              <span className={badge("mint", "text-sm shadow-hard")}>충장로 · 금남로5가역</span>
             </div>
             <div className="absolute right-2 -top-3 rotate-[5deg]">
               <span className={badge("lilac", "text-sm shadow-hard")}>3시간권 12,000원~</span>
@@ -195,7 +195,7 @@ export default function Home() {
         </p>
       </Section>
 
-      <Section eyebrow="Location" title="충장로, 금남로4가역 근처" accent="mint">
+      <Section eyebrow="Location" title="충장로, 금남로5가역 근처" accent="mint">
         <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
           <div className={`${card} p-5`}>
             <p className="text-xl font-black">WORKROOM by 4REST</p>
@@ -204,20 +204,20 @@ export default function Home() {
               <div>
                 <dt className="text-sm font-bold">🚇 지하철</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
-                  광주 1호선 <b className="font-bold text-workroom-ink">금남로4가역</b>에서 도보 약 1–3분. 충금지하상가(충장치안센터 방면)로 바로
-                  이어집니다. 금남로5가역·문화전당역에서도 도보 약 10분.
+                  광주 1호선 <b className="font-bold text-workroom-ink">금남로5가역 1번 출구</b>에서 도보 약 3–5분.
                 </dd>
               </div>
               <div>
                 <dt className="text-sm font-bold">🚌 버스</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
-                  ‘금남로4가역’ 또는 ‘충장치안센터(충파)’ 정류장 하차. 경유 노선이 많아 출발지에서 지도 길찾기를 권합니다.
+                  ‘금남로5가역’ 정류장 하차. 경유 노선이 많아 출발지에서 지도 길찾기로 확인하는 게 가장 정확해요.
                 </dd>
               </div>
               <div>
                 <dt className="text-sm font-bold">🅿️ 주차</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
-                  전용 주차장은 없습니다. 인근 공영주차장(예: 황금주차빌딩)을 이용해 주세요.
+                  전용 주차장은 없습니다. 인근 <b className="font-bold text-workroom-ink">충장로상점가 공영주차장</b>(광주 동구 금남로5가
+                  124-1, 24시간)을 이용해 주세요. 30분 700원 · 1시간 1,400원 · 2시간 2,800원 · 4시간 5,600원.
                 </dd>
               </div>
             </dl>
@@ -239,9 +239,6 @@ export default function Home() {
             >
               카카오맵에서 보기
             </a>
-            <p className="text-xs font-medium leading-5 text-workroom-muted">
-              버스 노선·주차 요금은 바뀔 수 있어요. 방문 전 지도 앱에서 한 번 더 확인해 주세요.
-            </p>
           </div>
         </div>
       </Section>

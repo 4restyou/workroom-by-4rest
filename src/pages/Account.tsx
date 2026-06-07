@@ -8,12 +8,11 @@ import { supabase } from "../lib/supabase";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Profile, Reservation, ReservationNotification } from "../lib/types";
 
-type AccountTab = "profile" | "reservations" | "notifications";
+type AccountTab = "reservations" | "profile";
 
 const tabLabels: Record<AccountTab, string> = {
-  profile: "회원정보",
   reservations: "예약현황",
-  notifications: "알림",
+  profile: "회원정보",
 };
 
 export default function Account() {
@@ -21,7 +20,8 @@ export default function Account() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [dbNotifications, setDbNotifications] = useState<ReservationNotification[]>([]);
-  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
+  const [activeTab, setActiveTab] = useState<AccountTab>("reservations");
+  const [showNotifications, setShowNotifications] = useState(false);
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -106,7 +106,7 @@ export default function Account() {
   const unreadCount = useMemo(() => dbNotifications.filter((notification) => !notification.is_read).length, [dbNotifications]);
 
   useEffect(() => {
-    if (activeTab !== "notifications" || !supabase) return;
+    if (!showNotifications || !supabase) return;
     const unreadIds = dbNotifications.filter((notification) => !notification.is_read).map((notification) => notification.id);
     if (!unreadIds.length) return;
 
@@ -119,7 +119,7 @@ export default function Account() {
           current.map((notification) => (unreadIds.includes(notification.id) ? { ...notification, is_read: true } : notification)),
         );
       });
-  }, [activeTab, dbNotifications]);
+  }, [showNotifications, dbNotifications]);
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -173,7 +173,30 @@ export default function Account() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="My Page" title="내정보" accent="mint">
+      <Section
+        eyebrow="My Page"
+        title="내정보"
+        accent="mint"
+        action={
+          profile ? (
+            <button
+              className="relative grid h-11 w-11 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-surface shadow-hard transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+              onClick={() => setShowNotifications(true)}
+              type="button"
+              aria-label={`알림${unreadCount ? ` ${unreadCount}건` : ""}`}
+            >
+              <span className="text-lg" aria-hidden>
+                🔔
+              </span>
+              {unreadCount ? (
+                <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-yellow px-1 text-[10px] font-black">
+                  {unreadCount}
+                </span>
+              ) : null}
+            </button>
+          ) : undefined
+        }
+      >
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>내정보를 불러오는 중입니다.</p> : null}
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
@@ -192,7 +215,6 @@ export default function Account() {
                   type="button"
                 >
                   {tabLabels[tab]}
-                  {tab === "notifications" && unreadCount ? ` ${unreadCount}` : ""}
                 </button>
               ))}
             </div>
@@ -237,23 +259,6 @@ export default function Account() {
               </form>
             ) : null}
 
-            {activeTab === "notifications" ? (
-              <section className={`${card} p-5`}>
-                <h2 className="text-xl font-black">알림</h2>
-                <div className="mt-4 grid gap-2">
-                  {notifications.length ? (
-                    notifications.map((notification, index) => (
-                      <p className={`${tintCard("yellow")} px-4 py-3 text-sm font-bold`} key={`${notification}-${index}`}>
-                        {notification}
-                      </p>
-                    ))
-                  ) : (
-                    <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>새 알림이 없습니다.</p>
-                  )}
-                </div>
-              </section>
-            ) : null}
-
             {activeTab === "reservations" ? (
               <section className={`${card} p-5`}>
                 <div className="flex items-center justify-between gap-3">
@@ -287,6 +292,38 @@ export default function Account() {
           </div>
         ) : null}
       </Section>
+
+      {showNotifications ? (
+        <div
+          className="fixed inset-0 z-50 grid justify-center bg-black/50 p-4 pt-20"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowNotifications(false)}
+        >
+          <div
+            className={`${card} h-fit max-h-[75vh] w-full max-w-md overflow-y-auto p-5`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-black">알림</h2>
+              <button className={buttonClass("secondary", "sm")} onClick={() => setShowNotifications(false)} type="button">
+                닫기
+              </button>
+            </div>
+            <div className="mt-4 grid gap-2">
+              {notifications.length ? (
+                notifications.map((notification, index) => (
+                  <p className={`${tintCard("yellow")} px-4 py-3 text-sm font-bold`} key={`${notification}-${index}`}>
+                    {notification}
+                  </p>
+                ))
+              ) : (
+                <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>새 알림이 없습니다.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
