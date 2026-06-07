@@ -220,7 +220,7 @@ export default function AdminReservations() {
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>예약을 불러오는 중입니다.</p> : null}
         {error ? <p className={`${tintCard("danger")} mb-4 p-4 text-sm font-bold`}>{error}</p> : null}
         {!isLoading && !visibleReservations.length ? (
-          <p className={`${card} p-6 text-center font-bold`}>조건에 맞는 예약이 없습니다.</p>
+          <p className={`${card} mb-4 p-6 text-center font-bold`}>조건에 맞는 예약이 없습니다.</p>
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[380px_1fr]">

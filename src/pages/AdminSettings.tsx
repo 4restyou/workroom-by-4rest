@@ -196,6 +196,28 @@ export default function AdminSettings() {
     await loadSettings();
   }
 
+  async function deleteSeatType(id: string, name: string) {
+    if (!supabase) return;
+    if (!window.confirm(`'${name}' 좌석 유형을 삭제할까요? 연결된 이용권은 좌석 미지정으로 바뀝니다.`)) return;
+    const { error: deleteError } = await supabase.from("seat_types").delete().eq("id", id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    await loadSettings();
+  }
+
+  async function deletePass(id: string, name: string) {
+    if (!supabase) return;
+    if (!window.confirm(`'${name}' 이용권을 삭제할까요? 삭제 후에는 되돌릴 수 없습니다.`)) return;
+    const { error: deleteError } = await supabase.from("passes").delete().eq("id", id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    await loadSettings();
+  }
+
   return (
     <main className="pb-12">
       <Section accent="ink" eyebrow="Admin" title="운영 설정">
@@ -218,23 +240,44 @@ export default function AdminSettings() {
         <div className="grid gap-5">
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">좌석 유형</h2>
+            <p className="mt-1 text-sm font-medium text-workroom-muted">
+              예약 시 정원 계산에 쓰입니다. 칸은 차례로 좌석 이름 · 정원 · 정렬 순서 · 노출 여부입니다.
+            </p>
             <div className="mt-4 grid gap-3">
               {seatTypes.map((seatType, index) => (
-                <div className={`grid gap-3 ${cardFlat} p-4 sm:grid-cols-[1fr_120px_110px_100px]`} key={seatType.id}>
-                  <input value={seatType.name} onChange={(event) => updateSeatType(index, "name", event.target.value)} />
-                  <input min={0} type="number" value={seatType.capacity} onChange={(event) => updateSeatType(index, "capacity", Number(event.target.value))} />
-                  <input min={0} type="number" value={seatType.sort_order} onChange={(event) => updateSeatType(index, "sort_order", Number(event.target.value))} />
-                  <label className="flex items-center gap-2 text-sm font-bold">
+                <div className={`grid gap-3 ${cardFlat} p-4 sm:grid-cols-[1fr_110px_110px_auto_auto] sm:items-end`} key={seatType.id}>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    좌석 이름
+                    <input value={seatType.name} onChange={(event) => updateSeatType(index, "name", event.target.value)} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    정원(명)
+                    <input min={0} type="number" value={seatType.capacity} onChange={(event) => updateSeatType(index, "capacity", Number(event.target.value))} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    정렬 순서
+                    <input min={0} type="number" value={seatType.sort_order} onChange={(event) => updateSeatType(index, "sort_order", Number(event.target.value))} />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-bold sm:h-12">
                     <input checked={seatType.is_active} className="h-5 w-5" type="checkbox" onChange={(event) => updateSeatType(index, "is_active", event.target.checked)} />
                     노출
                   </label>
+                  <button className={buttonClass("secondary", "sm", "sm:h-12")} onClick={() => void deleteSeatType(seatType.id, seatType.name)} type="button">
+                    삭제
+                  </button>
                 </div>
               ))}
             </div>
-            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_auto]" onSubmit={addSeatType}>
-              <input placeholder="새 좌석 유형" value={newSeatName} onChange={(event) => setNewSeatName(event.target.value)} />
-              <input min={0} type="number" value={newSeatCapacity} onChange={(event) => setNewSeatCapacity(event.target.value)} />
-              <button className={buttonClass("primary", "md")} type="submit">
+            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end" onSubmit={addSeatType}>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                새 좌석 이름
+                <input placeholder="예: 단독석" value={newSeatName} onChange={(event) => setNewSeatName(event.target.value)} />
+              </label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                정원(명)
+                <input min={0} type="number" value={newSeatCapacity} onChange={(event) => setNewSeatCapacity(event.target.value)} />
+              </label>
+              <button className={buttonClass("primary", "md", "sm:h-12")} type="submit">
                 좌석 추가
               </button>
             </form>
@@ -242,40 +285,70 @@ export default function AdminSettings() {
 
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">이용권 / 가격</h2>
+            <p className="mt-1 text-sm font-medium text-workroom-muted">
+              칸은 차례로 이름 · 설명 · 가격(원) · 좌석 · 정렬 · 노출이며, 노출을 끄거나 삭제로 정리할 수 있습니다.
+            </p>
             <div className="mt-4 grid gap-3">
               {passes.map((pass, index) => (
-                <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1fr_1.3fr_130px_150px_90px_90px]`} key={pass.id}>
-                  <input value={pass.name} onChange={(event) => updatePass(index, "name", event.target.value)} />
-                  <input value={pass.description ?? ""} onChange={(event) => updatePass(index, "description", event.target.value)} />
-                  <input min={0} type="number" value={pass.price} onChange={(event) => updatePass(index, "price", Number(event.target.value))} />
-                  <select value={pass.seat_type_id ?? ""} onChange={(event) => updatePass(index, "seat_type_id", event.target.value || null)}>
-                    <option value="">좌석 미지정</option>
-                    {seatTypes.map((seatType) => (
-                      <option key={seatType.id} value={seatType.id}>
-                        {seatType.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input min={0} type="number" value={pass.sort_order ?? 0} onChange={(event) => updatePass(index, "sort_order", Number(event.target.value))} />
-                  <label className="flex items-center gap-2 text-sm font-bold">
+                <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1fr_1.3fr_120px_140px_80px_auto_auto] lg:items-end`} key={pass.id}>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    이용권 이름
+                    <input value={pass.name} onChange={(event) => updatePass(index, "name", event.target.value)} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    설명
+                    <input value={pass.description ?? ""} onChange={(event) => updatePass(index, "description", event.target.value)} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    가격(원)
+                    <input min={0} type="number" value={pass.price} onChange={(event) => updatePass(index, "price", Number(event.target.value))} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    좌석
+                    <select value={pass.seat_type_id ?? ""} onChange={(event) => updatePass(index, "seat_type_id", event.target.value || null)}>
+                      <option value="">좌석 미지정</option>
+                      {seatTypes.map((seatType) => (
+                        <option key={seatType.id} value={seatType.id}>
+                          {seatType.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    정렬
+                    <input min={0} type="number" value={pass.sort_order ?? 0} onChange={(event) => updatePass(index, "sort_order", Number(event.target.value))} />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-bold lg:h-12">
                     <input checked={pass.is_active ?? true} className="h-5 w-5" type="checkbox" onChange={(event) => updatePass(index, "is_active", event.target.checked)} />
                     노출
                   </label>
+                  <button className={buttonClass("secondary", "sm", "lg:h-12")} onClick={() => void deletePass(pass.id, pass.name)} type="button">
+                    삭제
+                  </button>
                 </div>
               ))}
             </div>
-            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_180px_auto]" onSubmit={addPass}>
-              <input placeholder="새 이용권 이름" value={newPassName} onChange={(event) => setNewPassName(event.target.value)} />
-              <input min={0} type="number" value={newPassPrice} onChange={(event) => setNewPassPrice(event.target.value)} />
-              <select value={newPassSeatTypeId} onChange={(event) => setNewPassSeatTypeId(event.target.value)}>
-                <option value="">좌석 미지정</option>
-                {seatTypes.map((seatType) => (
-                  <option key={seatType.id} value={seatType.id}>
-                    {seatType.name}
-                  </option>
-                ))}
-              </select>
-              <button className={buttonClass("primary", "md")} type="submit">
+            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_180px_auto] sm:items-end" onSubmit={addPass}>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                새 이용권 이름
+                <input placeholder="예: 3시간권" value={newPassName} onChange={(event) => setNewPassName(event.target.value)} />
+              </label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                가격(원)
+                <input min={0} type="number" value={newPassPrice} onChange={(event) => setNewPassPrice(event.target.value)} />
+              </label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                좌석
+                <select value={newPassSeatTypeId} onChange={(event) => setNewPassSeatTypeId(event.target.value)}>
+                  <option value="">좌석 미지정</option>
+                  {seatTypes.map((seatType) => (
+                    <option key={seatType.id} value={seatType.id}>
+                      {seatType.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className={buttonClass("primary", "md", "sm:h-12")} type="submit">
                 이용권 추가
               </button>
             </form>
