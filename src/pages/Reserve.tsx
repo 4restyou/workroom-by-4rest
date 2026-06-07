@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import Calendar from "../components/Calendar";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
+import { computeFullDates, type IntervalInput } from "../lib/availability";
 import { formatDateInputValue, formatPhone, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
@@ -20,28 +21,6 @@ const emptyForm = {
   email: "",
   message: "",
 };
-
-function toMinutes(time: string) {
-  const [hour, minute] = time.slice(0, 5).split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-// Peak number of people booked at the same instant during a day.
-function peakConcurrent(intervals: { start: number; end: number; people: number }[]) {
-  const events: { at: number; delta: number }[] = [];
-  for (const item of intervals) {
-    events.push({ at: item.start, delta: item.people });
-    events.push({ at: item.end, delta: -item.people });
-  }
-  events.sort((a, b) => a.at - b.at || a.delta - b.delta);
-  let current = 0;
-  let peak = 0;
-  for (const event of events) {
-    current += event.delta;
-    if (current > peak) peak = current;
-  }
-  return peak;
-}
 
 function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -180,19 +159,7 @@ export default function Reserve() {
         .gte("date", monthStart)
         .lte("date", monthEnd);
 
-      const byDate = new Map<string, { start: number; end: number; people: number }[]>();
-      for (const row of (data ?? []) as { date: string; start_time: string | null; end_time: string | null; people: number | null }[]) {
-        if (!row.start_time || !row.end_time) continue;
-        const list = byDate.get(row.date) ?? [];
-        list.push({ start: toMinutes(row.start_time), end: toMinutes(row.end_time), people: row.people ?? 1 });
-        byDate.set(row.date, list);
-      }
-
-      const next = new Set<string>();
-      byDate.forEach((intervals, date) => {
-        if (peakConcurrent(intervals) >= capacity) next.add(date);
-      });
-      setFullDates(next);
+      setFullDates(computeFullDates((data ?? []) as IntervalInput[], capacity));
     }
 
     void loadAvailability();

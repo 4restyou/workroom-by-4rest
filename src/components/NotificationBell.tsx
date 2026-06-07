@@ -48,6 +48,8 @@ export default function NotificationBell() {
     void load();
     const timer = window.setInterval(() => void load(), 30000);
     return () => window.clearInterval(timer);
+    // load is intentionally mount-only (polling); deps left empty on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-dismiss the toast.
