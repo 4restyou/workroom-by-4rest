@@ -158,6 +158,7 @@ export default function AdminStats() {
           <StatCard label="대기" value={`${summary.pending}건`} />
           <StatCard label="확정/이용완료" value={`${summary.confirmed + summary.completed}건`} />
           <StatCard label="노쇼" value={`${summary.noShow}건`} />
+          <StatCard label="노쇼율" value={`${summary.total ? Math.round((summary.noShow / summary.total) * 100) : 0}%`} />
           <StatCard label="예상 매출" value={formatPrice(summary.estimatedRevenue)} />
         </div>
 

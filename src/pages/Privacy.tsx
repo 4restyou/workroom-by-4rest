@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Section from "../components/Section";
+import { SITE } from "../lib/site";
 import { card } from "../lib/ui";
 
 const sections: { title: string; body: string[] }[] = [
@@ -52,7 +53,7 @@ const sections: { title: string; body: string[] }[] = [
   },
   {
     title: "8. 개인정보 보호 책임 및 문의처",
-    body: ["개인정보 관련 문의는 아래 연락처로 해주시기 바랍니다.", "· 연락처: 010-4931-3298", "· 운영: WORKROOM by 4REST (광주광역시 동구 충장로 10-1, 2층)"],
+    body: ["개인정보 관련 문의는 아래 연락처로 해주시기 바랍니다.", `· 연락처: ${SITE.phone}`, `· 운영: ${SITE.name} (${SITE.address})`],
   },
   {
     title: "시행일",
