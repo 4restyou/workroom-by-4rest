@@ -24,7 +24,7 @@ const settingLabels: Record<(typeof settingKeys)[number], string> = {
   etiquette_notice: "음식/통화/소리 안내 문구",
   print_notice: "프린트 안내 문구",
   location_notice: "위치 안내 문구",
-  reservation_enabled: "예약 가능 여부(true/false)",
+  reservation_enabled: "예약 받기",
 };
 
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
@@ -301,12 +301,28 @@ export default function AdminSettings() {
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-black">운영 안내</h2>
             <div className="mt-4 grid gap-4">
-              {settingKeys.map((key) => (
-                <label className="grid gap-2 text-sm font-black" key={key}>
-                  {settingLabels[key]}
-                  <textarea rows={key === "reservation_enabled" ? 1 : 3} value={settings[key] ?? ""} onChange={(event) => setSettings((current) => ({ ...current, [key]: event.target.value }))} />
-                </label>
-              ))}
+              <label className={`flex items-center justify-between gap-3 ${cardFlat} p-4`}>
+                <span className="text-sm font-bold">
+                  예약 받기
+                  <span className="mt-1 block text-xs font-medium text-workroom-muted">끄면 예약 페이지에서 신청을 받지 않습니다.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="h-6 w-6 shrink-0 accent-black"
+                  checked={settings["reservation_enabled"] !== "false"}
+                  onChange={(event) =>
+                    setSettings((current) => ({ ...current, reservation_enabled: event.target.checked ? "true" : "false" }))
+                  }
+                />
+              </label>
+              {settingKeys
+                .filter((key) => key !== "reservation_enabled")
+                .map((key) => (
+                  <label className="grid gap-2 text-sm font-bold" key={key}>
+                    {settingLabels[key]}
+                    <textarea rows={3} value={settings[key] ?? ""} onChange={(event) => setSettings((current) => ({ ...current, [key]: event.target.value }))} />
+                  </label>
+                ))}
             </div>
           </section>
         </div>

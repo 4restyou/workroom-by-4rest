@@ -83,9 +83,6 @@ export default function Account() {
   const notifications = useMemo(() => {
     const items: string[] = [];
     if (!profile?.phone) items.push("연락처를 입력하면 예약 신청 때 자동으로 채워집니다.");
-    if (profile?.membership_status === "pending") items.push("회원 상태 확인이 필요합니다.");
-    if (profile?.membership_status === "approved") items.push("회원 정보가 활성화되어 있습니다.");
-    if (profile?.membership_status === "rejected") items.push("회원 상태가 보류되었습니다. 공간 운영자에게 문의해 주세요.");
 
     reservations.slice(0, 5).forEach((reservation) => {
       if (reservation.status === "confirmed") {
@@ -204,10 +201,8 @@ export default function Account() {
               <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-workroom-muted">회원 상태</p>
-                    <p className="mt-1 text-2xl font-black">
-                      {profile.membership_status === "approved" ? "이용 가능" : profile.membership_status === "rejected" ? "보류" : "확인 필요"}
-                    </p>
+                    <p className="text-sm font-bold text-workroom-muted">회원</p>
+                    <p className="mt-1 text-2xl font-black">{profile.full_name || "내 정보"}</p>
                   </div>
                   <button className={buttonClass("secondary", "sm")} onClick={signOut} type="button">
                     로그아웃

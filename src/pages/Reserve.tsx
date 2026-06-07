@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
-import { getCurrentProfile } from "../lib/profiles";
+import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { BusinessHour, Pass, Profile, ReservationInsert } from "../lib/types";
@@ -31,6 +31,7 @@ export default function Reserve() {
   const [reservationEnabled, setReservationEnabled] = useState(true);
   const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
   const [trap, setTrap] = useState(""); // honeypot: real users never fill this
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
@@ -57,20 +58,31 @@ export default function Reserve() {
 
   useEffect(() => {
     async function loadProfile() {
-      if (!hasSupabaseConfig || !supabase) return;
+      if (!hasSupabaseConfig || !supabase) {
+        setAuthChecked(true);
+        return;
+      }
       const loadedProfile = await getCurrentProfile();
-      if (!loadedProfile) return;
       setProfile(loadedProfile);
-      setForm((current) => ({
-        ...current,
-        name: current.name || loadedProfile.full_name || "",
-        phone: current.phone || loadedProfile.phone || "",
-        email: current.email || loadedProfile.email || "",
-      }));
+      if (loadedProfile) {
+        setForm((current) => ({
+          ...current,
+          name: current.name || loadedProfile.full_name || "",
+          phone: current.phone || loadedProfile.phone || "",
+          email: current.email || loadedProfile.email || "",
+        }));
+      }
+      setAuthChecked(true);
     }
 
     void loadProfile();
   }, []);
+
+  function loginToReserve() {
+    void signInWithGoogle(`${location.pathname}${location.search}`);
+  }
+
+  const needsLogin = hasSupabaseConfig && authChecked && !profile;
 
   useEffect(() => {
     async function loadOperatingInfo() {
@@ -222,6 +234,17 @@ export default function Reserve() {
           </div>
         ) : null}
 
+        {needsLogin ? (
+          <div className={`${card} p-6 text-center`}>
+            <p className="text-lg font-black">예약은 회원만 가능합니다</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
+              구글 계정으로 로그인하면 선택하신 이용권 그대로 바로 예약할 수 있어요.
+            </p>
+            <button className={buttonClass("primary", "lg", "mt-5 w-full sm:w-auto")} onClick={loginToReserve} type="button">
+              구글로 로그인하고 예약하기
+            </button>
+          </div>
+        ) : (
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <input
             type="text"
@@ -334,6 +357,7 @@ export default function Reserve() {
             소개 페이지로 돌아가기
           </Link>
         </form>
+        )}
       </Section>
     </main>
   );

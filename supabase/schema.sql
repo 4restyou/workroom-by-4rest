@@ -499,11 +499,13 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Reservations are members only: must be signed in and book for themselves.
 drop policy if exists "reservations_public_insert" on reservations;
-create policy "reservations_public_insert"
+drop policy if exists "reservations_member_insert" on reservations;
+create policy "reservations_member_insert"
 on reservations
 for insert
-to anon, authenticated
+to authenticated
 with check (
   status = 'pending'
   and name <> ''
@@ -511,7 +513,7 @@ with check (
   and pass_type <> ''
   and coalesce(payment_status, 'unpaid') = 'unpaid'
   and payment_method is null
-  and (profile_id is null or profile_id = auth.uid())
+  and profile_id = auth.uid()
 );
 
 drop policy if exists "reservations_select_own" on reservations;

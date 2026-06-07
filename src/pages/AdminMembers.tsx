@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
-import { buttonClass, card, cardFlat, tintCard, badge } from "../lib/ui";
+import { formatDate } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { MemberStatus, Profile } from "../lib/types";
-
-const memberStatuses: MemberStatus[] = ["pending", "approved", "rejected"];
-const statusLabels: Record<MemberStatus, string> = {
-  pending: "확인 필요",
-  approved: "이용 가능",
-  rejected: "보류",
-};
+import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
+import type { Profile } from "../lib/types";
 
 export default function AdminMembers() {
   const navigate = useNavigate();
   const [members, setMembers] = useState<Profile[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"all" | MemberStatus>("all");
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,27 +61,13 @@ export default function AdminMembers() {
   const visibleMembers = useMemo(() => {
     const q = query.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, "");
-    return members
-      .filter((member) => (statusFilter === "all" ? true : member.membership_status === statusFilter))
-      .filter((member) => {
-        if (!q) return true;
-        const haystack = `${member.full_name ?? ""} ${member.email}`.toLowerCase();
-        const phoneMatch = qDigits.length > 0 && (member.phone ?? "").replace(/\D/g, "").includes(qDigits);
-        return haystack.includes(q) || phoneMatch;
-      });
-  }, [members, query, statusFilter]);
-
-  const pendingCount = members.filter((member) => member.membership_status === "pending" && member.role !== "admin").length;
-
-  async function updateMember(id: string, membership_status: MemberStatus) {
-    if (!supabase) return;
-    const { error: updateError } = await supabase.from("profiles").update({ membership_status }).eq("id", id);
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-    setMembers((current) => current.map((member) => (member.id === id ? { ...member, membership_status } : member)));
-  }
+    if (!q) return members;
+    return members.filter((member) => {
+      const haystack = `${member.full_name ?? ""} ${member.email}`.toLowerCase();
+      const phoneMatch = qDigits.length > 0 && (member.phone ?? "").replace(/\D/g, "").includes(qDigits);
+      return haystack.includes(q) || phoneMatch;
+    });
+  }, [members, query]);
 
   return (
     <main className="pb-12">
@@ -98,18 +77,7 @@ export default function AdminMembers() {
             이름 · 이메일 · 전화 검색
             <input placeholder="이름, 이메일 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-            <label className="grid gap-2 text-sm font-bold">
-              상태별 필터
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | MemberStatus)}>
-                <option value="all">전체</option>
-                {memberStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabels[status]}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="grid gap-3 sm:grid-cols-[auto_auto] sm:justify-start">
             <button className={buttonClass("accent", "md")} onClick={loadMembers} type="button">
               새로고침
             </button>
@@ -119,9 +87,7 @@ export default function AdminMembers() {
           </div>
         </div>
 
-        <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold`}>
-          전체 회원 {members.length}명 · 상태 확인 필요 {pendingCount}명
-        </p>
+        <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold`}>전체 회원 {members.length}명</p>
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>회원 목록을 불러오는 중입니다.</p> : null}
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
         {!isLoading && !visibleMembers.length ? (
@@ -148,25 +114,14 @@ export default function AdminMembers() {
                     <p className="text-sm font-medium text-workroom-muted">연락처 미입력</p>
                   )}
                 </div>
-                <span className={badge(member.role === "admin" ? "ink" : "yellow")}>
-                  {member.role === "admin" ? "관리자" : statusLabels[member.membership_status]}
+                <span className={badge(member.role === "admin" ? "ink" : "mint")}>
+                  {member.role === "admin" ? "관리자" : "회원"}
                 </span>
               </div>
               {member.address ? <p className={`mt-4 ${cardFlat} p-3 text-sm font-medium`}>{member.address}</p> : null}
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                {memberStatuses.map((status) => (
-                  <button
-                    className={`rounded-pill border-2 border-workroom-ink px-3 py-2 text-sm font-bold transition-transform active:translate-x-[2px] active:translate-y-[2px] ${
-                      member.membership_status === status ? "bg-workroom-ink text-white shadow-hard" : "bg-white hover:-translate-y-0.5 hover:shadow-hard"
-                    }`}
-                    key={status}
-                    onClick={() => void updateMember(member.id, status)}
-                    type="button"
-                  >
-                    {statusLabels[status]}
-                  </button>
-                ))}
-              </div>
+              {member.created_at ? (
+                <p className="mt-3 text-xs font-medium text-workroom-muted">가입일 · {formatDate(member.created_at.slice(0, 10))}</p>
+              ) : null}
             </article>
           ))}
         </div>
