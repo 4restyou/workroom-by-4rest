@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted Pretendard Variable (weight axis 45–920) so font-weight builds
+   the visual hierarchy instead of relying on system Korean fonts that only
+   ship 2–3 weights. */
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Pretendard Variable"),
+    url("../../assets/fonts/PretendardVariable.woff2") format("woff2");
+}
+
 :root {
   color: #141414;
   background: #f4eee1;
@@ -19,6 +32,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  font-weight: 400;
+  word-break: keep-all;
+  -webkit-text-size-adjust: 100%;
   background-color: #f4eee1;
   background-image: radial-gradient(rgba(20, 20, 20, 0.05) 1.4px, transparent 1.4px);
   background-size: 22px 22px;

@@ -181,8 +181,8 @@ export default function Reserve() {
                     key={pass.id}
                   >
                     <span className="min-w-0">
-                      <span className="block text-base font-black">{pass.name}</span>
-                      <span className="mt-1 block text-xs font-medium text-workroom-muted">
+                      <span className="block text-base font-bold">{pass.name}</span>
+                      <span className="mt-1 block text-xs font-normal text-workroom-muted">
                         {pass.description}
                         {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
                       </span>
@@ -273,7 +273,7 @@ function StepHeading({ step, title }: { step: string; title: string }) {
       <span className="grid h-8 w-8 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-yellow text-sm font-black">
         {step}
       </span>
-      <h2 className="text-xl font-black">{title}</h2>
+      <h2 className="text-xl font-bold">{title}</h2>
     </div>
   );
 }
