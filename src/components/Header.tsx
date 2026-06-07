@@ -11,7 +11,7 @@ type HeaderProps = {
 };
 
 function adminNavClass({ isActive }: { isActive: boolean }) {
-  return `rounded-pill border-2 px-3 py-1.5 transition-colors ${
+  return `rounded-pill border-2 px-2.5 py-1 transition-colors sm:px-3 sm:py-1.5 ${
     isActive
       ? "border-workroom-ink bg-workroom-ink text-white"
       : "border-transparent text-workroom-muted hover:border-workroom-ink hover:text-workroom-ink"
@@ -42,17 +42,16 @@ export default function Header({ isAdmin }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b-2 border-workroom-ink bg-workroom-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-        <Link className="flex min-w-0 items-center gap-2" to="/">
-          <img className="h-8 w-auto max-w-[124px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
+        <Link className="flex min-w-0 shrink-0 items-center gap-2" to="/" title="WORKROOM 사이트로">
+          <img className="h-7 w-auto max-w-[96px] object-contain sm:h-8 sm:max-w-[124px]" src={logoSig} alt="WORKROOM by 4REST" />
         </Link>
 
         {isAdmin ? (
-          <nav className="flex items-center gap-1.5 text-xs font-bold sm:gap-2 sm:text-sm">
+          <nav className="flex items-center gap-1 text-xs font-bold sm:gap-2 sm:text-sm">
             <NavLink className={adminNavClass} to="/admin/reservations">예약</NavLink>
             <NavLink className={adminNavClass} to="/admin/stats">통계</NavLink>
             <NavLink className={adminNavClass} to="/admin/members">회원</NavLink>
             <NavLink className={adminNavClass} to="/admin/settings">설정</NavLink>
-            <Link className="ml-1 rounded-pill border-2 border-workroom-ink px-3 py-1.5 transition-colors hover:bg-workroom-yellow" to="/">사이트</Link>
           </nav>
         ) : (
           <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-4 sm:text-sm">

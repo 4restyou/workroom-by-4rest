@@ -36,13 +36,13 @@ export default {
         },
       },
       boxShadow: {
-        hard: "4px 4px 0 0 #141414",
+        hard: "3px 3px 0 0 #141414",
         "hard-sm": "2px 2px 0 0 #141414",
-        "hard-lg": "6px 6px 0 0 #141414",
+        "hard-lg": "5px 5px 0 0 #141414",
         // Legacy aliases kept so older class names still read as the new
         // hard-offset language.
-        soft: "3px 3px 0 0 #141414",
-        sketch: "6px 6px 0 0 #141414",
+        soft: "2px 2px 0 0 #141414",
+        sketch: "4px 4px 0 0 #141414",
       },
       borderRadius: {
         card: "1.25rem",

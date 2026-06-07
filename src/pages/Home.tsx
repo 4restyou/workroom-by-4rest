@@ -99,10 +99,10 @@ export default function Home() {
                 loading="eager"
               />
             </div>
-            <div className="absolute -bottom-4 -left-3 rotate-[-4deg]">
+            <div className="absolute -bottom-3 left-2 rotate-[-4deg]">
               <span className={badge("mint", "text-sm shadow-hard")}>충장로 · 금남로5가역</span>
             </div>
-            <div className="absolute -right-3 -top-3 rotate-[6deg]">
+            <div className="absolute right-2 -top-3 rotate-[5deg]">
               <span className={badge("lilac", "text-sm shadow-hard")}>3시간권 12,000원~</span>
             </div>
           </div>
