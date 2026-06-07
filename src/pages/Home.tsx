@@ -77,7 +77,7 @@ export default function Home() {
               <br />
               머무는 <span className="bg-workroom-yellow px-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span> 작업 공간
             </h1>
-            <p className="mt-5 max-w-xl text-lg font-normal leading-8 text-workroom-muted">
+            <p className="mt-5 max-w-xl text-lg font-medium leading-8 text-workroom-muted">
               카페보다 조용하고, 사무실보다 느슨하게. 혼자 일하거나 작은 모임을 갖기 좋은 자리입니다.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -111,7 +111,7 @@ export default function Home() {
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤" accent="mint">
         <div className={`${card} p-6 sm:p-8`}>
-          <div className="max-w-3xl text-base font-normal leading-8 text-workroom-muted sm:text-lg">
+          <div className="max-w-3xl text-base font-medium leading-8 text-workroom-muted sm:text-lg">
             <p>
               카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데
               이상하게 일이 잘 안 될 때가 있습니다.
@@ -165,7 +165,7 @@ export default function Home() {
           {guideItems.map(([title, body]) => (
             <article className={`${card} p-5`} key={title}>
               <h3 className="text-lg font-bold">{title}</h3>
-              <p className="mt-2 text-sm font-normal leading-6 text-workroom-muted">{body}</p>
+              <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">{body}</p>
             </article>
           ))}
         </div>
@@ -193,7 +193,7 @@ export default function Home() {
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
           <div className={`${card} p-5`}>
             <p className="text-xl font-bold">충장로 작업 라운지</p>
-            <p className="mt-2 font-normal text-workroom-muted">금남로5가역 도보 약 3-5분</p>
+            <p className="mt-2 font-medium text-workroom-muted">금남로5가역 도보 약 3-5분</p>
           </div>
           <div className="grid gap-3">
             <a

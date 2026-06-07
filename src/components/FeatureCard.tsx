@@ -16,7 +16,7 @@ export default function FeatureCard({ title, body, mark, accent = "mint" }: Feat
         {mark}
       </div>
       <h3 className="text-lg font-bold">{title}</h3>
-      <p className="mt-2 text-sm font-normal leading-6 text-workroom-muted">{body}</p>
+      <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">{body}</p>
     </article>
   );
 }

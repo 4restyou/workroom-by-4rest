@@ -182,7 +182,7 @@ export default function Reserve() {
                   >
                     <span className="min-w-0">
                       <span className="block text-base font-bold">{pass.name}</span>
-                      <span className="mt-1 block text-xs font-normal text-workroom-muted">
+                      <span className="mt-1 block text-xs font-medium text-workroom-muted">
                         {pass.description}
                         {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
                       </span>
