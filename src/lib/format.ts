@@ -12,6 +12,15 @@ export function formatPrice(price: number) {
   return `${new Intl.NumberFormat("ko-KR").format(price)}원`;
 }
 
+// Auto-insert hyphens as a Korean phone number is typed (e.g. 010-0000-0000).
+export function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length < 4) return digits;
+  if (digits.length < 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (digits.length < 11) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 export function formatDate(value: string) {
   if (!value) return "";
   return new Intl.DateTimeFormat("ko-KR", {

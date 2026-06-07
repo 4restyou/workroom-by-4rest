@@ -1,12 +1,12 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
-import { formatDate, formatTimeRange, statusLabel } from "../lib/format";
+import { formatDate, formatPhone, formatTimeRange, statusLabel } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
-import type { Profile, Reservation, ReservationNotification } from "../lib/types";
+import type { Profile, Reservation } from "../lib/types";
 
 type AccountTab = "reservations" | "profile";
 
@@ -19,9 +19,7 @@ export default function Account() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [dbNotifications, setDbNotifications] = useState<ReservationNotification[]>([]);
   const [activeTab, setActiveTab] = useState<AccountTab>("reservations");
-  const [showNotifications, setShowNotifications] = useState(false);
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,24 +50,15 @@ export default function Account() {
           address: loadedProfile?.address ?? "",
         });
 
-        const [{ data, error: reservationsError }, { data: notificationData, error: notificationError }] = await Promise.all([
-          supabase
-            .from("reservations")
-            .select("*")
-            .eq("profile_id", user.id)
-            .order("date", { ascending: false })
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("reservation_notifications")
-            .select("*")
-            .eq("profile_id", user.id)
-            .order("created_at", { ascending: false }),
-        ]);
+        const { data, error: reservationsError } = await supabase
+          .from("reservations")
+          .select("*")
+          .eq("profile_id", user.id)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false });
 
         if (reservationsError) throw reservationsError;
-        if (notificationError) throw notificationError;
         setReservations((data ?? []) as Reservation[]);
-        setDbNotifications((notificationData ?? []) as ReservationNotification[]);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "내정보를 불러오지 못했습니다.");
       } finally {
@@ -79,47 +68,6 @@ export default function Account() {
 
     void loadAccount();
   }, [navigate]);
-
-  const notifications = useMemo(() => {
-    const items: string[] = [];
-    if (!profile?.phone) items.push("연락처를 입력하면 예약 신청 때 자동으로 채워집니다.");
-
-    reservations.slice(0, 5).forEach((reservation) => {
-      if (reservation.status === "confirmed") {
-        items.push(`${formatDate(reservation.date)} ${formatTimeRange(reservation.start_time, reservation.end_time)} 예약이 확정되었습니다.`);
-      }
-      if (reservation.status === "canceled") {
-        items.push(`${formatDate(reservation.date)} 예약이 취소 처리되었습니다.`);
-      }
-      if (reservation.status === "no_show") {
-        items.push(`${formatDate(reservation.date)} 예약이 노쇼 처리되었습니다.`);
-      }
-    });
-
-    dbNotifications.forEach((notification) => {
-      items.push(`${notification.title} ${notification.body}`);
-    });
-
-    return items;
-  }, [dbNotifications, profile, reservations]);
-
-  const unreadCount = useMemo(() => dbNotifications.filter((notification) => !notification.is_read).length, [dbNotifications]);
-
-  useEffect(() => {
-    if (!showNotifications || !supabase) return;
-    const unreadIds = dbNotifications.filter((notification) => !notification.is_read).map((notification) => notification.id);
-    if (!unreadIds.length) return;
-
-    void supabase
-      .from("reservation_notifications")
-      .update({ is_read: true })
-      .in("id", unreadIds)
-      .then(() => {
-        setDbNotifications((current) =>
-          current.map((notification) => (unreadIds.includes(notification.id) ? { ...notification, is_read: true } : notification)),
-        );
-      });
-  }, [showNotifications, dbNotifications]);
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -173,30 +121,7 @@ export default function Account() {
 
   return (
     <main className="pb-16">
-      <Section
-        eyebrow="My Page"
-        title="내정보"
-        accent="mint"
-        action={
-          profile ? (
-            <button
-              className="relative grid h-11 w-11 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-surface shadow-hard transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-              onClick={() => setShowNotifications(true)}
-              type="button"
-              aria-label={`알림${unreadCount ? ` ${unreadCount}건` : ""}`}
-            >
-              <span className="text-lg" aria-hidden>
-                🔔
-              </span>
-              {unreadCount ? (
-                <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-yellow px-1 text-[10px] font-black">
-                  {unreadCount}
-                </span>
-              ) : null}
-            </button>
-          ) : undefined
-        }
-      >
+      <Section eyebrow="My Page" title="내정보" accent="mint">
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>내정보를 불러오는 중입니다.</p> : null}
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
@@ -246,7 +171,13 @@ export default function Account() {
                 </label>
                 <label className="grid gap-2 text-sm font-bold">
                   연락처
-                  <input required placeholder="010-0000-0000" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
+                  <input
+                    required
+                    inputMode="numeric"
+                    placeholder="010-0000-0000"
+                    value={form.phone}
+                    onChange={(event) => updateField("phone", formatPhone(event.target.value))}
+                  />
                 </label>
                 <label className="grid gap-2 text-sm font-bold">
                   주소
@@ -292,38 +223,6 @@ export default function Account() {
           </div>
         ) : null}
       </Section>
-
-      {showNotifications ? (
-        <div
-          className="fixed inset-0 z-50 grid justify-center bg-black/50 p-4 pt-20"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowNotifications(false)}
-        >
-          <div
-            className={`${card} h-fit max-h-[75vh] w-full max-w-md overflow-y-auto p-5`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">알림</h2>
-              <button className={buttonClass("secondary", "sm")} onClick={() => setShowNotifications(false)} type="button">
-                닫기
-              </button>
-            </div>
-            <div className="mt-4 grid gap-2">
-              {notifications.length ? (
-                notifications.map((notification, index) => (
-                  <p className={`${tintCard("yellow")} px-4 py-3 text-sm font-bold`} key={`${notification}-${index}`}>
-                    {notification}
-                  </p>
-                ))
-              ) : (
-                <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>새 알림이 없습니다.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }

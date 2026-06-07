@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import Calendar from "../components/Calendar";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
-import { formatDateInputValue, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
+import { formatDateInputValue, formatPhone, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
@@ -436,7 +436,13 @@ export default function Reserve() {
                 <input required placeholder="성함 또는 팀명" value={form.name} onChange={(event) => updateField("name", event.target.value)} />
               </Field>
               <Field label="연락처">
-                <input required placeholder="010-0000-0000" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
+                <input
+                  required
+                  inputMode="numeric"
+                  placeholder="010-0000-0000"
+                  value={form.phone}
+                  onChange={(event) => updateField("phone", formatPhone(event.target.value))}
+                />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="이메일">
