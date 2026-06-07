@@ -106,6 +106,24 @@ export default function Account() {
     return items;
   }, [dbNotifications, profile, reservations]);
 
+  const unreadCount = useMemo(() => dbNotifications.filter((notification) => !notification.is_read).length, [dbNotifications]);
+
+  useEffect(() => {
+    if (activeTab !== "notifications" || !supabase) return;
+    const unreadIds = dbNotifications.filter((notification) => !notification.is_read).map((notification) => notification.id);
+    if (!unreadIds.length) return;
+
+    void supabase
+      .from("reservation_notifications")
+      .update({ is_read: true })
+      .in("id", unreadIds)
+      .then(() => {
+        setDbNotifications((current) =>
+          current.map((notification) => (unreadIds.includes(notification.id) ? { ...notification, is_read: true } : notification)),
+        );
+      });
+  }, [activeTab, dbNotifications]);
+
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
   }
@@ -177,7 +195,7 @@ export default function Account() {
                   type="button"
                 >
                   {tabLabels[tab]}
-                  {tab === "notifications" && notifications.length ? ` ${notifications.length}` : ""}
+                  {tab === "notifications" && unreadCount ? ` ${unreadCount}` : ""}
                 </button>
               ))}
             </div>

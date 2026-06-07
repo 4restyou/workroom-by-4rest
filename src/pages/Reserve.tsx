@@ -30,6 +30,7 @@ export default function Reserve() {
   const [success, setSuccess] = useState(false);
   const [reservationEnabled, setReservationEnabled] = useState(true);
   const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
+  const [trap, setTrap] = useState(""); // honeypot: real users never fill this
 
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
@@ -117,6 +118,13 @@ export default function Reserve() {
 
     if (!reservationEnabled) {
       setError("현재 예약을 받고 있지 않습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    // Honeypot: a bot filled the hidden field — pretend success, skip the insert.
+    if (trap.trim()) {
+      setSuccess(true);
+      setForm({ ...emptyForm, date: todayValue() });
       return;
     }
 
@@ -215,6 +223,16 @@ export default function Reserve() {
         ) : null}
 
         <form className="grid gap-5" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            name="company"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="pointer-events-none absolute left-[-9999px] h-0 w-0 opacity-0"
+            value={trap}
+            onChange={(event) => setTrap(event.target.value)}
+          />
           <fieldset className={`${card} p-5`}>
             <StepHeading step="1" title="이용권" />
             <div className="grid gap-3">
