@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import { buttonClass } from "../lib/ui";
 import NotificationBell from "./NotificationBell";
 import type { Profile } from "../lib/types";
 import logoSig from "../../assets/logo/logo_sig.png";
@@ -66,7 +65,6 @@ export default function Header({ isAdmin }: HeaderProps) {
               {profile ? "내정보" : "로그인"}
             </Link>
             {profile ? <NotificationBell /> : null}
-            <Link className={buttonClass("accent", "sm")} to="/reserve">예약</Link>
           </nav>
         )}
       </div>

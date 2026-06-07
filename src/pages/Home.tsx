@@ -106,7 +106,7 @@ export default function Home() {
               혼자 일하거나 작은 모임을 갖기 좋은 자리입니다.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link className={buttonClass("primary", "lg", "w-full sm:w-auto")} to="/reserve">
+              <Link className={buttonClass("accent", "lg", "w-full sm:w-auto")} to="/reserve">
                 예약하기 →
               </Link>
               <a className={buttonClass("secondary", "lg", "w-full sm:w-auto")} href="#pricing">
