@@ -217,7 +217,8 @@ export default function Home() {
                 <dt className="text-sm font-bold">🅿️ 주차</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
                   전용 주차장은 없습니다. 인근 <b className="font-bold text-workroom-ink">충장로상점가 공영주차장</b>(광주 동구 금남로5가
-                  124-1, 24시간)을 이용해 주세요. 30분 700원 · 1시간 1,400원 · 2시간 2,800원 · 4시간 5,600원.
+                  124-1, 24시간)을 이용해 주세요. 30분 700원 · 1시간 1,400원 · 2시간 2,800원 · 4시간 5,600원 · 1일 8,000원. 월 정기주차도
+                  가능합니다.
                 </dd>
               </div>
             </dl>
