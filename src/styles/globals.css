@@ -73,21 +73,46 @@ button {
   cursor: pointer;
 }
 
-input,
+/* Text-like fields, selects and textareas. -webkit-appearance:none is the key
+   line: iOS Safari otherwise paints its own native border/inner-shadow on top
+   of ours, which looks like every field has a drop shadow on iPhone (it never
+   shows up in Chrome). Checkboxes and radios are excluded so they keep their
+   native rendering. */
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   width: 100%;
   min-height: 48px;
   border: 2px solid #141414;
   border-radius: 14px;
-  background: #ffffff;
+  background-color: #ffffff;
   padding: 11px 14px;
   color: #141414;
   font-weight: 600;
+  box-shadow: none;
   outline: none;
-  transition:
-    box-shadow 0.12s ease,
-    transform 0.12s ease;
+  transition: box-shadow 0.12s ease;
+}
+
+/* appearance:none drops the native dropdown arrow, so draw our own chevron. */
+select {
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23141414' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px 14px;
+}
+
+/* Keep date/time values left-aligned like the other fields. */
+input[type="date"],
+input[type="time"] {
+  text-align: left;
+}
+input::-webkit-date-and-time-value {
+  text-align: left;
 }
 
 input::placeholder,
@@ -100,7 +125,7 @@ textarea {
   resize: vertical;
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   border-color: #141414;
@@ -110,7 +135,7 @@ textarea:focus {
 input:disabled,
 select:disabled,
 textarea:disabled {
-  background: #f1ece1;
+  background-color: #f1ece1;
   color: #5c5a54;
 }
 
