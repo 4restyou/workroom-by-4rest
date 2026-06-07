@@ -1,8 +1,9 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import Calendar from "../components/Calendar";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
-import { formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
+import { formatDateInputValue, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
@@ -20,6 +21,32 @@ const emptyForm = {
   message: "",
 };
 
+function toMinutes(time: string) {
+  const [hour, minute] = time.slice(0, 5).split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+// Peak number of people booked at the same instant during a day.
+function peakConcurrent(intervals: { start: number; end: number; people: number }[]) {
+  const events: { at: number; delta: number }[] = [];
+  for (const item of intervals) {
+    events.push({ at: item.start, delta: item.people });
+    events.push({ at: item.end, delta: -item.people });
+  }
+  events.sort((a, b) => a.at - b.at || a.delta - b.delta);
+  let current = 0;
+  let peak = 0;
+  for (const event of events) {
+    current += event.delta;
+    if (current > peak) peak = current;
+  }
+  return peak;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
 export default function Reserve() {
   const location = useLocation();
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
@@ -32,6 +59,9 @@ export default function Reserve() {
   const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
   const [trap, setTrap] = useState(""); // honeypot: real users never fill this
   const [authChecked, setAuthChecked] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
+  const [fullDates, setFullDates] = useState<Set<string>>(new Set());
+  const [seatCapacities, setSeatCapacities] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
@@ -87,15 +117,19 @@ export default function Reserve() {
   useEffect(() => {
     async function loadOperatingInfo() {
       if (!hasSupabaseConfig || !supabase) return;
-      const [{ data: settingRows }, { data: hoursData }] = await Promise.all([
+      const [{ data: settingRows }, { data: hoursData }, { data: seatData }] = await Promise.all([
         supabase.from("space_settings").select("key,value"),
         supabase.from("business_hours").select("*"),
+        supabase.from("seat_types").select("id,capacity"),
       ]);
       if (settingRows) {
         setSettings(Object.fromEntries((settingRows as { key: string; value: string }[]).map((row) => [row.key, row.value])));
       }
       if (hoursData) {
         setHoursByWeekday(Object.fromEntries((hoursData as BusinessHour[]).map((hour) => [hour.weekday, hour])));
+      }
+      if (seatData) {
+        setSeatCapacities(Object.fromEntries((seatData as { id: string; capacity: number }[]).map((seat) => [seat.id, seat.capacity])));
       }
     }
 
@@ -121,6 +155,61 @@ export default function Reserve() {
       ["프린트", settings.print_notice],
     ] as [string, string | undefined][]
   ).filter((item): item is [string, string] => Boolean(item[1] && item[1].trim()));
+
+  const selectedSeatTypeId = passes.find((pass) => pass.name === form.pass_type)?.seat_type_id ?? null;
+
+  useEffect(() => {
+    async function loadAvailability() {
+      if (!hasSupabaseConfig || !supabase || !selectedSeatTypeId) {
+        setFullDates(new Set());
+        return;
+      }
+      const capacity = seatCapacities[selectedSeatTypeId];
+      if (!capacity) {
+        setFullDates(new Set());
+        return;
+      }
+      const monthStart = formatDateInputValue(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1));
+      const monthEnd = formatDateInputValue(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0));
+
+      const { data } = await supabase
+        .from("reservations")
+        .select("date,start_time,end_time,people,status")
+        .eq("seat_type_id", selectedSeatTypeId)
+        .in("status", ["pending", "confirmed"])
+        .gte("date", monthStart)
+        .lte("date", monthEnd);
+
+      const byDate = new Map<string, { start: number; end: number; people: number }[]>();
+      for (const row of (data ?? []) as { date: string; start_time: string | null; end_time: string | null; people: number | null }[]) {
+        if (!row.start_time || !row.end_time) continue;
+        const list = byDate.get(row.date) ?? [];
+        list.push({ start: toMinutes(row.start_time), end: toMinutes(row.end_time), people: row.people ?? 1 });
+        byDate.set(row.date, list);
+      }
+
+      const next = new Set<string>();
+      byDate.forEach((intervals, date) => {
+        if (peakConcurrent(intervals) >= capacity) next.add(date);
+      });
+      setFullDates(next);
+    }
+
+    void loadAvailability();
+  }, [calendarMonth, selectedSeatTypeId, seatCapacities, success]);
+
+  const today = todayValue();
+
+  function isDateDisabled(date: string) {
+    if (date < today) return true;
+    const weekday = new Date(`${date}T00:00:00`).getDay();
+    if (hoursByWeekday[weekday]?.is_closed) return true;
+    return fullDates.has(date);
+  }
+
+  function isDateFull(date: string) {
+    return fullDates.has(date);
+  }
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -305,22 +394,39 @@ export default function Reserve() {
 
           <fieldset className={`${card} p-5`}>
             <StepHeading step="2" title="날짜와 시간" />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="예약 날짜">
-                <input required min={todayValue()} type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} />
-              </Field>
-              <Field label="시작 시간">
-                <input required type="time" min={openHHMM} max={closeHHMM} value={form.start_time} onChange={(event) => updateField("start_time", event.target.value)} />
-              </Field>
-              <Field label="종료 시간">
-                <input required type="time" min={openHHMM} max={closeHHMM} value={form.end_time} onChange={(event) => updateField("end_time", event.target.value)} />
-              </Field>
-            </div>
-            {selectedHours ? (
-              <p className={`mt-3 text-xs font-bold ${isClosedDay ? "text-red-600" : "text-workroom-muted"}`}>
-                {isClosedDay ? "이 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요." : `이 날짜 운영 시간 · ${openHHMM} – ${closeHHMM}`}
-              </p>
+            {!form.pass_type ? (
+              <p className={`mb-4 ${tintCard("yellow")} p-3 text-sm font-bold`}>먼저 이용권을 선택하면 좌석이 남은 날짜만 선택할 수 있어요.</p>
             ) : null}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid content-start gap-2 text-sm font-bold">
+                <span>예약 날짜</span>
+                <Calendar
+                  month={calendarMonth}
+                  selected={form.date}
+                  minMonth={startOfMonth(new Date())}
+                  onSelect={(date) => updateField("date", date)}
+                  onMonthChange={setCalendarMonth}
+                  isDisabled={isDateDisabled}
+                  isFull={isDateFull}
+                />
+              </div>
+              <div className="grid content-start gap-4">
+                <Field label="시작 시간">
+                  <input required type="time" min={openHHMM} max={closeHHMM} value={form.start_time} onChange={(event) => updateField("start_time", event.target.value)} />
+                </Field>
+                <Field label="종료 시간">
+                  <input required type="time" min={openHHMM} max={closeHHMM} value={form.end_time} onChange={(event) => updateField("end_time", event.target.value)} />
+                </Field>
+                <p className="text-xs font-medium leading-5 text-workroom-muted">
+                  시간은 이용권에 맞게 자동으로 채워지며, 필요하면 직접 바꿀 수 있어요.
+                </p>
+                {selectedHours ? (
+                  <p className={`text-xs font-bold ${isClosedDay ? "text-red-600" : "text-workroom-muted"}`}>
+                    {isClosedDay ? "이 날짜는 휴무일입니다." : `이 날짜 운영 시간 · ${openHHMM} – ${closeHHMM}`}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </fieldset>
 
           <fieldset className={`${card} p-5`}>
