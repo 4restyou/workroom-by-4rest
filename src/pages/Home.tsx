@@ -104,7 +104,7 @@ export default function Home() {
               />
             </div>
             <div className="absolute -bottom-3 left-2 rotate-[-4deg]">
-              <span className={badge("mint", "text-sm shadow-hard")}>충장로 · 금남로5가역</span>
+              <span className={badge("mint", "text-sm shadow-hard")}>충장로 · 금남로4가역</span>
             </div>
             <div className="absolute right-2 -top-3 rotate-[5deg]">
               <span className={badge("lilac", "text-sm shadow-hard")}>3시간권 12,000원~</span>
@@ -195,16 +195,37 @@ export default function Home() {
         </p>
       </Section>
 
-      <Section eyebrow="Location" title="충장로, 금남로5가역 근처" accent="mint">
-        <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
+      <Section eyebrow="Location" title="충장로, 금남로4가역 근처" accent="mint">
+        <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
           <div className={`${card} p-5`}>
-            <p className="text-xl font-bold">충장로 작업 라운지</p>
-            <p className="mt-2 font-medium text-workroom-muted">금남로5가역 도보 약 3-5분</p>
+            <p className="text-xl font-black">WORKROOM by 4REST</p>
+            <p className="mt-1 font-medium text-workroom-muted">광주광역시 동구 충장로 10-1, 2층</p>
+            <dl className="mt-5 grid gap-4">
+              <div>
+                <dt className="text-sm font-bold">🚇 지하철</dt>
+                <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
+                  광주 1호선 <b className="font-bold text-workroom-ink">금남로4가역</b>에서 도보 약 1–3분. 충금지하상가(충장치안센터 방면)로 바로
+                  이어집니다. 금남로5가역·문화전당역에서도 도보 약 10분.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-bold">🚌 버스</dt>
+                <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
+                  ‘금남로4가역’ 또는 ‘충장치안센터(충파)’ 정류장 하차. 경유 노선이 많아 출발지에서 지도 길찾기를 권합니다.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-bold">🅿️ 주차</dt>
+                <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
+                  전용 주차장은 없습니다. 인근 공영주차장(예: 황금주차빌딩)을 이용해 주세요.
+                </dd>
+              </div>
+            </dl>
           </div>
-          <div className="grid gap-3">
+          <div className="grid gap-3 sm:content-start">
             <a
               className={buttonClass("primary", "lg")}
-              href="https://map.naver.com/p/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C"
+              href="https://map.naver.com/p/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C%2010-1"
               rel="noreferrer"
               target="_blank"
             >
@@ -212,12 +233,15 @@ export default function Home() {
             </a>
             <a
               className={buttonClass("accent", "lg")}
-              href="https://map.kakao.com/link/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C"
+              href="https://map.kakao.com/link/search/%EA%B4%91%EC%A3%BC%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C%2010-1"
               rel="noreferrer"
               target="_blank"
             >
               카카오맵에서 보기
             </a>
+            <p className="text-xs font-medium leading-5 text-workroom-muted">
+              버스 노선·주차 요금은 바뀔 수 있어요. 방문 전 지도 앱에서 한 번 더 확인해 주세요.
+            </p>
           </div>
         </div>
       </Section>

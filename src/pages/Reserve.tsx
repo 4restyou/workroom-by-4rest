@@ -28,7 +28,7 @@ export default function Reserve() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [reservationEnabled, setReservationEnabled] = useState(true);
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
   const [trap, setTrap] = useState(""); // honeypot: real users never fill this
   const [authChecked, setAuthChecked] = useState(false);
@@ -87,11 +87,13 @@ export default function Reserve() {
   useEffect(() => {
     async function loadOperatingInfo() {
       if (!hasSupabaseConfig || !supabase) return;
-      const [{ data: settingRow }, { data: hoursData }] = await Promise.all([
-        supabase.from("space_settings").select("key,value").eq("key", "reservation_enabled").maybeSingle(),
+      const [{ data: settingRows }, { data: hoursData }] = await Promise.all([
+        supabase.from("space_settings").select("key,value"),
         supabase.from("business_hours").select("*"),
       ]);
-      if (settingRow) setReservationEnabled(settingRow.value === "true");
+      if (settingRows) {
+        setSettings(Object.fromEntries((settingRows as { key: string; value: string }[]).map((row) => [row.key, row.value])));
+      }
       if (hoursData) {
         setHoursByWeekday(Object.fromEntries((hoursData as BusinessHour[]).map((hour) => [hour.weekday, hour])));
       }
@@ -109,6 +111,16 @@ export default function Reserve() {
   const openHHMM = selectedHours?.open_time.slice(0, 5);
   const closeHHMM = selectedHours?.close_time.slice(0, 5);
   const isClosedDay = selectedHours?.is_closed ?? false;
+  const reservationEnabled = settings.reservation_enabled !== "false";
+  const noticeItems = (
+    [
+      ["결제", settings.payment_notice],
+      ["취소·환불", settings.cancellation_notice],
+      ["연장", settings.extension_notice],
+      ["음식·소리", settings.etiquette_notice],
+      ["프린트", settings.print_notice],
+    ] as [string, string | undefined][]
+  ).filter((item): item is [string, string] => Boolean(item[1] && item[1].trim()));
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -341,13 +353,6 @@ export default function Reserve() {
           </fieldset>
 
           {error ? <p className={`${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
-          {success ? (
-            <div className={`${tintCard("mint")} p-5 font-bold leading-7`}>
-              <p className="text-lg font-black">예약 신청이 접수되었습니다. 🎉</p>
-              <p className="mt-1">확인 후 연락드릴게요.</p>
-              <p className="mt-3 text-sm font-medium">확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.</p>
-            </div>
-          ) : null}
 
           <button className={buttonClass("primary", "lg")} disabled={isSubmitting || !reservationEnabled} type="submit">
             {isSubmitting ? "보내는 중…" : reservationEnabled ? "예약 신청 →" : "예약 일시 중지"}
@@ -359,6 +364,33 @@ export default function Reserve() {
         </form>
         )}
       </Section>
+
+      {success ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className={`${card} max-h-[85vh] w-full max-w-lg overflow-y-auto p-6`}>
+            <p className="text-2xl font-black">예약 신청이 접수되었습니다 🎉</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
+              확인 후 전화 또는 문자로 안내드릴게요. 확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.
+            </p>
+
+            {noticeItems.length ? (
+              <div className="mt-5 grid gap-3">
+                <p className="text-sm font-black">이용 전 꼭 확인해 주세요</p>
+                {noticeItems.map(([title, body]) => (
+                  <div className={`${tintCard("mint")} p-3`} key={title}>
+                    <p className="text-sm font-bold">{title}</p>
+                    <p className="mt-1 text-sm font-medium leading-6">{body}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <button className={buttonClass("primary", "lg", "mt-6 w-full")} onClick={() => setSuccess(false)} type="button">
+              확인했어요
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
