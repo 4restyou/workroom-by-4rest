@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
@@ -6,7 +6,7 @@ import { formatPrice, reservationWindowForPass, todayValue } from "../lib/format
 import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
-import type { Pass, Profile, ReservationInsert } from "../lib/types";
+import type { BusinessHour, Pass, Profile, ReservationInsert } from "../lib/types";
 
 const emptyForm = {
   pass_type: "",
@@ -28,6 +28,8 @@ export default function Reserve() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [reservationEnabled, setReservationEnabled] = useState(true);
+  const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
 
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
@@ -69,6 +71,32 @@ export default function Reserve() {
     void loadProfile();
   }, []);
 
+  useEffect(() => {
+    async function loadOperatingInfo() {
+      if (!hasSupabaseConfig || !supabase) return;
+      const [{ data: settingRow }, { data: hoursData }] = await Promise.all([
+        supabase.from("space_settings").select("key,value").eq("key", "reservation_enabled").maybeSingle(),
+        supabase.from("business_hours").select("*"),
+      ]);
+      if (settingRow) setReservationEnabled(settingRow.value === "true");
+      if (hoursData) {
+        setHoursByWeekday(Object.fromEntries((hoursData as BusinessHour[]).map((hour) => [hour.weekday, hour])));
+      }
+    }
+
+    void loadOperatingInfo();
+  }, []);
+
+  const selectedHours = useMemo(() => {
+    if (!form.date) return undefined;
+    const weekday = new Date(`${form.date}T00:00:00`).getDay();
+    return hoursByWeekday[weekday];
+  }, [form.date, hoursByWeekday]);
+
+  const openHHMM = selectedHours?.open_time.slice(0, 5);
+  const closeHHMM = selectedHours?.close_time.slice(0, 5);
+  const isClosedDay = selectedHours?.is_closed ?? false;
+
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
   }
@@ -87,6 +115,11 @@ export default function Reserve() {
       return;
     }
 
+    if (!reservationEnabled) {
+      setError("현재 예약을 받고 있지 않습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
     if (!form.pass_type || !form.name.trim() || !form.phone.trim() || !form.message.trim()) {
       setError("이용권, 이름, 연락처, 요청사항을 입력해 주세요.");
       return;
@@ -94,6 +127,16 @@ export default function Reserve() {
 
     if (form.start_time >= form.end_time) {
       setError("종료 시간은 시작 시간보다 늦어야 합니다.");
+      return;
+    }
+
+    if (isClosedDay) {
+      setError("선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.");
+      return;
+    }
+
+    if (openHHMM && closeHHMM && (form.start_time < openHHMM || form.end_time > closeHHMM)) {
+      setError(`운영 시간(${openHHMM} - ${closeHHMM}) 안에서만 예약할 수 있습니다.`);
       return;
     }
 
@@ -165,6 +208,12 @@ export default function Reserve() {
           {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
         </div>
 
+        {!reservationEnabled ? (
+          <div className={`mb-6 ${tintCard("danger")} p-4 text-sm font-bold`}>
+            지금은 예약을 받고 있지 않습니다. 자세한 내용은 운영자에게 문의해 주세요.
+          </div>
+        ) : null}
+
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <fieldset className={`${card} p-5`}>
             <StepHeading step="1" title="이용권" />
@@ -208,12 +257,17 @@ export default function Reserve() {
                 <input required min={todayValue()} type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} />
               </Field>
               <Field label="시작 시간">
-                <input required type="time" value={form.start_time} onChange={(event) => updateField("start_time", event.target.value)} />
+                <input required type="time" min={openHHMM} max={closeHHMM} value={form.start_time} onChange={(event) => updateField("start_time", event.target.value)} />
               </Field>
               <Field label="종료 시간">
-                <input required type="time" value={form.end_time} onChange={(event) => updateField("end_time", event.target.value)} />
+                <input required type="time" min={openHHMM} max={closeHHMM} value={form.end_time} onChange={(event) => updateField("end_time", event.target.value)} />
               </Field>
             </div>
+            {selectedHours ? (
+              <p className={`mt-3 text-xs font-bold ${isClosedDay ? "text-red-600" : "text-workroom-muted"}`}>
+                {isClosedDay ? "이 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요." : `이 날짜 운영 시간 · ${openHHMM} – ${closeHHMM}`}
+              </p>
+            ) : null}
           </fieldset>
 
           <fieldset className={`${card} p-5`}>
@@ -254,8 +308,8 @@ export default function Reserve() {
             </div>
           ) : null}
 
-          <button className={buttonClass("primary", "lg")} disabled={isSubmitting} type="submit">
-            {isSubmitting ? "보내는 중…" : "예약 신청 →"}
+          <button className={buttonClass("primary", "lg")} disabled={isSubmitting || !reservationEnabled} type="submit">
+            {isSubmitting ? "보내는 중…" : reservationEnabled ? "예약 신청 →" : "예약 일시 중지"}
           </button>
 
           <Link className="text-center text-sm font-bold text-workroom-muted underline underline-offset-4 transition-colors hover:text-workroom-ink" to="/">

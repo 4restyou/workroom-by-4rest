@@ -317,6 +317,98 @@ create trigger reservation_status_notification
 after update of status on reservations
 for each row execute function public.notify_reservation_status_change();
 
+-- Server-side reservation guard. Runs on every insert so the rules cannot be
+-- bypassed by a crafted client, and serializes the capacity check per
+-- seat/day with an advisory lock so concurrent requests can't overbook.
+create or replace function public.before_reservation_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_enabled text;
+  v_pass public.passes%rowtype;
+  v_hours public.business_hours%rowtype;
+  v_dow integer;
+  v_capacity integer;
+  v_booked integer;
+begin
+  -- 1) Reservations globally enabled?
+  select value into v_enabled from public.space_settings where key = 'reservation_enabled';
+  if coalesce(v_enabled, 'true') <> 'true' then
+    raise exception '현재 예약을 받고 있지 않습니다.';
+  end if;
+
+  -- 2) Resolve the pass on the server so price / snapshot cannot be spoofed.
+  if new.pass_type is distinct from '기타 문의' then
+    select * into v_pass
+    from public.passes
+    where name = new.pass_type and is_active = true
+    order by sort_order
+    limit 1;
+
+    if found then
+      new.pass_id := v_pass.id;
+      new.pass_name_snapshot := v_pass.name;
+      new.price_at_booking := v_pass.price;
+      new.seat_type_id := v_pass.seat_type_id;
+    end if;
+  end if;
+
+  -- 3) Business hours / closed days and capacity (only when a time window is given).
+  if new.start_time is not null and new.end_time is not null then
+    if new.end_time <= new.start_time then
+      raise exception '종료 시간은 시작 시간보다 늦어야 합니다.';
+    end if;
+
+    v_dow := extract(dow from new.date);  -- 0 = Sunday .. 6 = Saturday
+    select * into v_hours from public.business_hours where weekday = v_dow;
+    if found then
+      if v_hours.is_closed then
+        raise exception '선택하신 날짜는 휴무일입니다.';
+      end if;
+      if new.start_time < v_hours.open_time or new.end_time > v_hours.close_time then
+        raise exception '운영 시간(% - %) 안에서만 예약할 수 있습니다.',
+          to_char(v_hours.open_time, 'HH24:MI'), to_char(v_hours.close_time, 'HH24:MI');
+      end if;
+    end if;
+
+    if new.seat_type_id is not null then
+      -- Serialize capacity checks for the same seat type + date.
+      perform pg_advisory_xact_lock(hashtext(new.seat_type_id::text || new.date::text));
+
+      select capacity into v_capacity
+      from public.seat_types
+      where id = new.seat_type_id and is_active = true;
+
+      if v_capacity is null then
+        raise exception '선택하신 좌석을 사용할 수 없습니다.';
+      end if;
+
+      select coalesce(sum(coalesce(people, 1)), 0) into v_booked
+      from public.reservations
+      where date = new.date
+        and seat_type_id = new.seat_type_id
+        and status in ('pending', 'confirmed')
+        and start_time is not null and end_time is not null
+        and start_time < new.end_time and end_time > new.start_time;
+
+      if v_booked + greatest(coalesce(new.people, 1), 1) > v_capacity then
+        raise exception '선택한 시간대의 잔여 좌석이 부족합니다. (잔여 %석)', greatest(v_capacity - v_booked, 0);
+      end if;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists before_reservation_insert on reservations;
+create trigger before_reservation_insert
+before insert on reservations
+for each row execute function public.before_reservation_insert();
+
 drop policy if exists "profiles_select_own_or_admin" on profiles;
 create policy "profiles_select_own_or_admin"
 on profiles
