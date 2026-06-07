@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPhone, formatTimeRange, statusLabel } from "../lib/format";
@@ -17,12 +17,14 @@ const tabLabels: Record<AccountTab, string> = {
 
 export default function Account() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [inquiryDrafts, setInquiryDrafts] = useState<Record<string, string>>({});
   const [inquiryBusy, setInquiryBusy] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<AccountTab>("reservations");
+  const [activeTab, setActiveTab] = useState<AccountTab>(tabParam === "profile" ? "profile" : "reservations");
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -78,6 +80,10 @@ export default function Account() {
 
     void loadAccount();
   }, [navigate]);
+
+  useEffect(() => {
+    if (tabParam === "profile" || tabParam === "reservations") setActiveTab(tabParam);
+  }, [tabParam]);
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
+import AccountMenu from "./AccountMenu";
 import NotificationBell from "./NotificationBell";
 import type { Profile } from "../lib/types";
 import logoSig from "../../assets/logo/logo_sig.png";
@@ -61,9 +62,11 @@ export default function Header({ isAdmin }: HeaderProps) {
             {profile?.role === "admin" ? (
               <Link className="transition-colors hover:text-workroom-ink" to="/admin/reservations">관리자</Link>
             ) : null}
-            <Link className="transition-colors hover:text-workroom-ink" to={profile ? "/account" : "/login"}>
-              {profile ? "내정보" : "로그인"}
-            </Link>
+            {profile ? (
+              <AccountMenu />
+            ) : (
+              <Link className="transition-colors hover:text-workroom-ink" to="/login">로그인</Link>
+            )}
             {profile ? <NotificationBell /> : null}
           </nav>
         )}
