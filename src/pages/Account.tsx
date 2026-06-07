@@ -151,12 +151,6 @@ export default function Account() {
     setSuccess("내정보를 저장했습니다.");
   }
 
-  async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    navigate("/", { replace: true });
-  }
-
   return (
     <main className="pb-16">
       <Section eyebrow="My Page" title="내정보" accent="mint">
@@ -184,14 +178,9 @@ export default function Account() {
 
             {activeTab === "profile" ? (
               <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-workroom-muted">회원</p>
-                    <p className="mt-1 text-2xl font-black">{profile.full_name || "내 정보"}</p>
-                  </div>
-                  <button className={buttonClass("secondary", "sm")} onClick={signOut} type="button">
-                    로그아웃
-                  </button>
+                <div>
+                  <p className="text-sm font-bold text-workroom-muted">회원</p>
+                  <p className="mt-1 text-2xl font-black">{profile.full_name || "내 정보"}</p>
                 </div>
                 {profile.role === "admin" ? (
                   <Link className={buttonClass("accent", "md")} to="/admin/reservations">

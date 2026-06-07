@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
-export default function AccountMenu() {
+export default function AccountMenu({ isAdmin = false }: { isAdmin?: boolean }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -47,9 +47,15 @@ export default function AccountMenu() {
 
       {open ? (
         <div className="absolute right-0 top-[calc(100%+10px)] z-50 grid w-44 animate-pop-in gap-1 rounded-card border-2 border-workroom-ink bg-workroom-surface p-2 text-workroom-ink shadow-hard">
-          <Link className={itemClass} to="/account?tab=reservations" onClick={() => setOpen(false)}>
-            예약현황
-          </Link>
+          {isAdmin ? (
+            <Link className={itemClass} to="/admin/reservations" onClick={() => setOpen(false)}>
+              예약관리
+            </Link>
+          ) : (
+            <Link className={itemClass} to="/account?tab=reservations" onClick={() => setOpen(false)}>
+              예약현황
+            </Link>
+          )}
           <Link className={itemClass} to="/account?tab=profile" onClick={() => setOpen(false)}>
             회원정보
           </Link>
