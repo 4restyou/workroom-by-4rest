@@ -93,6 +93,9 @@ export default function Account() {
       if (reservation.status === "canceled") {
         items.push(`${formatDate(reservation.date)} 예약이 취소 처리되었습니다.`);
       }
+      if (reservation.status === "no_show") {
+        items.push(`${formatDate(reservation.date)} 예약이 노쇼 처리되었습니다.`);
+      }
     });
 
     dbNotifications.forEach((notification) => {

@@ -2,45 +2,39 @@ import type { Pass } from "./types";
 
 export const defaultPasses: Pass[] = [
   {
-    id: "default-hourly",
-    name: "1시간권",
-    description: "1시간 이용",
+    id: "default-three-hour",
+    name: "3시간권",
+    description: "기본 이용권 / 커피 1잔",
+    price: 12000,
+  },
+  {
+    id: "default-extra-hour",
+    name: "추가 1시간",
+    description: "3시간 이후 좌석 여유 시 연장",
     price: 4000,
   },
   {
-    id: "default-day-light",
-    name: "종일권 라이트",
-    description: "평일 09:00-18:00",
-    price: 30000,
-  },
-  {
-    id: "default-day-standard",
-    name: "종일권 스탠다드",
-    description: "평일 09:00-21:00",
+    id: "default-day",
+    name: "종일권",
+    description: "09:00-22:00 / 커피 1일 3잔",
     price: 40000,
   },
   {
-    id: "default-week-light",
-    name: "주간권 라이트",
-    description: "월-금 09:00-18:00",
-    price: 99000,
-  },
-  {
-    id: "default-week-standard",
-    name: "주간권 스탠다드",
-    description: "월-금 09:00-21:00",
-    price: 139000,
+    id: "default-week",
+    name: "주간권",
+    description: "월-금 09:00-22:00 / 커피 1일 3잔",
+    price: 149000,
   },
   {
     id: "default-month-flex",
     name: "월권 자유석",
-    description: "4주 기준 / 비지정석",
+    description: "4주 기준 / 비지정석 / 커피 1일 3잔",
     price: 199000,
   },
   {
     id: "default-month-fixed",
     name: "월권 지정석",
-    description: "4주 기준 / 지정석",
+    description: "4주 기준 / 지정석 / 커피 1일 3잔",
     price: 299000,
   },
 ];

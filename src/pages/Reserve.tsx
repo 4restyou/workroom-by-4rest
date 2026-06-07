@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
-import { currentReservationWindow, formatPrice, todayValue } from "../lib/format";
+import { formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import type { Pass, Profile, ReservationInsert } from "../lib/types";
@@ -10,7 +10,7 @@ import type { Pass, Profile, ReservationInsert } from "../lib/types";
 const emptyForm = {
   pass_type: "",
   date: todayValue(),
-  start_time: "10:00",
+  start_time: "09:00",
   end_time: "12:00",
   people: "1",
   name: "",
@@ -31,8 +31,7 @@ export default function Reserve() {
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
     if (!selectedPass) return;
-    const reservationWindow = currentReservationWindow();
-    setForm((current) => ({ ...current, ...reservationWindow, pass_type: selectedPass }));
+    setForm((current) => ({ ...current, ...reservationWindowForPass(selectedPass), pass_type: selectedPass }));
   }, [location.search]);
 
   useEffect(() => {
@@ -71,6 +70,10 @@ export default function Reserve() {
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function selectPass(passName: string) {
+    setForm((current) => ({ ...current, ...reservationWindowForPass(passName), pass_type: passName }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -121,6 +124,8 @@ export default function Reserve() {
       pass_name_snapshot: selectedPass?.name ?? form.pass_type,
       price_at_booking: selectedPass?.price ?? null,
       seat_type_id: selectedPass?.seat_type_id ?? null,
+      payment_method: null,
+      payment_status: "unpaid",
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim() || null,
@@ -150,7 +155,7 @@ export default function Reserve() {
     <main className="pb-10">
       <Section eyebrow="Reserve" title="예약">
         <div className="mb-5 rounded-card border border-workroom-line bg-workroom-yellow p-4 text-sm font-black leading-6 shadow-sketch">
-          예약 신청 후 확인 연락을 드립니다. 확정 전까지 시간은 조금 조정될 수 있습니다.
+          홈페이지 예약을 기준으로 운영합니다. 예약 신청 후 전화 또는 문자로 확인 안내를 드립니다.
           {profile ? <span className="mt-2 block">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
         </div>
         <form className="grid gap-5" onSubmit={handleSubmit}>
@@ -175,7 +180,7 @@ export default function Reserve() {
                     checked={form.pass_type === pass.name}
                     className="h-5 w-5 accent-black"
                     name="pass_type"
-                    onChange={() => updateField("pass_type", pass.name)}
+                    onChange={() => selectPass(pass.name)}
                     type="radio"
                     value={pass.name}
                   />

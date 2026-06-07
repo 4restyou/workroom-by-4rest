@@ -5,10 +5,23 @@ import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import type { BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
 
-const settingKeys = ["reservation_notice", "payment_notice", "location_notice", "reservation_enabled"] as const;
+const settingKeys = [
+  "reservation_notice",
+  "payment_notice",
+  "cancellation_notice",
+  "extension_notice",
+  "etiquette_notice",
+  "print_notice",
+  "location_notice",
+  "reservation_enabled",
+] as const;
 const settingLabels: Record<(typeof settingKeys)[number], string> = {
   reservation_notice: "예약 안내 문구",
   payment_notice: "결제 안내 문구",
+  cancellation_notice: "취소/환불 안내 문구",
+  extension_notice: "연장 안내 문구",
+  etiquette_notice: "음식/통화/소리 안내 문구",
+  print_notice: "프린트 안내 문구",
   location_notice: "위치 안내 문구",
   reservation_enabled: "예약 가능 여부(true/false)",
 };

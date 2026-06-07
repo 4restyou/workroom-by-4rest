@@ -5,9 +5,15 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { Reservation, ReservationStatus } from "../lib/types";
+import type { PaymentStatus, Reservation, ReservationStatus } from "../lib/types";
 
-const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed"];
+const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
+const paymentStatusLabels: Record<PaymentStatus, string> = {
+  unpaid: "미결제",
+  paid: "결제완료",
+  refunded: "환불",
+};
+const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded"];
 
 export default function AdminReservations() {
   const navigate = useNavigate();
@@ -110,6 +116,21 @@ export default function AdminReservations() {
     setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, admin_note: adminNote } : reservation)));
   }
 
+  async function updatePayment(id: string, paymentMethod: string | null, paymentStatus: PaymentStatus) {
+    if (!supabase) return;
+    const { error: updateError } = await supabase
+      .from("reservations")
+      .update({ payment_method: paymentMethod, payment_status: paymentStatus })
+      .eq("id", id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setReservations((current) =>
+      current.map((reservation) => (reservation.id === id ? { ...reservation, payment_method: paymentMethod, payment_status: paymentStatus } : reservation)),
+    );
+  }
+
   async function deleteReservation(id: string) {
     if (!supabase) return;
     const confirmed = window.confirm("예약을 삭제할까요? 삭제 후에는 되돌릴 수 없습니다.");
@@ -204,6 +225,7 @@ export default function AdminReservations() {
               reservation={selectedReservation}
               onDelete={() => void deleteReservation(selectedReservation.id)}
               onNote={(note) => void updateNote(selectedReservation.id, note)}
+              onPayment={(method, status) => void updatePayment(selectedReservation.id, method, status)}
               onStatus={(status) => void updateStatus(selectedReservation.id, status)}
             />
           ) : (
@@ -252,18 +274,24 @@ function ReservationCard({
   reservation,
   onDelete,
   onNote,
+  onPayment,
   onStatus,
 }: {
   reservation: Reservation;
   onDelete: () => void;
   onNote: (note: string) => void;
+  onPayment: (method: string | null, status: PaymentStatus) => void;
   onStatus: (status: ReservationStatus) => void;
 }) {
   const [note, setNote] = useState(reservation.admin_note ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(reservation.payment_method ?? "");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(reservation.payment_status ?? "unpaid");
 
   useEffect(() => {
     setNote(reservation.admin_note ?? "");
-  }, [reservation.admin_note]);
+    setPaymentMethod(reservation.payment_method ?? "");
+    setPaymentStatus(reservation.payment_status ?? "unpaid");
+  }, [reservation.admin_note, reservation.payment_method, reservation.payment_status]);
 
   return (
     <article className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-sketch">
@@ -285,6 +313,11 @@ function ReservationCard({
         <dd className="font-black">{formatDate(reservation.date)}</dd>
         <dt className="font-black text-workroom-muted">시간</dt>
         <dd className="font-black">{formatTimeRange(reservation.start_time, reservation.end_time)}</dd>
+        <dt className="font-black text-workroom-muted">결제</dt>
+        <dd className="font-black">
+          {paymentStatusLabels[reservation.payment_status ?? "unpaid"]}
+          {reservation.payment_method ? ` / ${reservation.payment_method}` : ""}
+        </dd>
         <dt className="font-black text-workroom-muted">인원</dt>
         <dd className="font-black">{reservation.people}명</dd>
         <dt className="font-black text-workroom-muted">요청사항</dt>
@@ -302,16 +335,49 @@ function ReservationCard({
             ))}
           </select>
         </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-black">
+            결제 방식
+            <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
+              <option value="">미정</option>
+              <option value="카드">카드</option>
+              <option value="계좌이체">계좌이체</option>
+              <option value="현장결제">현장결제</option>
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-black">
+            결제 상태
+            <select value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)}>
+              {paymentStatusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {paymentStatusLabels[status]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <label className="grid gap-2 text-sm font-black">
           관리자 메모
           <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
         <div className="grid grid-cols-2 gap-2">
+          <button
+            className="rounded-full border border-workroom-line bg-workroom-yellow px-4 py-3 font-black"
+            onClick={() => onPayment(paymentMethod || null, paymentStatus)}
+            type="button"
+          >
+            결제 저장
+          </button>
           <button className="rounded-full border border-workroom-line bg-workroom-yellow px-4 py-3 font-black" onClick={() => onNote(note)} type="button">
             메모 저장
           </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <button className="rounded-full border border-workroom-line bg-white px-4 py-3 font-black" onClick={() => onStatus("canceled")} type="button">
             취소 처리
+          </button>
+          <button className="rounded-full border border-workroom-line bg-white px-4 py-3 font-black" onClick={() => onStatus("no_show")} type="button">
+            노쇼 처리
           </button>
         </div>
         <button className="rounded-full border border-workroom-line bg-workroom-text px-4 py-3 font-black text-white" onClick={onDelete} type="button">

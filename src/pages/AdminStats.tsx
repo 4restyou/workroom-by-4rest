@@ -77,7 +77,7 @@ export default function AdminStats() {
   const priceByPassName = useMemo(() => new Map(passes.map((pass) => [pass.name, pass.price])), [passes]);
 
   const summary = useMemo(() => {
-    const activeReservations = reservations.filter((reservation) => reservation.status !== "canceled");
+    const activeReservations = reservations.filter((reservation) => reservation.status !== "canceled" && reservation.status !== "no_show");
     const paidReservations = reservations.filter((reservation) => reservation.status === "confirmed" || reservation.status === "completed");
     const estimatedRevenue = paidReservations.reduce((total, reservation) => total + reservationRevenue(reservation, priceByPassName), 0);
 
@@ -87,21 +87,23 @@ export default function AdminStats() {
       confirmed: reservations.filter((reservation) => reservation.status === "confirmed").length,
       completed: reservations.filter((reservation) => reservation.status === "completed").length,
       canceled: reservations.filter((reservation) => reservation.status === "canceled").length,
+      noShow: reservations.filter((reservation) => reservation.status === "no_show").length,
       active: activeReservations.length,
       estimatedRevenue,
     };
   }, [priceByPassName, reservations]);
 
   const groupedStats = useMemo(() => {
-    const groups = new Map<string, { key: string; count: number; confirmed: number; completed: number; canceled: number; revenue: number }>();
+    const groups = new Map<string, { key: string; count: number; confirmed: number; completed: number; canceled: number; noShow: number; revenue: number }>();
 
     reservations.forEach((reservation) => {
       const key = periodKey(reservation.date, period);
-      const current = groups.get(key) ?? { key, count: 0, confirmed: 0, completed: 0, canceled: 0, revenue: 0 };
+      const current = groups.get(key) ?? { key, count: 0, confirmed: 0, completed: 0, canceled: 0, noShow: 0, revenue: 0 };
       current.count += 1;
       if (reservation.status === "confirmed") current.confirmed += 1;
       if (reservation.status === "completed") current.completed += 1;
       if (reservation.status === "canceled") current.canceled += 1;
+      if (reservation.status === "no_show") current.noShow += 1;
       if (reservation.status === "confirmed" || reservation.status === "completed") {
         current.revenue += reservationRevenue(reservation, priceByPassName);
       }
@@ -154,6 +156,7 @@ export default function AdminStats() {
           <StatCard label="전체 예약" value={`${summary.total}건`} />
           <StatCard label="대기" value={`${summary.pending}건`} />
           <StatCard label="확정/이용완료" value={`${summary.confirmed + summary.completed}건`} />
+          <StatCard label="노쇼" value={`${summary.noShow}건`} />
           <StatCard label="예상 매출" value={formatPrice(summary.estimatedRevenue)} />
         </div>
 
@@ -163,7 +166,7 @@ export default function AdminStats() {
             <p className="text-sm font-bold text-workroom-muted">최근 {groupedStats.length}개 구간</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] border-separate border-spacing-y-2 text-left text-sm">
+            <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-sm">
               <thead className="text-workroom-muted">
                 <tr>
                   <th className="px-3 py-2">기간</th>
@@ -171,6 +174,7 @@ export default function AdminStats() {
                   <th className="px-3 py-2">확정</th>
                   <th className="px-3 py-2">이용완료</th>
                   <th className="px-3 py-2">취소</th>
+                  <th className="px-3 py-2">노쇼</th>
                   <th className="px-3 py-2">예상 매출</th>
                 </tr>
               </thead>
@@ -182,6 +186,7 @@ export default function AdminStats() {
                     <td className="px-3 py-3">{group.confirmed}</td>
                     <td className="px-3 py-3">{group.completed}</td>
                     <td className="px-3 py-3">{group.canceled}</td>
+                    <td className="px-3 py-3">{group.noShow}</td>
                     <td className="rounded-r-card px-3 py-3">{formatPrice(group.revenue)}</td>
                   </tr>
                 ))}

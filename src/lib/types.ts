@@ -1,4 +1,5 @@
-export type ReservationStatus = "pending" | "confirmed" | "canceled" | "completed";
+export type ReservationStatus = "pending" | "confirmed" | "canceled" | "completed" | "no_show";
+export type PaymentStatus = "unpaid" | "paid" | "refunded";
 export type MemberStatus = "pending" | "approved" | "rejected";
 
 export type Profile = {
@@ -63,6 +64,8 @@ export type Reservation = {
   pass_name_snapshot: string | null;
   price_at_booking: number | null;
   seat_type_id: string | null;
+  payment_method: string | null;
+  payment_status: PaymentStatus | null;
   name: string;
   phone: string;
   email: string | null;
@@ -83,6 +86,8 @@ export type ReservationInsert = {
   pass_name_snapshot?: string | null;
   price_at_booking?: number | null;
   seat_type_id?: string | null;
+  payment_method?: string | null;
+  payment_status?: PaymentStatus | null;
   name: string;
   phone: string;
   email?: string | null;

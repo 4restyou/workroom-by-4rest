@@ -26,8 +26,21 @@ VITE_ADMIN_EMAILS=colorfg@gmail.com
 
 - 회원가입과 로그인은 `/login`에서 Google OAuth로 진행합니다.
 - 로그인한 회원은 `/account`에서 이름, 연락처, 주소를 관리하고 예약 상태 알림을 확인합니다.
-- 관리자는 `profiles.role = 'admin'`이어야 `/admin/reservations`, `/admin/members`에 접근할 수 있습니다.
-- 신규 회원은 `profiles.membership_status = 'pending'`으로 생성되며 관리자가 승인/보류 처리합니다.
+- 관리자는 `profiles.role = 'admin'`이어야 `/admin/reservations`, `/admin/members`, `/admin/stats`, `/admin/settings`에 접근할 수 있습니다.
+- 신규 회원은 기본적으로 `profiles.membership_status = 'approved'`로 생성됩니다. 예약은 관리자가 확인 후 확정합니다.
+
+## 운영 기준
+
+- 운영 시간: 09:00-22:00
+- 기본 이용권: 3시간권 12,000원
+- 연장: 좌석 여유가 있을 때 1시간 단위, 4,000원
+- 종일권: 09:00-22:00, 40,000원
+- 주간권: 월-금 09:00-22:00, 149,000원
+- 월권 자유석: 4주 기준, 199,000원
+- 월권 지정석: 4주 기준, 299,000원
+- 결제: 카드 및 계좌이체 가능
+- 취소: 3시간권/종일권은 예약 시간 전까지 당일 취소 가능
+- 유예: 이용 종료 후 15분까지 유예, 이후 1시간 추가 요금 적용
 
 Supabase Auth 설정에서 Google provider를 켜고, Site URL과 Redirect URL에 배포 도메인을 등록해야 합니다.
 로컬 개발 시에는 `http://localhost:5173/account`, `http://localhost:5173/admin/reservations`도 추가합니다.

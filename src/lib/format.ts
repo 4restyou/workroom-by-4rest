@@ -5,6 +5,7 @@ export const statusLabel: Record<ReservationStatus, string> = {
   confirmed: "확정",
   canceled: "취소",
   completed: "이용완료",
+  no_show: "노쇼",
 };
 
 export function formatPrice(price: number) {
@@ -36,15 +37,15 @@ export function formatDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export function currentReservationWindow() {
+export function currentReservationWindow(durationHours = 3) {
   const start = new Date();
   start.setMinutes(start.getMinutes() <= 30 ? 30 : 60, 0, 0);
 
   const end = new Date(start);
-  end.setHours(end.getHours() + 2);
+  end.setHours(end.getHours() + durationHours);
   if (end.getDate() !== start.getDate()) {
     end.setTime(start.getTime());
-    end.setHours(23, 59, 0, 0);
+    end.setHours(22, 0, 0, 0);
   }
 
   return {
@@ -52,6 +53,19 @@ export function currentReservationWindow() {
     start_time: formatTimeInputValue(start),
     end_time: formatTimeInputValue(end),
   };
+}
+
+export function reservationWindowForPass(passName: string) {
+  if (passName.includes("종일권") || passName.includes("주간권") || passName.includes("월권")) {
+    return {
+      date: todayValue(),
+      start_time: "09:00",
+      end_time: "22:00",
+    };
+  }
+
+  if (passName.includes("추가 1시간")) return currentReservationWindow(1);
+  return currentReservationWindow(3);
 }
 
 function formatTimeInputValue(date: Date) {

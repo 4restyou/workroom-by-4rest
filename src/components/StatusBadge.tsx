@@ -6,6 +6,7 @@ const statusClass: Record<ReservationStatus, string> = {
   confirmed: "bg-green-200 text-workroom-text",
   canceled: "bg-zinc-200 text-workroom-muted",
   completed: "bg-workroom-text text-white",
+  no_show: "bg-red-100 text-workroom-text",
 };
 
 type StatusBadgeProps = {

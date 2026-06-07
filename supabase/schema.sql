@@ -47,12 +47,28 @@ create table if not exists reservations (
   end_time time,
   people integer default 1,
   message text,
-  status text default 'pending' check (status in ('pending', 'confirmed', 'canceled', 'completed')),
+  status text default 'pending' check (status in ('pending', 'confirmed', 'canceled', 'completed', 'no_show')),
+  payment_method text,
+  payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'refunded')),
   admin_note text,
   created_at timestamp with time zone default now()
 );
 
 alter table reservations add column if not exists profile_id uuid references profiles(id) on delete set null;
+alter table reservations add column if not exists payment_method text;
+alter table reservations add column if not exists payment_status text default 'unpaid';
+alter table reservations alter column payment_status set default 'unpaid';
+update reservations set payment_status = 'unpaid' where payment_status is null;
+
+alter table reservations drop constraint if exists reservations_status_check;
+alter table reservations
+add constraint reservations_status_check
+check (status in ('pending', 'confirmed', 'canceled', 'completed', 'no_show'));
+
+alter table reservations drop constraint if exists reservations_payment_status_check;
+alter table reservations
+add constraint reservations_payment_status_check
+check (payment_status in ('unpaid', 'paid', 'refunded'));
 
 create table if not exists passes (
   id uuid primary key default gen_random_uuid(),
@@ -285,6 +301,7 @@ begin
         when 'confirmed' then '예약이 확정되었습니다.'
         when 'canceled' then '예약이 취소되었습니다.'
         when 'completed' then '이용이 완료되었습니다.'
+        when 'no_show' then '예약이 노쇼 처리되었습니다.'
         else '예약 상태가 변경되었습니다.'
       end,
       coalesce(new.pass_name_snapshot, new.pass_type) || ' / ' || new.date::text || ' ' || coalesce(left(new.start_time::text, 5), '') || '-' || coalesce(left(new.end_time::text, 5), '')
@@ -400,6 +417,8 @@ with check (
   and name <> ''
   and phone <> ''
   and pass_type <> ''
+  and coalesce(payment_status, 'unpaid') = 'unpaid'
+  and payment_method is null
   and (profile_id is null or profile_id = auth.uid())
 );
 
@@ -464,40 +483,65 @@ on conflict (name) do nothing;
 
 insert into business_hours (weekday, open_time, close_time, is_closed)
 values
-  (0, '10:00', '18:00', true),
-  (1, '09:00', '21:00', false),
-  (2, '09:00', '21:00', false),
-  (3, '09:00', '21:00', false),
-  (4, '09:00', '21:00', false),
-  (5, '09:00', '21:00', false),
-  (6, '10:00', '18:00', false)
-on conflict (weekday) do nothing;
+  (0, '09:00', '22:00', false),
+  (1, '09:00', '22:00', false),
+  (2, '09:00', '22:00', false),
+  (3, '09:00', '22:00', false),
+  (4, '09:00', '22:00', false),
+  (5, '09:00', '22:00', false),
+  (6, '09:00', '22:00', false)
+on conflict (weekday) do update
+set open_time = excluded.open_time,
+    close_time = excluded.close_time,
+    is_closed = excluded.is_closed;
 
 insert into space_settings (key, value)
 values
-  ('reservation_notice', '예약 신청 후 확정되면 연락드립니다.'),
-  ('payment_notice', '결제는 예약 확정 안내 후 진행됩니다.'),
-  ('location_notice', '광주광역시 동구 충장로 / 금남로5가역 도보 약 3-5분'),
+  ('reservation_notice', '홈페이지 예약을 기준으로 운영합니다. 예약 신청 후 전화 또는 문자로 확인 안내를 드립니다.'),
+  ('payment_notice', '결제는 카드와 계좌이체가 가능합니다. 예약 확정 안내 후 진행됩니다.'),
+  ('cancellation_notice', '3시간권과 종일권은 예약 시간 전까지 당일 취소가 가능합니다. 예약 시간이 지난 뒤에는 취소 및 환불이 어렵습니다.'),
+  ('extension_notice', '이용 시간 종료 후 15분까지는 유예되며, 이후에는 1시간 추가 요금이 적용됩니다.'),
+  ('etiquette_notice', '냄새가 적은 간단한 음식과 음료는 가능하며, 통화는 조용히 부탁드립니다. 음악과 영상은 이어폰 또는 헤드폰으로 이용해 주세요.'),
+  ('print_notice', '흑백 프린트는 5장까지 무료이며, 초과 시 장당 100원입니다. 대량 출력은 사전 문의해 주세요.'),
+  ('location_notice', '충장로 / 금남로5가역 도보 약 3-5분'),
   ('reservation_enabled', 'true')
-on conflict (key) do nothing;
+on conflict (key) do update
+set value = excluded.value,
+    updated_at = now();
 
+update passes
+set is_active = false
+where name in ('1시간권', '종일권 라이트', '종일권 스탠다드', '주간권 라이트', '주간권 스탠다드');
+
+update passes set description = '기본 이용권 / 커피 1잔', price = 12000, sort_order = 1, is_active = true where name = '3시간권';
 insert into passes (name, description, price, sort_order)
-select pass_seed.name, pass_seed.description, pass_seed.price, pass_seed.sort_order
-from (
-  values
-    ('1시간권', '1시간 이용', 4000, 1),
-    ('종일권 라이트', '평일 09:00-18:00', 30000, 2),
-    ('종일권 스탠다드', '평일 09:00-21:00', 40000, 3),
-    ('주간권 라이트', '월-금 09:00-18:00', 99000, 4),
-    ('주간권 스탠다드', '월-금 09:00-21:00', 139000, 5),
-    ('월권 자유석', '4주 기준 / 비지정석', 199000, 6),
-    ('월권 지정석', '4주 기준 / 지정석', 299000, 7)
-) as pass_seed(name, description, price, sort_order)
-where not exists (
-  select 1
-  from passes
-  where passes.name = pass_seed.name
-);
+select '3시간권', '기본 이용권 / 커피 1잔', 12000, 1
+where not exists (select 1 from passes where name = '3시간권');
+
+update passes set description = '3시간 이후 좌석 여유 시 연장', price = 4000, sort_order = 2, is_active = true where name = '추가 1시간';
+insert into passes (name, description, price, sort_order)
+select '추가 1시간', '3시간 이후 좌석 여유 시 연장', 4000, 2
+where not exists (select 1 from passes where name = '추가 1시간');
+
+update passes set description = '09:00-22:00 / 커피 1일 3잔', price = 40000, sort_order = 3, is_active = true where name = '종일권';
+insert into passes (name, description, price, sort_order)
+select '종일권', '09:00-22:00 / 커피 1일 3잔', 40000, 3
+where not exists (select 1 from passes where name = '종일권');
+
+update passes set description = '월-금 09:00-22:00 / 커피 1일 3잔', price = 149000, sort_order = 4, is_active = true where name = '주간권';
+insert into passes (name, description, price, sort_order)
+select '주간권', '월-금 09:00-22:00 / 커피 1일 3잔', 149000, 4
+where not exists (select 1 from passes where name = '주간권');
+
+update passes set description = '4주 기준 / 비지정석 / 커피 1일 3잔', price = 199000, sort_order = 5, is_active = true where name = '월권 자유석';
+insert into passes (name, description, price, sort_order)
+select '월권 자유석', '4주 기준 / 비지정석 / 커피 1일 3잔', 199000, 5
+where not exists (select 1 from passes where name = '월권 자유석');
+
+update passes set description = '4주 기준 / 지정석 / 커피 1일 3잔', price = 299000, sort_order = 6, is_active = true where name = '월권 지정석';
+insert into passes (name, description, price, sort_order)
+select '월권 지정석', '4주 기준 / 지정석 / 커피 1일 3잔', 299000, 6
+where not exists (select 1 from passes where name = '월권 지정석');
 
 update passes
 set seat_type_id = (select id from seat_types where name = '공용석')

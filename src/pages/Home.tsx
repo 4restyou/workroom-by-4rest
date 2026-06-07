@@ -10,22 +10,22 @@ import type { Pass } from "../lib/types";
 const features = [
   {
     title: "개인 작업석",
-    body: "혼자 집중하기 좋은 자리. 가능하면 남의 화면이 잘 보이지 않도록 배치합니다.",
+    body: "혼자 집중하기 좋은 자유석. 먼저 앉는 순서대로 이용합니다.",
     mark: "1",
   },
   {
     title: "공용 테이블",
-    body: "가벼운 대화, 협업, 작은 모임을 위한 큰 테이블.",
+    body: "가벼운 대화, 협업, 작은 모임을 위한 자리입니다.",
     mark: "2",
   },
   {
-    title: "작은 촬영",
-    body: "증명사진, 제품 촬영 등 작은 촬영을 위한 코너를 준비합니다.",
+    title: "호리존 촬영",
+    body: "상반신 증명사진과 간단 프로필 촬영을 운영자가 직접 진행합니다.",
     mark: "3",
   },
   {
     title: "커피 / 프린트",
-    body: "작업 중 필요한 커피와 간단한 출력 기능을 준비합니다.",
+    body: "커피는 이용권 기준으로 제공하고, 흑백 프린트는 5장까지 무료입니다.",
     mark: "4",
   },
 ];
@@ -56,7 +56,7 @@ export default function Home() {
         <div className="grid gap-8 sm:grid-cols-[1fr_320px] sm:items-end">
           <div>
             <p className="mb-4 inline-flex rounded-full bg-workroom-purple px-3 py-1 text-xs font-black">
-              예약제 작업 라운지
+              09:00-22:00 예약제 운영
             </p>
             <h1 className="max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
               필요한 시간만큼 머무는 조용한 작업 공간
@@ -70,7 +70,7 @@ export default function Home() {
 
           <div className="rounded-card bg-white/75 p-5 shadow-soft">
             <p className="text-sm font-black text-workroom-muted">Reservation</p>
-            <p className="mt-2 text-2xl font-black leading-tight">예약 신청 후 확정 연락을 드립니다.</p>
+            <p className="mt-2 text-2xl font-black leading-tight">신청 후 전화 또는 문자로 확인 안내를 드립니다.</p>
             <Link className="mt-5 block rounded-full bg-workroom-yellow px-8 py-4 text-center text-lg font-black text-workroom-text shadow-sketch" to="/reserve">
               예약하기
             </Link>
@@ -110,7 +110,7 @@ export default function Home() {
           ))}
         </div>
         <p className="mt-4 rounded-card bg-workroom-purple px-4 py-3 text-sm font-black">
-          이용권을 선택하면 예약 신청으로 바로 이어집니다.
+          기본 단위는 3시간권입니다. 1시간권은 운영하지 않고, 좌석 여유가 있을 때 1시간 단위 연장이 가능합니다.
         </p>
       </Section>
 
@@ -131,9 +131,27 @@ export default function Home() {
         </div>
       </section>
 
+      <Section eyebrow="Guide" title="이용 기준은 가볍게, 분명하게">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[
+            ["결제", "예약 확정 안내 후 카드 또는 계좌이체로 결제할 수 있습니다."],
+            ["취소", "3시간권과 종일권은 예약 시간 전까지 당일 취소가 가능합니다."],
+            ["연장", "이용 종료 후 15분까지는 유예되며, 이후 1시간 추가 요금이 적용됩니다."],
+            ["소리", "통화는 조용히, 음악과 영상은 반드시 이어폰이나 헤드폰으로 이용합니다."],
+            ["음식", "냄새가 적은 간단한 음식과 음료는 가능합니다."],
+            ["동반", "함께 이용하는 분은 별도 좌석 예약이 필요합니다."],
+          ].map(([title, body]) => (
+            <article className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft" key={title}>
+              <h3 className="text-lg font-black">{title}</h3>
+              <p className="mt-2 text-sm font-semibold leading-6 text-workroom-muted">{body}</p>
+            </article>
+          ))}
+        </div>
+      </Section>
+
       <Section eyebrow="How to use" title="예약은 길게 말하지 않고">
         <ol className="grid gap-3 sm:grid-cols-4">
-          {["원하는 이용권을 선택합니다.", "날짜와 시간을 선택합니다.", "예약 신청을 남깁니다.", "확인 후 예약이 확정됩니다."].map((item, index) => (
+          {["원하는 이용권을 선택합니다.", "날짜와 시간을 선택합니다.", "예약 신청을 남깁니다.", "전화 또는 문자 안내 후 확정됩니다."].map((item, index) => (
             <li key={item} className="rounded-card border border-workroom-line bg-workroom-surface p-5 font-black shadow-soft">
               <span className="mb-4 grid h-8 w-8 place-items-center rounded-full bg-workroom-text text-sm text-white">{index + 1}</span>
               {item}
@@ -141,14 +159,14 @@ export default function Home() {
           ))}
         </ol>
         <p className="mt-4 rounded-card bg-workroom-yellow px-4 py-3 text-sm font-black">
-          예약 신청 후 확정되면 연락드립니다.
+          당일 이용은 좌석이 남아 있을 경우 예약할 수 있습니다.
         </p>
       </Section>
 
-      <Section eyebrow="Location" title="충장로에 준비 중입니다">
+      <Section eyebrow="Location" title="충장로, 금남로5가역 근처">
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
           <div className="rounded-card border border-workroom-line bg-workroom-surface p-5 shadow-soft">
-            <p className="text-xl font-black">광주광역시 동구 충장로</p>
+            <p className="text-xl font-black">충장로 작업 라운지</p>
             <p className="mt-2 font-semibold text-workroom-muted">금남로5가역 도보 약 3-5분</p>
           </div>
           <div className="grid gap-3">
