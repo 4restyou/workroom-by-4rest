@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
 import FixedReserveButton from "./components/FixedReserveButton";
+import Footer from "./components/Footer";
 import Header from "./components/Header";
 
 export default function App() {
@@ -8,9 +9,12 @@ export default function App() {
   const showReserveButton = !isAdmin && location.pathname !== "/reserve";
 
   return (
-    <div className="min-h-screen bg-workroom-background text-workroom-text">
+    <div className="flex min-h-screen flex-col bg-workroom-background text-workroom-text">
       <Header isAdmin={isAdmin} />
-      <Outlet />
+      <div className="flex-1">
+        <Outlet />
+      </div>
+      {!isAdmin ? <Footer /> : null}
       {showReserveButton ? <FixedReserveButton /> : null}
     </div>
   );

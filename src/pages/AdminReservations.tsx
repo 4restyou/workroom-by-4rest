@@ -5,7 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { PaymentStatus, Reservation, ReservationStatus } from "../lib/types";
+import type { PaymentStatus, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
 import { buttonClass, card, tintCard } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
@@ -30,6 +30,7 @@ export default function AdminReservations() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
+  const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -115,6 +116,23 @@ export default function AdminReservations() {
       setSelectedReservationId(visibleReservations[0].id);
     }
   }, [selectedReservationId, visibleReservations]);
+
+  useEffect(() => {
+    async function loadInquiries() {
+      if (!supabase || !selectedReservationId) {
+        setInquiries([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("reservation_inquiries")
+        .select("*")
+        .eq("reservation_id", selectedReservationId)
+        .order("created_at", { ascending: true });
+      setInquiries((data ?? []) as ReservationInquiry[]);
+    }
+
+    void loadInquiries();
+  }, [selectedReservationId]);
 
   async function saveReservation(id: string, payload: ReservationEdit) {
     if (!supabase) return;
@@ -227,6 +245,7 @@ export default function AdminReservations() {
             <ReservationCard
               key={selectedReservation.id}
               reservation={selectedReservation}
+              inquiries={inquiries}
               onDelete={() => void deleteReservation(selectedReservation.id)}
               onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
             />
@@ -276,10 +295,12 @@ function ReservationListItem({
 
 function ReservationCard({
   reservation,
+  inquiries,
   onDelete,
   onSave,
 }: {
   reservation: Reservation;
+  inquiries: ReservationInquiry[];
   onDelete: () => void;
   onSave: (payload: ReservationEdit) => void;
 }) {
@@ -343,6 +364,20 @@ function ReservationCard({
         <dt className="font-bold text-workroom-muted">요청사항</dt>
         <dd className="whitespace-pre-wrap font-medium">{reservation.message || "-"}</dd>
       </dl>
+
+      {inquiries.length ? (
+        <div className="mt-5">
+          <p className="text-sm font-black">회원 문의 {inquiries.length}건</p>
+          <div className="mt-2 grid gap-2">
+            {inquiries.map((inquiry) => (
+              <div className={`${tintCard("lilac")} p-3`} key={inquiry.id}>
+                <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
+                <p className="mt-1 text-xs font-medium text-workroom-muted">{formatDate(inquiry.created_at.slice(0, 10))}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-3">
         <label className="grid gap-2 text-sm font-bold">

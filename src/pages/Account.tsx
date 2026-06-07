@@ -6,7 +6,7 @@ import { formatDate, formatPhone, formatTimeRange, statusLabel } from "../lib/fo
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
-import type { Profile, Reservation } from "../lib/types";
+import type { Profile, Reservation, ReservationInquiry } from "../lib/types";
 
 type AccountTab = "reservations" | "profile";
 
@@ -19,6 +19,9 @@ export default function Account() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
+  const [inquiryDrafts, setInquiryDrafts] = useState<Record<string, string>>({});
+  const [inquiryBusy, setInquiryBusy] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AccountTab>("reservations");
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
   const [isLoading, setIsLoading] = useState(true);
@@ -59,6 +62,13 @@ export default function Account() {
 
         if (reservationsError) throw reservationsError;
         setReservations((data ?? []) as Reservation[]);
+
+        const { data: inquiryData } = await supabase
+          .from("reservation_inquiries")
+          .select("*")
+          .eq("profile_id", user.id)
+          .order("created_at", { ascending: true });
+        setInquiries((inquiryData ?? []) as ReservationInquiry[]);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "내정보를 불러오지 못했습니다.");
       } finally {
@@ -71,6 +81,28 @@ export default function Account() {
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  async function sendInquiry(reservationId: string) {
+    if (!supabase || !profile) return;
+    const body = (inquiryDrafts[reservationId] ?? "").trim();
+    if (!body) return;
+
+    setInquiryBusy(reservationId);
+    const { data, error: inquiryError } = await supabase
+      .from("reservation_inquiries")
+      .insert({ reservation_id: reservationId, profile_id: profile.id, body })
+      .select("*")
+      .single();
+    setInquiryBusy(null);
+
+    if (inquiryError) {
+      setError(inquiryError.message);
+      return;
+    }
+
+    setInquiries((current) => [...current, data as ReservationInquiry]);
+    setInquiryDrafts((current) => ({ ...current, [reservationId]: "" }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -212,6 +244,39 @@ export default function Account() {
                           <StatusBadge status={reservation.status} />
                         </div>
                         <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
+
+                        {reservation.status === "confirmed" ? (
+                          <div className="mt-4 border-t-2 border-workroom-line pt-4">
+                            <p className="text-sm font-black">관리자에게 문의</p>
+                            {inquiries
+                              .filter((inquiry) => inquiry.reservation_id === reservation.id)
+                              .map((inquiry) => (
+                                <div className={`${tintCard("mint")} mt-2 p-3`} key={inquiry.id}>
+                                  <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
+                                  <p className="mt-1 text-xs font-medium text-workroom-muted">
+                                    {formatDate(inquiry.created_at.slice(0, 10))} · 전달됨
+                                  </p>
+                                </div>
+                              ))}
+                            <textarea
+                              className="mt-2"
+                              rows={2}
+                              placeholder="확정된 예약에 대해 궁금한 점을 남겨 주세요."
+                              value={inquiryDrafts[reservation.id] ?? ""}
+                              onChange={(event) =>
+                                setInquiryDrafts((current) => ({ ...current, [reservation.id]: event.target.value }))
+                              }
+                            />
+                            <button
+                              className={buttonClass("primary", "sm", "mt-2")}
+                              disabled={inquiryBusy === reservation.id || !(inquiryDrafts[reservation.id] ?? "").trim()}
+                              onClick={() => void sendInquiry(reservation.id)}
+                              type="button"
+                            >
+                              {inquiryBusy === reservation.id ? "보내는 중…" : "문의 보내기"}
+                            </button>
+                          </div>
+                        ) : null}
                       </article>
                     ))
                   ) : (

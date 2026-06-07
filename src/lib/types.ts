@@ -46,6 +46,14 @@ export type SpaceSetting = {
   updated_at?: string;
 };
 
+export type ReservationInquiry = {
+  id: string;
+  reservation_id: string | null;
+  profile_id: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type ReservationNotification = {
   id: string;
   profile_id: string | null;

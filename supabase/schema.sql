@@ -568,6 +568,45 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Inquiries a member leaves on their own reservation; the admin reads them.
+create table if not exists reservation_inquiries (
+  id uuid primary key default gen_random_uuid(),
+  reservation_id uuid references reservations(id) on delete cascade,
+  profile_id uuid references profiles(id) on delete set null,
+  body text not null,
+  created_at timestamp with time zone default now()
+);
+
+alter table reservation_inquiries enable row level security;
+
+drop policy if exists "reservation_inquiries_insert_own" on reservation_inquiries;
+create policy "reservation_inquiries_insert_own"
+on reservation_inquiries
+for insert
+to authenticated
+with check (
+  profile_id = auth.uid()
+  and exists (
+    select 1 from public.reservations r
+    where r.id = reservation_id and r.profile_id = auth.uid()
+  )
+);
+
+drop policy if exists "reservation_inquiries_select_own_or_admin" on reservation_inquiries;
+create policy "reservation_inquiries_select_own_or_admin"
+on reservation_inquiries
+for select
+to authenticated
+using (profile_id = auth.uid() or public.is_admin());
+
+drop policy if exists "reservation_inquiries_admin_all" on reservation_inquiries;
+create policy "reservation_inquiries_admin_all"
+on reservation_inquiries
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 insert into seat_types (name, capacity, sort_order)
 values
   ('단독석', 5, 1),

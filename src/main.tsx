@@ -10,7 +10,9 @@ import AdminSettings from "./pages/AdminSettings";
 import AdminStats from "./pages/AdminStats";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
+import Privacy from "./pages/Privacy";
 import Reserve from "./pages/Reserve";
+import Terms from "./pages/Terms";
 import "./styles/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -22,6 +24,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="login" element={<Auth />} />
           <Route path="account" element={<Account />} />
           <Route path="reserve" element={<Reserve />} />
+          <Route path="terms" element={<Terms />} />
+          <Route path="privacy" element={<Privacy />} />
           <Route path="admin" element={<AdminLogin />} />
           <Route path="admin/members" element={<AdminMembers />} />
           <Route path="admin/reservations" element={<AdminReservations />} />
