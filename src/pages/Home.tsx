@@ -72,7 +72,7 @@ export default function Home() {
         <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr]">
           <div className="animate-pop-in">
             <span className={badge("yellow")}>09:00–22:00 · 예약제 운영</span>
-            <h1 className="mt-4 text-[2.6rem] font-black leading-[1.05] tracking-tight sm:text-6xl">
+            <h1 className="mt-4 text-4xl font-black leading-[1.1] tracking-tight sm:text-6xl">
               필요한 시간만큼
               <br />
               머무는 <span className="bg-workroom-yellow px-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span> 작업 공간
@@ -80,11 +80,11 @@ export default function Home() {
             <p className="mt-5 max-w-xl text-lg font-medium leading-8 text-workroom-muted">
               카페보다 조용하고, 사무실보다 느슨하게. 혼자 일하거나 작은 모임을 갖기 좋은 자리입니다.
             </p>
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Link className={buttonClass("primary", "lg")} to="/reserve">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Link className={buttonClass("primary", "lg", "w-full sm:w-auto")} to="/reserve">
                 예약하기 →
               </Link>
-              <a className={buttonClass("secondary", "lg")} href="#pricing">
+              <a className={buttonClass("secondary", "lg", "w-full sm:w-auto")} href="#pricing">
                 이용권 보기
               </a>
             </div>
