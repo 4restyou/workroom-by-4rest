@@ -11,7 +11,7 @@ export default function FeatureCard({ title, body, mark, accent = "mint" }: Feat
   return (
     <article className={`${card} p-5 transition-colors duration-150 hover:border-workroom-ink`}>
       <div
-        className={`mb-5 grid h-10 w-10 place-items-center rounded-pill border border-workroom-line bg-workroom-${accent} text-sm font-bold`}
+        className={`mb-3 grid h-10 w-10 place-items-center rounded-pill border border-workroom-line bg-workroom-${accent} text-sm font-bold`}
       >
         {mark}
       </div>

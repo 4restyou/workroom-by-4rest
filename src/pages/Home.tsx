@@ -104,10 +104,10 @@ export default function Home() {
         <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr]">
           <div className="animate-pop-in">
             <span className={badge("yellow")}>09:00–22:00 · 예약제 운영</span>
-            <h1 className="mt-4 text-4xl font-black leading-[1.1] tracking-tight sm:text-6xl">
+            <h1 className="mt-4 text-4xl font-black leading-[1.18] tracking-tight sm:text-6xl">
               필요한 시간만큼
               <br />
-              머무는 <span className="bg-workroom-yellow px-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
+              머무는 <span className="rounded-[3px] bg-workroom-yellow px-2 py-0.5 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
               <br />
               작업 공간
             </h1>
@@ -149,14 +149,10 @@ export default function Home() {
         <div className={`${card} p-6 sm:p-8`}>
           <div className="max-w-3xl text-base font-medium leading-8 text-workroom-muted sm:text-lg">
             <p>
-              카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고,
-              <br />
-              집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
+              카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
             </p>
             <p className="mt-5">
-              WORKROOM은 그 사이 어딘가의 공간을 생각하며 준비하고 있습니다. 슬렁슬렁 들어와도 되고,
-              <br />
-              조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
+              WORKROOM은 그 사이 어딘가의 공간을 생각하며 준비하고 있습니다. 슬렁슬렁 들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
             </p>
           </div>
         </div>
