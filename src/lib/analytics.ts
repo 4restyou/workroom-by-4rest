@@ -1,7 +1,7 @@
-// Loads Google Analytics 4 only when VITE_GA_ID is configured. With no id set
-// (e.g. local dev or before setup) nothing is injected, so there is no tracking
-// and no console noise. GA4 Enhanced Measurement captures SPA route changes.
-const GA_ID = import.meta.env.VITE_GA_ID as string | undefined;
+// Loads Google Analytics 4. The measurement id defaults to the production
+// property and can be overridden (or disabled with "") via VITE_GA_ID.
+// GA4 Enhanced Measurement captures SPA route changes automatically.
+const GA_ID = (import.meta.env.VITE_GA_ID as string | undefined) ?? "G-CM4MEDZZ28";
 
 export function initAnalytics(): void {
   if (!GA_ID || typeof document === "undefined") return;
