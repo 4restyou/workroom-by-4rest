@@ -171,6 +171,22 @@ export default function Account() {
     setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, status: "canceled" } : item)));
   }
 
+  async function withdraw() {
+    if (!supabase) return;
+    if (!window.confirm("정말 탈퇴하시겠어요?\n계정과 개인정보가 삭제되며 되돌릴 수 없습니다.")) return;
+    setError("");
+    setActionBusy("withdraw");
+    const { data, error: deleteError } = await supabase.functions.invoke("delete-account", { body: {} });
+    const result = data as { ok?: boolean; message?: string } | null;
+    if (deleteError || !result?.ok) {
+      setActionBusy(null);
+      setError(result?.message ?? "탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    await supabase.auth.signOut();
+    navigate("/", { replace: true });
+  }
+
   async function saveInquiryEdit(inquiry: ReservationInquiry) {
     if (!supabase) return;
     const body = inquiryEditDraft.trim();
@@ -260,6 +276,11 @@ export default function Account() {
 
             {activeTab === "profile" ? (
               <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
+                {(!profile.full_name || !profile.phone || !profile.consented_at) && profile.role !== "admin" ? (
+                  <p className={`${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>
+                    가입을 완료하려면 이름·연락처를 입력하고 개인정보 수집·이용에 동의한 뒤 저장해 주세요.
+                  </p>
+                ) : null}
                 <div>
                   <p className="text-sm font-bold text-workroom-muted">회원</p>
                   <p className="mt-1 text-2xl font-bold">{profile.full_name || "내 정보"}</p>
@@ -311,6 +332,21 @@ export default function Account() {
                 <button className={buttonClass("primary", "lg")} disabled={isSaving} type="submit">
                   {isSaving ? "저장 중…" : "내정보 저장"}
                 </button>
+
+                <div className="mt-2 border-t-2 border-workroom-line pt-4">
+                  <p className="text-sm font-bold">회원 탈퇴</p>
+                  <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">
+                    탈퇴하면 계정과 개인정보(이름·연락처·이메일)가 삭제되며 되돌릴 수 없습니다. 과거 예약 내역은 익명 처리되어 운영 기록으로만 남습니다.
+                  </p>
+                  <button
+                    className={buttonClass("secondary", "sm", "mt-3")}
+                    disabled={actionBusy === "withdraw"}
+                    onClick={() => void withdraw()}
+                    type="button"
+                  >
+                    {actionBusy === "withdraw" ? "처리 중…" : "회원 탈퇴"}
+                  </button>
+                </div>
               </form>
             ) : null}
 

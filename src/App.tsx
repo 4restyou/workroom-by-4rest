@@ -1,12 +1,45 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import FixedReserveButton from "./components/FixedReserveButton";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
+import { getCurrentProfile } from "./lib/profiles";
+import { supabase } from "./lib/supabase";
+
+// Pages a not-yet-onboarded member may visit (to finish the profile or read
+// the policies). Everything else redirects to profile completion.
+const ONBOARDING_ALLOWED = ["/account", "/privacy", "/terms", "/login"];
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith("/admin");
   const showReserveButton = !isAdmin && location.pathname !== "/reserve";
+
+  // First login onboarding: if a signed-in member hasn't completed their
+  // profile (name, phone, privacy consent), send them to 회원정보 first.
+  useEffect(() => {
+    let active = true;
+    async function checkOnboarding() {
+      if (!supabase) return;
+      const { data } = await supabase.auth.getSession();
+      if (!active || !data.session) return;
+
+      const onAllowed =
+        location.pathname.startsWith("/admin") || ONBOARDING_ALLOWED.some((path) => location.pathname.startsWith(path));
+      if (onAllowed) return;
+
+      const profile = await getCurrentProfile();
+      if (!active || !profile || profile.role === "admin") return;
+
+      const incomplete = !profile.full_name || !profile.phone || !profile.consented_at;
+      if (incomplete) navigate("/account?tab=profile", { replace: true });
+    }
+    void checkOnboarding();
+    return () => {
+      active = false;
+    };
+  }, [location.pathname, navigate]);
 
   return (
     <div className="flex min-h-screen flex-col bg-workroom-background text-workroom-text">
