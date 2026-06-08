@@ -45,18 +45,28 @@ create table if not exists reservations (
   date date not null,
   start_time time,
   end_time time,
-  people integer default 1,
+  people integer default 1 check (people between 1 and 12),
   message text,
   status text default 'pending' check (status in ('pending', 'confirmed', 'canceled', 'completed', 'no_show')),
   payment_method text,
   payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'refunded')),
   admin_note text,
-  created_at timestamp with time zone default now()
+  deleted_at timestamp with time zone,
+  created_at timestamp with time zone default now(),
+  constraint reservations_name_not_blank check (btrim(name) <> ''),
+  constraint reservations_phone_not_blank check (btrim(phone) <> ''),
+  constraint reservations_pass_type_not_blank check (btrim(pass_type) <> ''),
+  constraint reservations_time_order check (
+    start_time is null
+    or end_time is null
+    or start_time < end_time
+  )
 );
 
 alter table reservations add column if not exists profile_id uuid references profiles(id) on delete set null;
 alter table reservations add column if not exists payment_method text;
 alter table reservations add column if not exists payment_status text default 'unpaid';
+alter table reservations add column if not exists deleted_at timestamp with time zone;
 alter table reservations alter column payment_status set default 'unpaid';
 update reservations set payment_status = 'unpaid' where payment_status is null;
 
@@ -69,6 +79,38 @@ alter table reservations drop constraint if exists reservations_payment_status_c
 alter table reservations
 add constraint reservations_payment_status_check
 check (payment_status in ('unpaid', 'paid', 'refunded'));
+
+update reservations set people = 1 where people is null or people < 1;
+update reservations set people = 12 where people > 12;
+
+alter table reservations drop constraint if exists reservations_people_range;
+alter table reservations
+add constraint reservations_people_range
+check (people between 1 and 12);
+
+alter table reservations drop constraint if exists reservations_name_not_blank;
+alter table reservations
+add constraint reservations_name_not_blank
+check (btrim(name) <> '');
+
+alter table reservations drop constraint if exists reservations_phone_not_blank;
+alter table reservations
+add constraint reservations_phone_not_blank
+check (btrim(phone) <> '');
+
+alter table reservations drop constraint if exists reservations_pass_type_not_blank;
+alter table reservations
+add constraint reservations_pass_type_not_blank
+check (btrim(pass_type) <> '');
+
+alter table reservations drop constraint if exists reservations_time_order;
+alter table reservations
+add constraint reservations_time_order
+check (
+  start_time is null
+  or end_time is null
+  or start_time < end_time
+);
 
 create table if not exists passes (
   id uuid primary key default gen_random_uuid(),
@@ -792,6 +834,27 @@ where not exists (select 1 from passes where name = '월권 지정석');
 update passes
 set seat_type_id = (select id from seat_types where name = '공용석')
 where seat_type_id is null;
+
+with ranked_passes as (
+  select
+    id,
+    row_number() over (
+      partition by name
+      order by is_active desc, sort_order asc, created_at asc
+    ) as row_number
+  from public.passes
+)
+update public.passes
+set is_active = false
+where id in (
+  select id
+  from ranked_passes
+  where row_number > 1
+);
+
+create unique index if not exists passes_active_name_unique
+on public.passes (name)
+where is_active = true;
 
 -- 관리자 계정 생성 후 auth.users의 id를 확인해 아래 예시처럼 등록합니다.
 -- insert into profiles (id, email, role, membership_status)

@@ -66,6 +66,10 @@ Kakao Developers의 카카오톡 메시지 API는 같은 서비스 사용자/친
 2. `auth.users`의 해당 사용자 UUID를 확인합니다.
 3. `profiles`에 `role = 'admin'`으로 등록합니다.
 
+이미 운영 중인 Supabase 프로젝트에는 `supabase/operational-hardening.sql`도 한 번 실행합니다.
+이 SQL은 예약 인원/시간 데이터 검증, 이용권 중복 방지, 예약 보관 처리를 위한
+`deleted_at` 컬럼을 추가합니다.
+
 ## 배포
 
 Netlify에서 이 폴더를 사이트 루트로 연결하고 환경 변수를 등록합니다. `netlify.toml`에

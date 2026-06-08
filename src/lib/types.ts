@@ -89,6 +89,7 @@ export type Reservation = {
   status: ReservationStatus;
   admin_note: string | null;
   created_at: string;
+  deleted_at?: string | null;
 };
 
 export type ReservationInsert = {

@@ -88,6 +88,7 @@ export default function AdminReservations() {
     const q = query.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, "");
     return reservations
+      .filter((reservation) => !reservation.deleted_at)
       .filter((reservation) => (dateFilter ? reservation.date === dateFilter : true))
       .filter((reservation) => (statusFilter === "all" ? true : reservation.status === statusFilter))
       .filter((reservation) => {
@@ -157,14 +158,17 @@ export default function AdminReservations() {
     setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
   }
 
-  async function deleteReservation(id: string) {
+  async function archiveReservation(id: string) {
     if (!supabase) return;
-    const confirmed = window.confirm("예약을 삭제할까요? 삭제 후에는 되돌릴 수 없습니다.");
+    const confirmed = window.confirm("예약을 보관 처리할까요? 목록에서는 숨겨지고 상태는 취소로 바뀝니다.");
     if (!confirmed) return;
 
-    const { error: deleteError } = await supabase.from("reservations").delete().eq("id", id);
-    if (deleteError) {
-      setError(deleteError.message);
+    const { error: archiveError } = await supabase
+      .from("reservations")
+      .update({ status: "canceled", deleted_at: new Date().toISOString() })
+      .eq("id", id);
+    if (archiveError) {
+      setError(archiveError.message);
       return;
     }
     setReservations((current) => current.filter((reservation) => reservation.id !== id));
@@ -272,10 +276,11 @@ export default function AdminReservations() {
 
           {selectedReservation ? (
             <ReservationCard
+              conflictCount={getConflictCount(selectedReservation, reservations)}
               key={selectedReservation.id}
               reservation={selectedReservation}
               inquiries={inquiries}
-              onDelete={() => void deleteReservation(selectedReservation.id)}
+              onArchive={() => void archiveReservation(selectedReservation.id)}
               onReply={(inquiryId, reply) => void replyInquiry(inquiryId, reply)}
               onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
             />
@@ -324,15 +329,17 @@ function ReservationListItem({
 }
 
 function ReservationCard({
+  conflictCount,
   reservation,
   inquiries,
-  onDelete,
+  onArchive,
   onReply,
   onSave,
 }: {
+  conflictCount: number;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
-  onDelete: () => void;
+  onArchive: () => void;
   onReply: (inquiryId: string, reply: string) => void;
   onSave: (payload: ReservationEdit) => void;
 }) {
@@ -377,6 +384,12 @@ function ReservationCard({
           문자 보내기
         </a>
       </div>
+
+      {conflictCount > 0 ? (
+        <p className={`${tintCard("yellow")} mt-4 p-3 text-sm font-black`}>
+          같은 시간대에 겹치는 예약이 {conflictCount}건 있습니다. 확정 전에 시간을 확인해 주세요.
+        </p>
+      ) : null}
 
       <dl className="mt-5 grid grid-cols-[86px_1fr] gap-x-3 gap-y-2 text-sm">
         <dt className="font-bold text-workroom-muted">이용권</dt>
@@ -473,10 +486,25 @@ function ReservationCard({
         <button className={buttonClass("primary", "lg")} onClick={save} type="button">
           변경사항 저장
         </button>
-        <button className={buttonClass("secondary", "md")} onClick={onDelete} type="button">
-          예약 삭제
+        <button className={buttonClass("secondary", "md")} onClick={onArchive} type="button">
+          보관 처리
         </button>
       </div>
     </article>
   );
+}
+
+function getConflictCount(target: Reservation, reservations: Reservation[]) {
+  if (!target.start_time || !target.end_time) return 0;
+  if (target.status === "canceled" || target.status === "completed" || target.status === "no_show" || target.deleted_at) return 0;
+
+  return reservations.filter((reservation) => {
+    if (reservation.id === target.id) return false;
+    if (reservation.deleted_at) return false;
+    if (reservation.date !== target.date) return false;
+    if (!reservation.start_time || !reservation.end_time) return false;
+    if (reservation.status === "canceled" || reservation.status === "completed" || reservation.status === "no_show") return false;
+
+    return target.start_time! < reservation.end_time && target.end_time! > reservation.start_time;
+  }).length;
 }

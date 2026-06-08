@@ -26,6 +26,18 @@ function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+type PassOption = Pass & {
+  group: "시간권" | "종일권" | "주간 / 월권" | "문의";
+};
+
+const customInquiryPass: PassOption = {
+  id: "custom-inquiry",
+  name: "기타 문의",
+  description: "촬영, 모임, 장기 이용 상담",
+  price: 0,
+  group: "문의",
+};
+
 export default function Reserve() {
   const location = useLocation();
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
@@ -218,6 +230,11 @@ export default function Reserve() {
       return;
     }
 
+    if (form.date < todayValue()) {
+      setError("오늘 이후 날짜로 예약해 주세요.");
+      return;
+    }
+
     if (isClosedDay) {
       setError("선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.");
       return;
@@ -228,6 +245,12 @@ export default function Reserve() {
       return;
     }
 
+    const people = Number(form.people);
+    if (!Number.isInteger(people) || people < 1 || people > 12) {
+      setError("인원은 1명부터 12명까지 입력할 수 있습니다.");
+      return;
+    }
+
     const selectedPass = passes.find((pass) => pass.name === form.pass_type);
     if (selectedPass?.seat_type_id) {
       const { data: capacityRows, error: capacityError } = await supabase.rpc("check_reservation_capacity", {
@@ -235,7 +258,7 @@ export default function Reserve() {
         p_start_time: form.start_time,
         p_end_time: form.end_time,
         p_seat_type_id: selectedPass.seat_type_id,
-        p_people: Number(form.people),
+        p_people: people,
       });
 
       if (capacityError) {
@@ -265,7 +288,7 @@ export default function Reserve() {
       date: form.date,
       start_time: form.start_time,
       end_time: form.end_time,
-      people: Number(form.people),
+      people,
       message: form.message.trim(),
       status: "pending",
     };
@@ -275,7 +298,7 @@ export default function Reserve() {
     setIsSubmitting(false);
 
     if (submitError) {
-      setError(submitError.message);
+      setError("예약 신청 중 문제가 생겼습니다. 잠시 후 다시 시도하거나 연락처로 문의해 주세요.");
       return;
     }
 
@@ -283,10 +306,7 @@ export default function Reserve() {
     setForm({ ...emptyForm, date: todayValue() });
   }
 
-  const passOptions = [
-    ...passes,
-    { id: "custom-inquiry", name: "기타 문의", description: "촬영, 모임, 장기 이용 상담", price: 0 },
-  ];
+  const groupedPasses = groupPasses(passes);
 
   return (
     <main className="pb-28 sm:pb-12">
@@ -327,35 +347,40 @@ export default function Reserve() {
           <fieldset className={`${card} p-5`}>
             <StepHeading step="1" title="이용권" />
             <div className="grid gap-3">
-              {passOptions.map((pass) => {
-                const isSelected = form.pass_type === pass.name;
-                return (
-                  <label
-                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 px-4 py-3 transition-transform duration-100 active:translate-x-[2px] active:translate-y-[2px] ${
-                      isSelected
-                        ? "border-workroom-ink bg-workroom-yellow"
-                        : "border-workroom-ink bg-white hover:-translate-y-0.5"
-                    }`}
-                    key={pass.id}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-base font-bold">{pass.name}</span>
-                      <span className="mt-1 block text-xs font-medium text-workroom-muted">
-                        {pass.description}
-                        {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
-                      </span>
-                    </span>
-                    <input
-                      checked={isSelected}
-                      className="h-5 w-5 shrink-0 accent-black"
-                      name="pass_type"
-                      onChange={() => selectPass(pass.name)}
-                      type="radio"
-                      value={pass.name}
-                    />
-                  </label>
-                );
-              })}
+              {groupedPasses.map((group) => (
+                <fieldset className="grid gap-2" key={group.name}>
+                  <legend className="mb-1 text-xs font-black text-workroom-muted">{group.name}</legend>
+                  {group.items.map((pass) => {
+                    const isSelected = form.pass_type === pass.name;
+                    return (
+                      <label
+                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 px-4 py-3 transition-transform duration-100 active:translate-x-[2px] active:translate-y-[2px] ${
+                          isSelected
+                            ? "border-workroom-ink bg-workroom-yellow"
+                            : "border-workroom-ink bg-white hover:-translate-y-0.5"
+                        }`}
+                        key={pass.id}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-base font-bold">{pass.name}</span>
+                          <span className="mt-1 block text-xs font-medium text-workroom-muted">
+                            {pass.description}
+                            {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
+                          </span>
+                        </span>
+                        <input
+                          checked={isSelected}
+                          className="h-5 w-5 shrink-0 accent-black"
+                          name="pass_type"
+                          onChange={() => selectPass(pass.name)}
+                          type="radio"
+                          value={pass.name}
+                        />
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              ))}
             </div>
           </fieldset>
 
@@ -491,4 +516,28 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </label>
   );
+}
+
+function groupPasses(passes: Pass[]) {
+  const passOptions: PassOption[] = [
+    ...passes.map((pass) => ({
+      ...pass,
+      group: getPassGroup(pass.name),
+    })),
+    customInquiryPass,
+  ];
+
+  return (["시간권", "종일권", "주간 / 월권", "문의"] as const)
+    .map((name) => ({
+      name,
+      items: passOptions.filter((pass) => pass.group === name),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+function getPassGroup(passName: string): PassOption["group"] {
+  if (passName.includes("시간")) return "시간권";
+  if (passName.includes("종일")) return "종일권";
+  if (passName.includes("주간") || passName.includes("월권")) return "주간 / 월권";
+  return "문의";
 }
