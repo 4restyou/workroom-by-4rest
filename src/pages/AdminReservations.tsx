@@ -5,7 +5,14 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { PaymentStatus, Reservation, ReservationAuditLog, ReservationInquiry, ReservationStatus } from "../lib/types";
+import type {
+  PaymentStatus,
+  Reservation,
+  ReservationAuditLog,
+  ReservationInquiry,
+  ReservationPaymentLog,
+  ReservationStatus,
+} from "../lib/types";
 import { buttonClass, card, tintCard } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
@@ -35,6 +42,7 @@ export default function AdminReservations() {
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [auditLogs, setAuditLogs] = useState<ReservationAuditLog[]>([]);
+  const [paymentLogs, setPaymentLogs] = useState<ReservationPaymentLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -168,6 +176,24 @@ export default function AdminReservations() {
     }
 
     void loadAuditLogs();
+  }, [selectedReservationId]);
+
+  useEffect(() => {
+    async function loadPaymentLogs() {
+      if (!supabase || !selectedReservationId) {
+        setPaymentLogs([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("reservation_payment_logs")
+        .select("*")
+        .eq("reservation_id", selectedReservationId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      setPaymentLogs((data ?? []) as ReservationPaymentLog[]);
+    }
+
+    void loadPaymentLogs();
   }, [selectedReservationId]);
 
   async function saveReservation(id: string, payload: ReservationEdit) {
@@ -328,6 +354,7 @@ export default function AdminReservations() {
             <ReservationCard
               conflictCount={getConflictCount(selectedReservation, reservations)}
               auditLogs={auditLogs}
+              paymentLogs={paymentLogs}
               isArchived={Boolean(selectedReservation.deleted_at)}
               key={selectedReservation.id}
               reservation={selectedReservation}
@@ -386,6 +413,7 @@ function ReservationListItem({
 function ReservationCard({
   conflictCount,
   auditLogs,
+  paymentLogs,
   isArchived,
   reservation,
   inquiries,
@@ -395,6 +423,7 @@ function ReservationCard({
 }: {
   conflictCount: number;
   auditLogs: ReservationAuditLog[];
+  paymentLogs: ReservationPaymentLog[];
   isArchived: boolean;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
@@ -572,6 +601,25 @@ function ReservationCard({
       </div>
 
       <div className="mt-5">
+        <p className="text-sm font-bold">결제/환불 이력</p>
+        {paymentLogs.length ? (
+          <div className="mt-2 grid gap-2">
+            {paymentLogs.map((log) => (
+              <div className={`${paymentLogTint(log.status)} p-3 text-sm`} key={log.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-bold">{describePaymentLog(log)}</p>
+                  <span className="text-xs font-bold text-workroom-muted">{formatAuditTime(log.created_at)}</span>
+                </div>
+                {log.message ? <p className="mt-1 text-xs font-medium text-workroom-muted">{log.message}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={`${tintCard("yellow")} mt-2 p-3 text-sm font-bold`}>아직 결제/환불 이력이 없습니다.</p>
+        )}
+      </div>
+
+      <div className="mt-5">
         <p className="text-sm font-bold">변경 이력</p>
         {auditLogs.length ? (
           <div className="mt-2 grid gap-2">
@@ -637,6 +685,26 @@ function describeAuditLog(log: ReservationAuditLog) {
   if (!changes.length && log.action === "archived") return "보관 처리";
   if (!changes.length) return "예약 정보 변경";
   return changes.join(" · ");
+}
+
+function describePaymentLog(log: ReservationPaymentLog) {
+  const action = log.action === "confirm" ? "결제 승인" : "환불/취소";
+  const status: Record<ReservationPaymentLog["status"], string> = {
+    requested: "요청",
+    succeeded: "성공",
+    failed: "실패",
+    skipped: "처리 제외",
+  };
+  const amount = log.amount ? ` · ${formatPrice(log.amount)}` : "";
+  const code = log.provider_code ? ` · ${log.provider_code}` : "";
+  return `${action} ${status[log.status]}${amount}${code}`;
+}
+
+function paymentLogTint(status: ReservationPaymentLog["status"]) {
+  if (status === "succeeded") return tintCard("mint");
+  if (status === "failed") return tintCard("danger");
+  if (status === "skipped") return tintCard("yellow");
+  return tintCard("lilac");
 }
 
 function labelStatus(status: ReservationStatus | null) {

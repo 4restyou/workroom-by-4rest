@@ -62,6 +62,45 @@ function isValidAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 10_000_000;
 }
 
+type PaymentLog = {
+  reservation_id: string;
+  profile_id?: string | null;
+  action: "confirm";
+  status: "succeeded" | "failed" | "skipped";
+  amount?: number | null;
+  provider_code?: string | null;
+  message?: string | null;
+};
+
+async function recordPaymentLog(log: PaymentLog) {
+  if (!SUPABASE_URL || !SERVICE_ROLE || !isUuid(log.reservation_id)) return;
+
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/reservation_payment_logs`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_ROLE,
+        Authorization: `Bearer ${SERVICE_ROLE}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        reservation_id: log.reservation_id,
+        profile_id: log.profile_id ?? null,
+        actor_id: null,
+        action: log.action,
+        status: log.status,
+        amount: log.amount ?? null,
+        provider: "toss",
+        provider_code: log.provider_code ?? null,
+        message: log.message ?? null,
+      }),
+    });
+  } catch (error) {
+    console.error("[confirm-payment] payment log error", { message: errorMessage(error) });
+  }
+}
+
 Deno.serve(async (request) => {
   const headers = corsHeaders(request);
   if (request.method === "OPTIONS") {
@@ -84,16 +123,62 @@ Deno.serve(async (request) => {
 
     // 1) Look up the reservation (orderId == reservation id).
     const lookup = await fetch(
-      `${SUPABASE_URL}/rest/v1/reservations?id=eq.${orderId}&select=id,status,payment_status,price_at_booking`,
+      `${SUPABASE_URL}/rest/v1/reservations?id=eq.${orderId}&select=id,profile_id,status,payment_status,price_at_booking`,
       { headers: authHeaders },
     );
-    const rows = (await lookup.json()) as Array<{ status: string; payment_status: string | null; price_at_booking: number | null }>;
+    const rows = (await lookup.json()) as Array<{
+      profile_id: string | null;
+      status: string;
+      payment_status: string | null;
+      price_at_booking: number | null;
+    }>;
     const reservation = Array.isArray(rows) ? rows[0] : null;
 
-    if (!reservation) return json({ ok: false, message: "예약을 찾을 수 없습니다." }, 404, headers);
-    if (reservation.payment_status === "paid") return json({ ok: true, alreadyPaid: true }, 200, headers);
-    if (reservation.status !== "confirmed") return json({ ok: false, message: "확정된 예약만 결제할 수 있습니다." }, 400, headers);
+    if (!reservation) {
+      await recordPaymentLog({
+        reservation_id: orderId,
+        action: "confirm",
+        status: "failed",
+        amount,
+        provider_code: "RESERVATION_NOT_FOUND",
+        message: "예약을 찾을 수 없습니다.",
+      });
+      return json({ ok: false, message: "예약을 찾을 수 없습니다." }, 404, headers);
+    }
+    if (reservation.payment_status === "paid") {
+      await recordPaymentLog({
+        reservation_id: orderId,
+        profile_id: reservation.profile_id,
+        action: "confirm",
+        status: "skipped",
+        amount,
+        provider_code: "ALREADY_PAID",
+        message: "이미 결제 완료된 예약입니다.",
+      });
+      return json({ ok: true, alreadyPaid: true }, 200, headers);
+    }
+    if (reservation.status !== "confirmed") {
+      await recordPaymentLog({
+        reservation_id: orderId,
+        profile_id: reservation.profile_id,
+        action: "confirm",
+        status: "failed",
+        amount,
+        provider_code: "RESERVATION_NOT_CONFIRMED",
+        message: "확정되지 않은 예약 결제 시도입니다.",
+      });
+      return json({ ok: false, message: "확정된 예약만 결제할 수 있습니다." }, 400, headers);
+    }
     if (Number(reservation.price_at_booking) !== Number(amount)) {
+      await recordPaymentLog({
+        reservation_id: orderId,
+        profile_id: reservation.profile_id,
+        action: "confirm",
+        status: "failed",
+        amount,
+        provider_code: "AMOUNT_MISMATCH",
+        message: "결제 요청 금액이 예약 금액과 일치하지 않습니다.",
+      });
       return json({ ok: false, message: "결제 금액이 예약 금액과 일치하지 않습니다." }, 400, headers);
     }
 
@@ -109,14 +194,45 @@ Deno.serve(async (request) => {
     const result = (await confirm.json()) as { code?: string; message?: string };
     if (!confirm.ok) {
       console.error("[confirm-payment] toss error", { status: confirm.status, code: result?.code ?? "unknown" });
+      await recordPaymentLog({
+        reservation_id: orderId,
+        profile_id: reservation.profile_id,
+        action: "confirm",
+        status: "failed",
+        amount,
+        provider_code: result?.code ?? "TOSS_CONFIRM_FAILED",
+        message: result?.message ?? "결제 승인에 실패했습니다.",
+      });
       return json({ ok: false, message: result?.message ?? "결제 승인에 실패했습니다." }, 400, headers);
     }
 
     // 3) Mark the reservation paid.
-    await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${orderId}`, {
+    const update = await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${orderId}`, {
       method: "PATCH",
       headers: { ...authHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ payment_status: "paid", payment_method: "카드", payment_key: paymentKey }),
+    });
+    if (!update.ok) {
+      await recordPaymentLog({
+        reservation_id: orderId,
+        profile_id: reservation.profile_id,
+        action: "confirm",
+        status: "failed",
+        amount,
+        provider_code: "RESERVATION_UPDATE_FAILED",
+        message: "Toss 결제 승인 후 예약 결제 상태 업데이트에 실패했습니다.",
+      });
+      return json({ ok: false, message: "결제는 승인되었지만 예약 반영에 실패했습니다. 관리자에게 문의해 주세요." }, 500, headers);
+    }
+
+    await recordPaymentLog({
+      reservation_id: orderId,
+      profile_id: reservation.profile_id,
+      action: "confirm",
+      status: "succeeded",
+      amount,
+      provider_code: "CONFIRMED",
+      message: "Toss 결제 승인이 완료되었습니다.",
     });
 
     return json({ ok: true }, 200, headers);

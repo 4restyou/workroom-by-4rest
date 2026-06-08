@@ -82,6 +82,20 @@ export type ReservationAuditLog = {
   created_at: string;
 };
 
+export type ReservationPaymentLog = {
+  id: string;
+  reservation_id: string;
+  profile_id: string | null;
+  actor_id: string | null;
+  action: "confirm" | "refund";
+  status: "requested" | "succeeded" | "failed" | "skipped";
+  amount: number | null;
+  provider: string;
+  provider_code: string | null;
+  message: string | null;
+  created_at: string;
+};
+
 export type Reservation = {
   id: string;
   profile_id: string | null;
@@ -91,6 +105,7 @@ export type Reservation = {
   seat_type_id: string | null;
   payment_method: string | null;
   payment_status: PaymentStatus | null;
+  payment_key?: string | null;
   name: string;
   phone: string;
   email: string | null;
