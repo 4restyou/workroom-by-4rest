@@ -43,6 +43,9 @@ export default function Footer() {
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t-2 border-workroom-line pt-5">
           <div className="flex gap-4 text-xs font-bold">
+            <Link className="transition-colors hover:text-workroom-muted" to="/faq">
+              이용안내
+            </Link>
             <Link className="transition-colors hover:text-workroom-muted" to="/terms">
               이용약관
             </Link>
