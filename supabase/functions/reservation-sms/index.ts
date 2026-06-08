@@ -37,6 +37,7 @@ const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
 const ADMIN_PHONE = (Deno.env.get("ADMIN_PHONE") ?? "").replace(/\D/g, "");
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
+const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
 
 const STATUS_MESSAGE: Record<string, string> = {
   confirmed: "예약이 확정되었습니다.",
@@ -117,7 +118,8 @@ Deno.serve(async (request) => {
       // Member-facing: status moved to confirmed / canceled / no_show.
       const message = STATUS_MESSAGE[row.status];
       if (statusChanged && message && row.phone) {
-        await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}\n문의: 010-4931-3298\n${SITE_URL}`);
+        const policyLine = row.status === "confirmed" ? `\n${REFUND_NOTICE}` : "";
+        await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`);
       }
 
       // Operator-facing: the member edited the date/time (re-request).
