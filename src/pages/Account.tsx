@@ -292,15 +292,31 @@ export default function Account() {
                 ) : null}
 
                 <label className="grid gap-2 text-sm font-bold">
-                  이메일
+                  <span>
+                    이메일
+                    <span className="ml-1 inline-block rounded-pill border-2 border-workroom-ink bg-workroom-coral px-2 py-0.5 align-middle text-[10px] font-bold">
+                      필수
+                    </span>
+                  </span>
                   <input disabled value={profile.email} />
                 </label>
                 <label className="grid gap-2 text-sm font-bold">
-                  이름
+                  <span>
+                    이름
+                    <span className="ml-1 inline-block rounded-pill border-2 border-workroom-ink bg-workroom-coral px-2 py-0.5 align-middle text-[10px] font-bold">
+                      필수
+                    </span>
+                  </span>
                   <input required value={form.full_name} onChange={(event) => updateField("full_name", event.target.value)} />
+                  <span className="text-xs font-medium text-workroom-muted">예약자 확인을 위해 알아볼 수 있는 본명으로 적어 주세요.</span>
                 </label>
                 <label className="grid gap-2 text-sm font-bold">
-                  연락처
+                  <span>
+                    연락처
+                    <span className="ml-1 inline-block rounded-pill border-2 border-workroom-ink bg-workroom-coral px-2 py-0.5 align-middle text-[10px] font-bold">
+                      필수
+                    </span>
+                  </span>
                   <input
                     required
                     inputMode="numeric"
