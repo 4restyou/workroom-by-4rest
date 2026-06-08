@@ -30,8 +30,8 @@ describe("tintCard / badge", () => {
 });
 
 describe("card", () => {
-  it("is a bordered, shadowed surface", () => {
+  it("is an outline surface with an ink border and no drop shadow", () => {
     expect(card).toContain("border-2 border-workroom-ink");
-    expect(card).toContain("shadow-hard");
+    expect(card).not.toContain("shadow-hard");
   });
 });

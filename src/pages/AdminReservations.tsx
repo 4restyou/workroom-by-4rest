@@ -303,8 +303,8 @@ function ReservationListItem({
     <button
       className={`rounded-card px-4 py-3 text-left ${
         isSelected
-          ? "border-2 border-workroom-ink bg-workroom-yellow shadow-hard"
-          : "border-2 border-workroom-ink bg-white hover:-translate-y-0.5 hover:shadow-hard transition-transform"
+          ? "border-2 border-workroom-ink bg-workroom-yellow"
+          : "border-2 border-workroom-ink bg-white hover:-translate-y-0.5 transition-transform"
       }`}
       onClick={onSelect}
       type="button"

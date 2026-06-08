@@ -1,16 +1,17 @@
-// Shared visual language for the "Bold Playful" system: chunky 2px ink
-// borders, hard offset (sticker) shadows, and a tactile press interaction.
+// Shared visual language for the "Bold Outline" system: chunky 2px ink
+// borders, chunky radii and heavy type — no drop shadows. Depth is carried by
+// the line work; buttons get a light lift on hover and a press feedback.
 
 export type ButtonVariant = "primary" | "accent" | "secondary" | "mint" | "lilac";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
   "inline-flex items-center justify-center gap-2 rounded-pill border-2 border-workroom-ink font-bold leading-none " +
-  "shadow-hard transition-[transform,box-shadow] duration-100 " +
-  "hover:-translate-x-px hover:-translate-y-px hover:shadow-hard-lg " +
-  "active:translate-x-[3px] active:translate-y-[3px] active:shadow-none " +
+  "transition-[transform,background-color,opacity] duration-100 " +
+  "hover:-translate-y-px " +
+  "active:translate-y-0 active:opacity-90 " +
   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow " +
-  "disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-hard";
+  "disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0";
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary: "bg-workroom-ink text-white",
@@ -34,16 +35,16 @@ export function buttonClass(
   return [buttonBase, buttonVariants[variant], buttonSizes[size], extra].filter(Boolean).join(" ");
 }
 
-// Card surfaces. `card` is the standard raised sticker; `cardFlat` drops the
-// shadow for nested panels.
-export const card = "rounded-card border-2 border-workroom-ink bg-workroom-surface shadow-hard";
-export const cardFlat = "rounded-card border-2 border-workroom-ink bg-workroom-surface";
+// Card surfaces. Outline-only — depth comes from the 2px ink border. `cardFlat`
+// is kept as an alias for callers that referenced it.
+export const card = "rounded-card border-2 border-workroom-ink bg-workroom-surface";
+export const cardFlat = card;
 
 export type TintColor = "yellow" | "mint" | "lilac" | "sky" | "coral" | "danger" | "ink";
 
 export function tintCard(color: TintColor, extra = "") {
   const bg = color === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${color}`;
-  return `rounded-card border-2 border-workroom-ink shadow-hard ${bg} ${extra}`.trim();
+  return `rounded-card border-2 border-workroom-ink ${bg} ${extra}`.trim();
 }
 
 // Small label chip.

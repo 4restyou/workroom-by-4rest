@@ -12,8 +12,8 @@ type SectionProps = {
 
 export default function Section({ id, eyebrow, title, accent = "yellow", action, children }: SectionProps) {
   return (
-    <section id={id} className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <section id={id} className="mx-auto max-w-5xl px-4 py-6 sm:py-12">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4 sm:mb-6">
         <div>
           {eyebrow ? <span className={`${badge(accent)} mb-3 uppercase tracking-[0.12em]`}>{eyebrow}</span> : null}
           <h2 className="max-w-2xl text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-4xl">{title}</h2>

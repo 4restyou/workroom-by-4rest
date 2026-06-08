@@ -115,7 +115,7 @@ export default function Home() {
           </div>
 
           <div className="relative">
-            <div className="overflow-hidden rounded-card border-2 border-workroom-ink shadow-hard-lg">
+            <div className="overflow-hidden rounded-card border-2 border-workroom-ink">
               <img
                 className="aspect-[4/3] w-full object-cover"
                 src={heroImage}
@@ -124,10 +124,10 @@ export default function Home() {
               />
             </div>
             <div className="absolute -bottom-3 left-2 rotate-[-4deg]">
-              <span className={badge("mint", "text-sm shadow-hard")}>충장로 · 금남로5가역</span>
+              <span className={badge("mint", "text-sm")}>충장로 · 금남로5가역</span>
             </div>
             <div className="absolute right-2 -top-3 rotate-[5deg]">
-              <span className={badge("lilac", "text-sm shadow-hard")}>3시간권 12,000원~</span>
+              <span className={badge("lilac", "text-sm")}>3시간권 12,000원~</span>
             </div>
           </div>
         </div>

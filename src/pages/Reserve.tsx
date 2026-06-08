@@ -333,8 +333,8 @@ export default function Reserve() {
                   <label
                     className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 px-4 py-3 transition-transform duration-100 active:translate-x-[2px] active:translate-y-[2px] ${
                       isSelected
-                        ? "border-workroom-ink bg-workroom-yellow shadow-hard"
-                        : "border-workroom-ink bg-white hover:-translate-y-0.5 hover:shadow-hard"
+                        ? "border-workroom-ink bg-workroom-yellow"
+                        : "border-workroom-ink bg-white hover:-translate-y-0.5"
                     }`}
                     key={pass.id}
                   >
