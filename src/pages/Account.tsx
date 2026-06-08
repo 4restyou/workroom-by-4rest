@@ -16,6 +16,13 @@ const tabLabels: Record<AccountTab, string> = {
   profile: "회원정보",
 };
 
+// Cancellation (and refund) is only allowed before the reservation start time.
+function canCancel(reservation: Reservation): boolean {
+  const start = new Date(`${reservation.date}T${(reservation.start_time ?? "00:00").slice(0, 5)}:00+09:00`);
+  if (Number.isNaN(start.getTime())) return true;
+  return Date.now() < start.getTime();
+}
+
 export default function Account() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -161,9 +168,35 @@ export default function Account() {
 
   async function cancelReservation(reservation: Reservation) {
     if (!supabase) return;
-    if (!window.confirm("예약을 취소할까요?")) return;
+    if (!canCancel(reservation)) {
+      setError("예약 시간이 지나 취소·환불이 불가합니다.");
+      return;
+    }
+    const wasPaid = reservation.payment_status === "paid";
+    const prompt = wasPaid ? "예약을 취소하고 결제 금액을 환불받을까요?" : "예약을 취소할까요?";
+    if (!window.confirm(prompt)) return;
     setError("");
     setActionBusy(reservation.id);
+
+    if (wasPaid) {
+      // Paid reservations are refunded server-side through Toss.
+      const { data, error: refundError } = await supabase.functions.invoke("refund-reservation", {
+        body: { reservationId: reservation.id },
+      });
+      setActionBusy(null);
+      const result = data as { ok?: boolean; refunded?: boolean; message?: string } | null;
+      if (refundError || !result?.ok) {
+        setError(result?.message ?? "취소·환불 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      setReservations((current) =>
+        current.map((item) =>
+          item.id === reservation.id ? { ...item, status: "canceled", payment_status: "refunded" } : item,
+        ),
+      );
+      return;
+    }
+
     const { error: cancelError } = await supabase.from("reservations").update({ status: "canceled" }).eq("id", reservation.id);
     setActionBusy(null);
     if (cancelError) {
@@ -321,6 +354,12 @@ export default function Account() {
                           </div>
                           <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
 
+                          {reservation.payment_status === "refunded" ? (
+                            <div className="mt-3">
+                              <span className={badge("lilac")}>환불완료</span>
+                            </div>
+                          ) : null}
+
                           {reservation.status === "confirmed" && (reservation.price_at_booking ?? 0) > 0 ? (
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
@@ -380,7 +419,7 @@ export default function Account() {
                                   </button>
                                 </div>
                               </div>
-                            ) : (
+                            ) : canCancel(reservation) ? (
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <button className={buttonClass("secondary", "sm")} onClick={() => startEdit(reservation)} type="button">
                                   시간 수정
@@ -391,9 +430,17 @@ export default function Account() {
                                   onClick={() => void cancelReservation(reservation)}
                                   type="button"
                                 >
-                                  예약 취소
+                                  {actionBusy === reservation.id
+                                    ? "처리 중…"
+                                    : reservation.payment_status === "paid"
+                                      ? "예약 취소·환불"
+                                      : "예약 취소"}
                                 </button>
                               </div>
+                            ) : (
+                              <p className="mt-3 text-xs font-medium text-workroom-muted">
+                                예약 시간이 지나 취소·환불이 불가합니다.
+                              </p>
                             )
                           ) : null}
 

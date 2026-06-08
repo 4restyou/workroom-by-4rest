@@ -111,3 +111,16 @@ supabase secrets set TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6
 - 회원으로 예약 → 관리자 확정 → 예약현황에서 `결제하기` → 테스트 카드로 결제
 - 성공하면 예약현황에 **결제완료** 배지가 보여야 합니다.
 - 안 되면 confirm-payment **Logs** 확인.
+
+## 6) 취소·환불 (refund-reservation 함수)
+회원이 예약현황에서 결제완료된 예약을 취소하면 Toss 결제를 자동 환불합니다.
+**정책: 예약 시작 시간 전까지만 취소·환불 가능** (이후에는 취소 버튼이 사라지고
+"예약 시간이 지나 취소·환불이 불가합니다" 안내).
+
+- 대시보드 Edge Functions → 함수 `refund-reservation` 생성 → 코드 붙여넣기 →
+  **Verify JWT ON** → Deploy
+  - (호출자 본인 토큰으로 소유권을 서버에서 재검증하므로 JWT 검증을 켭니다.)
+- 시크릿은 `confirm-payment` 와 동일한 `TOSS_SECRET_KEY` 를 그대로 사용
+  (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` 자동 제공).
+- 미결제(무료/대기) 예약 취소는 서버 호출 없이 상태만 `canceled` 로 변경됩니다.
+- 환불 성공 시 `payment_status` 가 `refunded` 로 바뀌고 예약현황에 **환불완료** 배지 표시.
