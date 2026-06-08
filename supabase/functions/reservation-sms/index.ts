@@ -9,6 +9,8 @@
 //   SOLAPI_API_SECRET  - Solapi API secret
 //   SMS_SENDER         - registered sender number (e.g. 01049313298)
 //   ADMIN_PHONE        - operator phone for new-reservation alerts (optional)
+//   WEBHOOK_SECRET     - optional shared secret checked against
+//                        x-workroom-webhook-secret
 //
 // If the Solapi secrets are missing the function logs and no-ops, so it is
 // safe to wire up the webhook before finishing provider setup.
@@ -36,6 +38,7 @@ const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
 const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
 const ADMIN_PHONE = (Deno.env.get("ADMIN_PHONE") ?? "").replace(/\D/g, "");
+const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
 const PAYMENT_NOTICE =
@@ -69,7 +72,7 @@ async function sendSms(to: string, text: string): Promise<void> {
   if (!phone) return;
 
   if (!SOLAPI_API_KEY || !SOLAPI_API_SECRET || !SMS_SENDER) {
-    console.log("[reservation-sms] secrets missing — skipping send", { to: phone, text });
+    console.log("[reservation-sms] solapi secrets missing — skipping send");
     return;
   }
 
@@ -100,6 +103,16 @@ async function sendSms(to: string, text: string): Promise<void> {
 
 Deno.serve(async (request) => {
   try {
+    if (WEBHOOK_SECRET) {
+      const receivedSecret = request.headers.get("x-workroom-webhook-secret") ?? "";
+      if (receivedSecret !== WEBHOOK_SECRET) {
+        console.warn("[reservation-sms] rejected unsigned webhook request");
+        return new Response("unauthorized", { status: 401 });
+      }
+    } else {
+      console.warn("[reservation-sms] WEBHOOK_SECRET is not configured");
+    }
+
     const payload = (await request.json()) as WebhookPayload;
     if (payload.table !== "reservations") return new Response("ignored", { status: 200 });
 

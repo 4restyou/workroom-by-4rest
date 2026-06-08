@@ -52,9 +52,11 @@ supabase secrets set \
   SOLAPI_API_KEY=발급키 \
   SOLAPI_API_SECRET=발급시크릿 \
   SMS_SENDER=01049313298 \
-  ADMIN_PHONE=01049313298
+  ADMIN_PHONE=01049313298 \
+  WEBHOOK_SECRET=충분히_긴_랜덤문자열
 ```
-> 시크릿이 없으면 함수는 **발송하지 않고 로그만** 남기므로, 웹훅을 먼저 연결해도 안전합니다.
+> Solapi 시크릿이 없으면 함수는 **발송하지 않고 로그만** 남기므로, 웹훅을 먼저 연결해도 안전합니다.
+> `WEBHOOK_SECRET`을 설정하면 요청 헤더 `x-workroom-webhook-secret` 값이 일치할 때만 문자 발송이 진행됩니다.
 
 ## 4) Database Webhook 연결 (대시보드)
 Supabase 대시보드 → **Database → Webhooks → Create a new hook**
@@ -62,6 +64,8 @@ Supabase 대시보드 → **Database → Webhooks → Create a new hook**
 - Events: **Insert**, **Update** 체크
 - Type: **Supabase Edge Functions** → `reservation-sms` 선택
   (또는 HTTP Request, POST, URL = `https://<프로젝트ref>.functions.supabase.co/reservation-sms`)
+- Headers:
+  - `x-workroom-webhook-secret`: 위에서 설정한 `WEBHOOK_SECRET` 값
 
 ## 5) 테스트
 - 관리자에서 예약을 **확정**으로 바꾸면 예약자 번호로 문자가 가야 합니다.
