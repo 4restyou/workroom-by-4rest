@@ -320,7 +320,7 @@ for each row execute function public.notify_reservation_status_change();
 -- Server-side reservation guard. Runs on every insert so the rules cannot be
 -- bypassed by a crafted client, and serializes the capacity check per
 -- seat/day with an advisory lock so concurrent requests can't overbook.
-create or replace function public.before_reservation_insert()
+create or replace function public.before_reservation_write()
 returns trigger
 language plpgsql
 security definer
@@ -333,11 +333,14 @@ declare
   v_dow integer;
   v_capacity integer;
   v_booked integer;
+  v_revalidate boolean;
 begin
-  -- 1) Reservations globally enabled?
-  select value into v_enabled from public.space_settings where key = 'reservation_enabled';
-  if coalesce(v_enabled, 'true') <> 'true' then
-    raise exception '현재 예약을 받고 있지 않습니다.';
+  -- 1) Only new requests are blocked when reservations are paused.
+  if tg_op = 'INSERT' then
+    select value into v_enabled from public.space_settings where key = 'reservation_enabled';
+    if coalesce(v_enabled, 'true') <> 'true' then
+      raise exception '현재 예약을 받고 있지 않습니다.';
+    end if;
   end if;
 
   -- 2) Resolve the pass on the server so price / snapshot cannot be spoofed.
@@ -356,8 +359,18 @@ begin
     end if;
   end if;
 
-  -- 3) Business hours / closed days and capacity (only when a time window is given).
-  if new.start_time is not null and new.end_time is not null then
+  -- Re-validate hours + capacity on insert, or when the time window changed.
+  if tg_op = 'INSERT' then
+    v_revalidate := true;
+  else
+    v_revalidate := new.date is distinct from old.date
+      or new.start_time is distinct from old.start_time
+      or new.end_time is distinct from old.end_time
+      or new.seat_type_id is distinct from old.seat_type_id
+      or coalesce(new.people, 1) is distinct from coalesce(old.people, 1);
+  end if;
+
+  if v_revalidate and new.start_time is not null and new.end_time is not null then
     if new.end_time <= new.start_time then
       raise exception '종료 시간은 시작 시간보다 늦어야 합니다.';
     end if;
@@ -374,7 +387,7 @@ begin
       end if;
     end if;
 
-    if new.seat_type_id is not null then
+    if new.seat_type_id is not null and new.status in ('pending', 'confirmed') then
       -- Serialize capacity checks for the same seat type + date.
       perform pg_advisory_xact_lock(hashtext(new.seat_type_id::text || new.date::text));
 
@@ -392,7 +405,8 @@ begin
         and seat_type_id = new.seat_type_id
         and status in ('pending', 'confirmed')
         and start_time is not null and end_time is not null
-        and start_time < new.end_time and end_time > new.start_time;
+        and start_time < new.end_time and end_time > new.start_time
+        and id is distinct from new.id;  -- exclude the row being updated
 
       if v_booked + greatest(coalesce(new.people, 1), 1) > v_capacity then
         raise exception '선택한 시간대의 잔여 좌석이 부족합니다. (잔여 %석)', greatest(v_capacity - v_booked, 0);
@@ -405,9 +419,12 @@ end;
 $$;
 
 drop trigger if exists before_reservation_insert on reservations;
-create trigger before_reservation_insert
-before insert on reservations
-for each row execute function public.before_reservation_insert();
+drop trigger if exists before_reservation_write on reservations;
+create trigger before_reservation_write
+before insert or update on reservations
+for each row execute function public.before_reservation_write();
+
+drop function if exists public.before_reservation_insert();
 
 drop policy if exists "profiles_select_own_or_admin" on profiles;
 create policy "profiles_select_own_or_admin"
@@ -538,6 +555,20 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Members may cancel or re-request (edit) their own reservation, but cannot
+-- self-confirm: the resulting status must be pending or canceled. (Price /
+-- snapshot are re-filled by before_reservation_write so they can't be spoofed.)
+drop policy if exists "reservations_owner_update" on reservations;
+create policy "reservations_owner_update"
+on reservations
+for update
+to authenticated
+using (profile_id = auth.uid())
+with check (
+  profile_id = auth.uid()
+  and status in ('pending', 'canceled')
+);
+
 drop policy if exists "reservations_admin_delete" on reservations;
 create policy "reservations_admin_delete"
 on reservations
@@ -609,6 +640,40 @@ with check (public.is_admin());
 
 alter table reservation_inquiries add column if not exists admin_reply text;
 alter table reservation_inquiries add column if not exists replied_at timestamp with time zone;
+alter table reservation_inquiries add column if not exists edited_at timestamp with time zone;
+
+-- Members may edit their own inquiry text. A trigger keeps non-admins from
+-- touching the admin reply and stamps edited_at when the body changes.
+drop policy if exists "reservation_inquiries_update_own" on reservation_inquiries;
+create policy "reservation_inquiries_update_own"
+on reservation_inquiries
+for update
+to authenticated
+using (profile_id = auth.uid())
+with check (profile_id = auth.uid());
+
+create or replace function public.guard_inquiry_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    new.admin_reply := old.admin_reply;
+    new.replied_at := old.replied_at;
+    if new.body is distinct from old.body then
+      new.edited_at := now();
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_inquiry_update on reservation_inquiries;
+create trigger guard_inquiry_update
+before update on reservation_inquiries
+for each row execute function public.guard_inquiry_update();
 
 -- Notify every admin when a member leaves an inquiry.
 create or replace function public.notify_inquiry_created()

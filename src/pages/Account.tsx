@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
-import { formatDate, formatPhone, formatTimeRange, statusLabel } from "../lib/format";
+import { formatDate, formatPhone, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
@@ -24,6 +24,11 @@ export default function Account() {
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [inquiryDrafts, setInquiryDrafts] = useState<Record<string, string>>({});
   const [inquiryBusy, setInquiryBusy] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState({ date: "", start_time: "", end_time: "" });
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [editingInquiryId, setEditingInquiryId] = useState<string | null>(null);
+  const [inquiryEditDraft, setInquiryEditDraft] = useState("");
   const [activeTab, setActiveTab] = useState<AccountTab>(tabParam === "profile" ? "profile" : "reservations");
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
   const [isLoading, setIsLoading] = useState(true);
@@ -109,6 +114,62 @@ export default function Account() {
 
     setInquiries((current) => [...current, data as ReservationInquiry]);
     setInquiryDrafts((current) => ({ ...current, [reservationId]: "" }));
+  }
+
+  function startEdit(reservation: Reservation) {
+    setError("");
+    setEditingId(reservation.id);
+    setEditDraft({
+      date: reservation.date,
+      start_time: (reservation.start_time ?? "09:00").slice(0, 5),
+      end_time: (reservation.end_time ?? "12:00").slice(0, 5),
+    });
+  }
+
+  async function saveEdit(reservation: Reservation) {
+    if (!supabase) return;
+    setError("");
+    setActionBusy(reservation.id);
+    const patch = { date: editDraft.date, start_time: editDraft.start_time, end_time: editDraft.end_time, status: "pending" as const };
+    const { error: editError } = await supabase.from("reservations").update(patch).eq("id", reservation.id);
+    setActionBusy(null);
+    if (editError) {
+      setError(editError.message);
+      return;
+    }
+    setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, ...patch } : item)));
+    setEditingId(null);
+  }
+
+  async function cancelReservation(reservation: Reservation) {
+    if (!supabase) return;
+    if (!window.confirm("예약을 취소할까요?")) return;
+    setError("");
+    setActionBusy(reservation.id);
+    const { error: cancelError } = await supabase.from("reservations").update({ status: "canceled" }).eq("id", reservation.id);
+    setActionBusy(null);
+    if (cancelError) {
+      setError(cancelError.message);
+      return;
+    }
+    setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, status: "canceled" } : item)));
+  }
+
+  async function saveInquiryEdit(inquiry: ReservationInquiry) {
+    if (!supabase) return;
+    const body = inquiryEditDraft.trim();
+    if (!body) return;
+    setActionBusy(inquiry.id);
+    const { error: editError } = await supabase.from("reservation_inquiries").update({ body }).eq("id", inquiry.id);
+    setActionBusy(null);
+    if (editError) {
+      setError(editError.message);
+      return;
+    }
+    setInquiries((current) =>
+      current.map((item) => (item.id === inquiry.id ? { ...item, body, edited_at: new Date().toISOString() } : item)),
+    );
+    setEditingInquiryId(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -227,59 +288,155 @@ export default function Account() {
                 </div>
                 <div className="mt-4 grid gap-3">
                   {reservations.length ? (
-                    reservations.map((reservation) => (
-                      <article className={`${cardFlat} p-4`} key={reservation.id}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-black">{reservation.pass_name_snapshot || reservation.pass_type}</p>
-                            <p className="mt-1 text-sm font-medium text-workroom-muted">
-                              {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
-                            </p>
+                    reservations.map((reservation) => {
+                      const active = reservation.status === "pending" || reservation.status === "confirmed";
+                      return (
+                        <article className={`${cardFlat} p-4`} key={reservation.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-black">{reservation.pass_name_snapshot || reservation.pass_type}</p>
+                              <p className="mt-1 text-sm font-medium text-workroom-muted">
+                                {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
+                              </p>
+                            </div>
+                            <StatusBadge status={reservation.status} />
                           </div>
-                          <StatusBadge status={reservation.status} />
-                        </div>
-                        <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
+                          <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
 
-                        {reservation.status === "confirmed" ? (
-                          <div className="mt-4 border-t-2 border-workroom-line pt-4">
-                            <p className="text-sm font-black">관리자에게 문의</p>
-                            {inquiries
-                              .filter((inquiry) => inquiry.reservation_id === reservation.id)
-                              .map((inquiry) => (
-                                <div className={`${tintCard("mint")} mt-2 p-3`} key={inquiry.id}>
-                                  <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
-                                  <p className="mt-1 text-xs font-medium text-workroom-muted">
-                                    {formatDate(inquiry.created_at.slice(0, 10))} · 전달됨
-                                  </p>
-                                  {inquiry.admin_reply ? (
-                                    <div className="mt-2 rounded-xl border-2 border-workroom-ink bg-white p-2.5">
-                                      <p className="text-xs font-black">운영자 답변</p>
-                                      <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.admin_reply}</p>
-                                    </div>
-                                  ) : null}
+                          {active ? (
+                            editingId === reservation.id ? (
+                              <div className="mt-4 grid gap-3 border-t-2 border-workroom-line pt-4">
+                                <p className="text-sm font-black">시간 수정 (저장하면 다시 확인 대기로 바뀝니다)</p>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                                    날짜
+                                    <input
+                                      type="date"
+                                      min={todayValue()}
+                                      value={editDraft.date}
+                                      onChange={(event) => setEditDraft((draft) => ({ ...draft, date: event.target.value }))}
+                                    />
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                                    시작
+                                    <input
+                                      type="time"
+                                      value={editDraft.start_time}
+                                      onChange={(event) => setEditDraft((draft) => ({ ...draft, start_time: event.target.value }))}
+                                    />
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                                    종료
+                                    <input
+                                      type="time"
+                                      value={editDraft.end_time}
+                                      onChange={(event) => setEditDraft((draft) => ({ ...draft, end_time: event.target.value }))}
+                                    />
+                                  </label>
                                 </div>
-                              ))}
-                            <textarea
-                              className="mt-2"
-                              rows={2}
-                              placeholder="확정된 예약에 대해 궁금한 점을 남겨 주세요."
-                              value={inquiryDrafts[reservation.id] ?? ""}
-                              onChange={(event) =>
-                                setInquiryDrafts((current) => ({ ...current, [reservation.id]: event.target.value }))
-                              }
-                            />
-                            <button
-                              className={buttonClass("primary", "sm", "mt-2")}
-                              disabled={inquiryBusy === reservation.id || !(inquiryDrafts[reservation.id] ?? "").trim()}
-                              onClick={() => void sendInquiry(reservation.id)}
-                              type="button"
-                            >
-                              {inquiryBusy === reservation.id ? "보내는 중…" : "문의 보내기"}
-                            </button>
-                          </div>
-                        ) : null}
-                      </article>
-                    ))
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    className={buttonClass("primary", "sm")}
+                                    disabled={actionBusy === reservation.id}
+                                    onClick={() => void saveEdit(reservation)}
+                                    type="button"
+                                  >
+                                    {actionBusy === reservation.id ? "저장 중…" : "변경 신청"}
+                                  </button>
+                                  <button className={buttonClass("secondary", "sm")} onClick={() => setEditingId(null)} type="button">
+                                    닫기
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button className={buttonClass("secondary", "sm")} onClick={() => startEdit(reservation)} type="button">
+                                  시간 수정
+                                </button>
+                                <button
+                                  className={buttonClass("secondary", "sm")}
+                                  disabled={actionBusy === reservation.id}
+                                  onClick={() => void cancelReservation(reservation)}
+                                  type="button"
+                                >
+                                  예약 취소
+                                </button>
+                              </div>
+                            )
+                          ) : null}
+
+                          {reservation.status === "confirmed" ? (
+                            <div className="mt-4 border-t-2 border-workroom-line pt-4">
+                              <p className="text-sm font-black">관리자에게 문의</p>
+                              {inquiries
+                                .filter((inquiry) => inquiry.reservation_id === reservation.id)
+                                .map((inquiry) => (
+                                  <div className={`${tintCard("mint")} mt-2 p-3`} key={inquiry.id}>
+                                    {editingInquiryId === inquiry.id ? (
+                                      <div className="grid gap-2">
+                                        <textarea rows={2} value={inquiryEditDraft} onChange={(event) => setInquiryEditDraft(event.target.value)} />
+                                        <div className="flex flex-wrap gap-2">
+                                          <button
+                                            className={buttonClass("primary", "sm")}
+                                            disabled={actionBusy === inquiry.id || !inquiryEditDraft.trim()}
+                                            onClick={() => void saveInquiryEdit(inquiry)}
+                                            type="button"
+                                          >
+                                            저장
+                                          </button>
+                                          <button className={buttonClass("secondary", "sm")} onClick={() => setEditingInquiryId(null)} type="button">
+                                            닫기
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
+                                        <p className="mt-1 text-xs font-medium text-workroom-muted">
+                                          {formatDate(inquiry.created_at.slice(0, 10))} · 전달됨{inquiry.edited_at ? " · 수정됨" : ""}
+                                        </p>
+                                        {!inquiry.admin_reply ? (
+                                          <button
+                                            className="mt-1 text-xs font-bold underline underline-offset-2"
+                                            onClick={() => {
+                                              setEditingInquiryId(inquiry.id);
+                                              setInquiryEditDraft(inquiry.body);
+                                            }}
+                                            type="button"
+                                          >
+                                            수정
+                                          </button>
+                                        ) : null}
+                                        {inquiry.admin_reply ? (
+                                          <div className="mt-2 rounded-xl border-2 border-workroom-ink bg-white p-2.5">
+                                            <p className="text-xs font-black">운영자 답변</p>
+                                            <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.admin_reply}</p>
+                                          </div>
+                                        ) : null}
+                                      </>
+                                    )}
+                                  </div>
+                                ))}
+                              <textarea
+                                className="mt-2"
+                                rows={2}
+                                placeholder="확정된 예약에 대해 궁금한 점을 남겨 주세요."
+                                value={inquiryDrafts[reservation.id] ?? ""}
+                                onChange={(event) => setInquiryDrafts((current) => ({ ...current, [reservation.id]: event.target.value }))}
+                              />
+                              <button
+                                className={buttonClass("primary", "sm", "mt-2")}
+                                disabled={inquiryBusy === reservation.id || !(inquiryDrafts[reservation.id] ?? "").trim()}
+                                onClick={() => void sendInquiry(reservation.id)}
+                                type="button"
+                              >
+                                {inquiryBusy === reservation.id ? "보내는 중…" : "문의 보내기"}
+                              </button>
+                            </div>
+                          ) : null}
+                        </article>
+                      );
+                    })
                   ) : (
                     <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>아직 예약 내역이 없습니다.</p>
                   )}

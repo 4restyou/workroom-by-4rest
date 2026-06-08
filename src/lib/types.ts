@@ -53,6 +53,7 @@ export type ReservationInquiry = {
   body: string;
   admin_reply: string | null;
   replied_at: string | null;
+  edited_at: string | null;
   created_at: string;
 };
 

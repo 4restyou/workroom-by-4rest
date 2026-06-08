@@ -108,11 +108,22 @@ Deno.serve(async (request) => {
     }
 
     if (payload.type === "UPDATE" && row && payload.old_record) {
-      const changed = row.status !== payload.old_record.status;
+      const previous = payload.old_record;
+      const statusChanged = row.status !== previous.status;
+      const timeChanged =
+        row.date !== previous.date || row.start_time !== previous.start_time || row.end_time !== previous.end_time;
+
+      // Member-facing: status moved to confirmed / canceled / no_show.
       const message = STATUS_MESSAGE[row.status];
-      if (changed && message && row.phone) {
+      if (statusChanged && message && row.phone) {
         await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}\n문의: 010-4931-3298`);
       }
+
+      // Operator-facing: the member edited the date/time (re-request).
+      if (ADMIN_PHONE && timeChanged) {
+        await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 변경 요청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.`);
+      }
+
       return new Response("ok", { status: 200 });
     }
 

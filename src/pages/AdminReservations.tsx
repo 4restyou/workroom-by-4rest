@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
@@ -25,6 +25,8 @@ type ReservationEdit = {
 
 export default function AdminReservations() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reservationParam = searchParams.get("reservation");
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [dateFilter, setDateFilter] = useState("");
   const [query, setQuery] = useState("");
@@ -116,6 +118,17 @@ export default function AdminReservations() {
       setSelectedReservationId(visibleReservations[0].id);
     }
   }, [selectedReservationId, visibleReservations]);
+
+  // Deep link from a notification: open the specific reservation.
+  useEffect(() => {
+    if (!reservationParam) return;
+    if (reservations.some((reservation) => reservation.id === reservationParam)) {
+      setDateFilter("");
+      setStatusFilter("all");
+      setQuery("");
+      setSelectedReservationId(reservationParam);
+    }
+  }, [reservationParam, reservations]);
 
   useEffect(() => {
     async function loadInquiries() {
@@ -394,7 +407,10 @@ function ReservationCard({
               return (
                 <div className={`${tintCard("lilac")} p-3`} key={inquiry.id}>
                   <p className="whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.body}</p>
-                  <p className="mt-1 text-xs font-medium text-workroom-muted">{formatDate(inquiry.created_at.slice(0, 10))}</p>
+                  <p className="mt-1 text-xs font-medium text-workroom-muted">
+                    {formatDate(inquiry.created_at.slice(0, 10))}
+                    {inquiry.edited_at ? " · 회원이 수정함" : ""}
+                  </p>
                   <div className="mt-2 grid gap-2">
                     <textarea
                       rows={2}

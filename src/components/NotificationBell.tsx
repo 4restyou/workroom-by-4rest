@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { buttonClass, cardFlat, tintCard } from "../lib/ui";
@@ -6,11 +7,26 @@ import type { ReservationNotification } from "../lib/types";
 
 const SEEN_KEY = "wr_notif_seen_at";
 
+// Where a notification should take you when tapped.
+function routeFor(item: ReservationNotification): string {
+  if (item.type === "inquiry") {
+    return item.reservation_id ? `/admin/reservations?reservation=${item.reservation_id}` : "/admin/reservations";
+  }
+  return "/account?tab=reservations";
+}
+
 export default function NotificationBell() {
   const [items, setItems] = useState<ReservationNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ReservationNotification | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  function goTo(item: ReservationNotification) {
+    setOpen(false);
+    setToast(null);
+    navigate(routeFor(item));
+  }
 
   // Pop a toast for the newest unread notification we haven't surfaced yet.
   function maybeToast(list: ReservationNotification[]) {
@@ -123,11 +139,11 @@ export default function NotificationBell() {
           <div className="mt-3 grid max-h-[60vh] gap-2 overflow-y-auto">
             {items.length ? (
               items.map((item) => (
-                <div className={`${tintCard("yellow")} p-3`} key={item.id}>
+                <button type="button" onClick={() => goTo(item)} className={`${tintCard("yellow")} block w-full p-3 text-left`} key={item.id}>
                   <p className="text-sm font-bold">{item.title}</p>
                   {item.body ? <p className="mt-1 text-sm font-medium leading-6">{item.body}</p> : null}
                   <p className="mt-1 text-xs font-medium text-workroom-muted">{formatDate(item.created_at.slice(0, 10))}</p>
-                </div>
+                </button>
               ))
             ) : (
               <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>새 알림이 없습니다.</p>
@@ -142,7 +158,7 @@ export default function NotificationBell() {
           aria-live="polite"
           className="fixed right-3 top-[70px] z-[60] w-[min(20rem,calc(100vw-1.5rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-yellow shadow-hard"
         >
-          <button type="button" onClick={() => void openDropdown()} className="block w-full p-4 pr-9 text-left">
+          <button type="button" onClick={() => goTo(toast)} className="block w-full p-4 pr-9 text-left">
             <p className="text-sm font-black">{toast.title}</p>
             {toast.body ? <p className="mt-1 text-sm font-medium leading-6">{toast.body}</p> : null}
           </button>
