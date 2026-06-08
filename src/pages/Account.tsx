@@ -5,7 +5,6 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPhone, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import { hasTossConfig, requestReservationPayment } from "../lib/toss";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Profile, Reservation, ReservationInquiry } from "../lib/types";
 
@@ -124,23 +123,6 @@ export default function Account() {
     setInquiryDrafts((current) => ({ ...current, [reservationId]: "" }));
   }
 
-  async function pay(reservation: Reservation) {
-    if (!profile) return;
-    setError("");
-    try {
-      await requestReservationPayment({
-        customerKey: profile.id,
-        orderId: reservation.id,
-        orderName: reservation.pass_name_snapshot || reservation.pass_type,
-        amount: reservation.price_at_booking ?? 0,
-        customerName: profile.full_name ?? undefined,
-        customerEmail: profile.email ?? undefined,
-      });
-    } catch (payError) {
-      setError(payError instanceof Error ? payError.message : "결제를 시작하지 못했습니다.");
-    }
-  }
-
   function startEdit(reservation: Reservation) {
     setError("");
     setEditingId(reservation.id);
@@ -173,29 +155,10 @@ export default function Account() {
       return;
     }
     const wasPaid = reservation.payment_status === "paid";
-    const prompt = wasPaid ? "예약을 취소하고 결제 금액을 환불받을까요?" : "예약을 취소할까요?";
+    const prompt = wasPaid ? "예약을 취소할까요? 결제/환불은 운영자가 확인 후 안내드립니다." : "예약을 취소할까요?";
     if (!window.confirm(prompt)) return;
     setError("");
     setActionBusy(reservation.id);
-
-    if (wasPaid) {
-      // Paid reservations are refunded server-side through Toss.
-      const { data, error: refundError } = await supabase.functions.invoke("refund-reservation", {
-        body: { reservationId: reservation.id },
-      });
-      setActionBusy(null);
-      const result = data as { ok?: boolean; refunded?: boolean; message?: string } | null;
-      if (refundError || !result?.ok) {
-        setError(result?.message ?? "취소·환불 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
-        return;
-      }
-      setReservations((current) =>
-        current.map((item) =>
-          item.id === reservation.id ? { ...item, status: "canceled", payment_status: "refunded" } : item,
-        ),
-      );
-      return;
-    }
 
     const { error: cancelError } = await supabase.from("reservations").update({ status: "canceled" }).eq("id", reservation.id);
     setActionBusy(null);
@@ -364,10 +327,6 @@ export default function Account() {
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
-                              ) : hasTossConfig ? (
-                                <button className={buttonClass("accent", "sm")} onClick={() => void pay(reservation)} type="button">
-                                  {formatPrice(reservation.price_at_booking ?? 0)} 결제하기
-                                </button>
                               ) : (
                                 <p className="text-xs font-medium text-workroom-muted">
                                   결제 안내는 확정 후 문자로 보내드립니다.

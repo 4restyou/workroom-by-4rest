@@ -79,56 +79,26 @@ Solapi에 등록한 뒤, `sendSms` 의 Solapi 호출을 `kakaoOptions`(pfId/temp
 
 ---
 
-# 온라인 결제 (Toss Payments) — 확정 후 결제
+# 결제 운영 — 현재 수동 결제
 
-흐름: 관리자가 예약을 **확정** → 회원이 **내정보 > 예약현황**에서 `결제하기` →
-Toss 결제창 → `/payment/success` 에서 **confirm-payment 함수**가 secretKey로
-승인·금액검증 후 예약을 `결제완료`로 바꿉니다.
+현재 WORKROOM은 Toss 온라인 카드 결제를 사용하지 않습니다.
 
-## 1) Toss Payments 키
-- https://docs.tosspayments.com — **clientKey(공개)**, **secretKey(비밀)** 발급
-- 테스트 키로 먼저 검증 가능:
-  - clientKey: `test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm`
-  - secretKey: `test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6`
-- 실제 결제는 가맹 심사 완료 후 **라이브 키**로 교체.
+운영 흐름:
+- 사용자가 예약 신청
+- 관리자가 예약 확인 후 확정
+- 확정 문자를 통해 결제 안내
+- 계좌이체 또는 현장 결제 확인
+- 관리자가 예약 상세에서 `결제 방식`, `결제 상태`를 직접 변경
 
-## 2) 프론트 키 (Netlify 환경변수)
-Netlify → Site settings → Environment variables 에 추가 후 **재배포**:
-```
-VITE_TOSS_CLIENT_KEY=test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm
-```
-(키가 없으면 결제 버튼 대신 "결제 대기"로 표시됩니다.)
+회원 화면에는 `결제하기` 버튼이 표시되지 않습니다.
+`/payment/success`, `/payment/fail` 경로도 실제 결제 승인 함수를 호출하지 않고 안내 화면만 표시합니다.
 
-## 3) confirm-payment 함수 배포 + 시크릿
-- 대시보드 Edge Functions → 함수 `confirm-payment` 생성 → 코드 붙여넣기 →
-  **Verify JWT OFF** → Deploy
-- 시크릿:
-```
-supabase secrets set \
-  TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6 \
-  ALLOWED_ORIGINS=https://workroomby4rest.netlify.app
-```
-  (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 는 Supabase가 자동 제공)
-  커스텀 도메인을 붙이면 `ALLOWED_ORIGINS`에 쉼표로 추가합니다.
-  예: `https://workroomby4rest.netlify.app,https://workroom.4rest.co.kr`
+## 취소·환불
 
-## 4) 스키마
-`payment_key` 컬럼이 필요합니다 → `migrations/0003_payment.sql`(또는 `schema.sql`) 적용.
+회원은 예약 시작 시간 전까지 예약을 취소할 수 있습니다.
+현재 자동 환불은 사용하지 않으므로, 결제된 예약이 취소되면 운영자가 결제 내역을 확인한 뒤 직접 환불 처리하고 관리자 화면에서 상태를 정리합니다.
 
-## 5) 테스트
-- 회원으로 예약 → 관리자 확정 → 예약현황에서 `결제하기` → 테스트 카드로 결제
-- 성공하면 예약현황에 **결제완료** 배지가 보여야 합니다.
-- 안 되면 confirm-payment **Logs** 확인.
+## 나중에 온라인 결제를 다시 붙일 때
 
-## 6) 취소·환불 (refund-reservation 함수)
-회원이 예약현황에서 결제완료된 예약을 취소하면 Toss 결제를 자동 환불합니다.
-**정책: 예약 시작 시간 전까지만 취소·환불 가능** (이후에는 취소 버튼이 사라지고
-"예약 시간이 지나 취소·환불이 불가합니다" 안내).
-
-- 대시보드 Edge Functions → 함수 `refund-reservation` 생성 → 코드 붙여넣기 →
-  **Verify JWT ON** → Deploy
-  - (호출자 본인 토큰으로 소유권을 서버에서 재검증하므로 JWT 검증을 켭니다.)
-- 시크릿은 `confirm-payment` 와 동일한 `TOSS_SECRET_KEY`, `ALLOWED_ORIGINS` 를 그대로 사용
-  (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` 자동 제공).
-- 미결제(무료/대기) 예약 취소는 서버 호출 없이 상태만 `canceled` 로 변경됩니다.
-- 환불 성공 시 `payment_status` 가 `refunded` 로 바뀌고 예약현황에 **환불완료** 배지 표시.
+기존 `confirm-payment`, `refund-reservation` Edge Function은 Toss 연동 후보로 남겨둘 수 있습니다.
+다시 사용하려면 프론트 결제 버튼, Toss SDK 의존성, `TOSS_SECRET_KEY`, 성공/실패 라우트의 승인 호출을 함께 복구해야 합니다.
