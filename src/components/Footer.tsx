@@ -37,7 +37,7 @@ export default function Footer() {
                 </a>
               </div>
             </div>
-            <CatBlink className="h-24 w-auto shrink-0" />
+            <CatBlink className="w-[72px] shrink-0" />
           </div>
         </div>
 
