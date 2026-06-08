@@ -856,6 +856,83 @@ create unique index if not exists passes_active_name_unique
 on public.passes (name)
 where is_active = true;
 
+create table if not exists public.reservation_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  reservation_id uuid not null references public.reservations(id) on delete cascade,
+  actor_id uuid references public.profiles(id) on delete set null,
+  action text not null default 'updated',
+  before_status text,
+  after_status text,
+  before_payment_status text,
+  after_payment_status text,
+  before_admin_note text,
+  after_admin_note text,
+  created_at timestamp with time zone default now()
+);
+
+alter table public.reservation_audit_logs enable row level security;
+
+drop policy if exists "reservation_audit_logs_admin_select" on public.reservation_audit_logs;
+create policy "reservation_audit_logs_admin_select"
+on public.reservation_audit_logs
+for select
+to authenticated
+using (public.is_admin());
+
+grant select on public.reservation_audit_logs to authenticated;
+
+create or replace function public.log_reservation_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  next_action text := 'updated';
+begin
+  if old.status is not distinct from new.status
+     and old.payment_status is not distinct from new.payment_status
+     and old.admin_note is not distinct from new.admin_note
+     and old.deleted_at is not distinct from new.deleted_at then
+    return new;
+  end if;
+
+  if old.deleted_at is null and new.deleted_at is not null then
+    next_action := 'archived';
+  end if;
+
+  insert into public.reservation_audit_logs (
+    reservation_id,
+    actor_id,
+    action,
+    before_status,
+    after_status,
+    before_payment_status,
+    after_payment_status,
+    before_admin_note,
+    after_admin_note
+  )
+  values (
+    new.id,
+    auth.uid(),
+    next_action,
+    old.status,
+    new.status,
+    old.payment_status,
+    new.payment_status,
+    old.admin_note,
+    new.admin_note
+  );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_reservation_audit_update on public.reservations;
+create trigger on_reservation_audit_update
+after update of status, payment_status, admin_note, deleted_at on public.reservations
+for each row execute function public.log_reservation_update();
+
 -- 관리자 계정 생성 후 auth.users의 id를 확인해 아래 예시처럼 등록합니다.
 -- insert into profiles (id, email, role, membership_status)
 -- values ('AUTH_USER_UUID', 'colorfg@gmail.com', 'admin', 'approved')

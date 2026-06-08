@@ -5,7 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { PaymentStatus, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
+import type { PaymentStatus, Reservation, ReservationAuditLog, ReservationInquiry, ReservationStatus } from "../lib/types";
 import { buttonClass, card, tintCard } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
@@ -31,8 +31,10 @@ export default function AdminReservations() {
   const [dateFilter, setDateFilter] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<ReservationAuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -88,7 +90,7 @@ export default function AdminReservations() {
     const q = query.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, "");
     return reservations
-      .filter((reservation) => !reservation.deleted_at)
+      .filter((reservation) => (archiveFilter === "archived" ? Boolean(reservation.deleted_at) : !reservation.deleted_at))
       .filter((reservation) => (dateFilter ? reservation.date === dateFilter : true))
       .filter((reservation) => (statusFilter === "all" ? true : reservation.status === statusFilter))
       .filter((reservation) => {
@@ -106,7 +108,7 @@ export default function AdminReservations() {
         if (aFuture !== bFuture) return aFuture - bFuture;
         return `${a.date} ${a.start_time ?? ""}`.localeCompare(`${b.date} ${b.start_time ?? ""}`);
       });
-  }, [dateFilter, query, reservations, statusFilter]);
+  }, [archiveFilter, dateFilter, query, reservations, statusFilter]);
 
   useEffect(() => {
     if (!visibleReservations.length) {
@@ -123,10 +125,12 @@ export default function AdminReservations() {
   // Deep link from a notification: open the specific reservation.
   useEffect(() => {
     if (!reservationParam) return;
-    if (reservations.some((reservation) => reservation.id === reservationParam)) {
+    const reservation = reservations.find((item) => item.id === reservationParam);
+    if (reservation) {
       setDateFilter("");
       setStatusFilter("all");
       setQuery("");
+      setArchiveFilter(reservation.deleted_at ? "archived" : "active");
       setSelectedReservationId(reservationParam);
     }
   }, [reservationParam, reservations]);
@@ -148,6 +152,24 @@ export default function AdminReservations() {
     void loadInquiries();
   }, [selectedReservationId]);
 
+  useEffect(() => {
+    async function loadAuditLogs() {
+      if (!supabase || !selectedReservationId) {
+        setAuditLogs([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("reservation_audit_logs")
+        .select("*")
+        .eq("reservation_id", selectedReservationId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      setAuditLogs((data ?? []) as ReservationAuditLog[]);
+    }
+
+    void loadAuditLogs();
+  }, [selectedReservationId]);
+
   async function saveReservation(id: string, payload: ReservationEdit) {
     if (!supabase) return;
     const { error: updateError } = await supabase.from("reservations").update(payload).eq("id", id);
@@ -156,6 +178,13 @@ export default function AdminReservations() {
       return;
     }
     setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
+    const { data } = await supabase
+      .from("reservation_audit_logs")
+      .select("*")
+      .eq("reservation_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setAuditLogs((data ?? []) as ReservationAuditLog[]);
   }
 
   async function archiveReservation(id: string) {
@@ -171,7 +200,12 @@ export default function AdminReservations() {
       setError(archiveError.message);
       return;
     }
-    setReservations((current) => current.filter((reservation) => reservation.id !== id));
+    const deletedAt = new Date().toISOString();
+    setReservations((current) =>
+      current.map((reservation) => (reservation.id === id ? { ...reservation, status: "canceled", deleted_at: deletedAt } : reservation)),
+    );
+    setArchiveFilter("archived");
+    setSelectedReservationId(id);
   }
 
   async function replyInquiry(inquiryId: string, reply: string) {
@@ -196,13 +230,29 @@ export default function AdminReservations() {
     navigate("/admin", { replace: true });
   }
 
-  const pendingCount = reservations.filter((reservation) => reservation.status === "pending").length;
+  const pendingCount = reservations.filter((reservation) => !reservation.deleted_at && reservation.status === "pending").length;
   const selectedReservation = visibleReservations.find((reservation) => reservation.id === selectedReservationId) ?? null;
 
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리" accent="ink">
         <div className={`${card} mb-5 grid gap-3 p-4`}>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={buttonClass(archiveFilter === "active" ? "accent" : "secondary", "sm")}
+              onClick={() => setArchiveFilter("active")}
+              type="button"
+            >
+              진행 예약
+            </button>
+            <button
+              className={buttonClass(archiveFilter === "archived" ? "accent" : "secondary", "sm")}
+              onClick={() => setArchiveFilter("archived")}
+              type="button"
+            >
+              보관 예약
+            </button>
+          </div>
           <label className="grid gap-2 text-sm font-bold">
             이름 · 전화 검색
             <input placeholder="이름 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -259,7 +309,7 @@ export default function AdminReservations() {
         <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
           <section className={`${card} p-3`}>
             <div className="mb-3 flex items-center justify-between gap-3 px-2">
-              <h2 className="text-lg font-black">예약 목록</h2>
+              <h2 className="text-lg font-black">{archiveFilter === "archived" ? "보관 예약" : "예약 목록"}</h2>
               <span className="text-sm font-bold text-workroom-muted">{visibleReservations.length}건</span>
             </div>
             <div className="grid max-h-[680px] gap-2 overflow-y-auto pr-1">
@@ -277,6 +327,8 @@ export default function AdminReservations() {
           {selectedReservation ? (
             <ReservationCard
               conflictCount={getConflictCount(selectedReservation, reservations)}
+              auditLogs={auditLogs}
+              isArchived={Boolean(selectedReservation.deleted_at)}
               key={selectedReservation.id}
               reservation={selectedReservation}
               inquiries={inquiries}
@@ -322,7 +374,10 @@ function ReservationListItem({
           </p>
           <p className="mt-1 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}</p>
         </div>
-        <StatusBadge status={reservation.status} />
+        <div className="grid justify-items-end gap-1">
+          <StatusBadge status={reservation.status} />
+          {reservation.deleted_at ? <span className="text-[11px] font-black text-workroom-muted">보관됨</span> : null}
+        </div>
       </div>
     </button>
   );
@@ -330,6 +385,8 @@ function ReservationListItem({
 
 function ReservationCard({
   conflictCount,
+  auditLogs,
+  isArchived,
   reservation,
   inquiries,
   onArchive,
@@ -337,6 +394,8 @@ function ReservationCard({
   onSave,
 }: {
   conflictCount: number;
+  auditLogs: ReservationAuditLog[];
+  isArchived: boolean;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
   onArchive: () => void;
@@ -348,6 +407,7 @@ function ReservationCard({
   const [note, setNote] = useState(reservation.admin_note ?? "");
   const [paymentMethod, setPaymentMethod] = useState(reservation.payment_method ?? "");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(reservation.payment_status ?? "unpaid");
+  const [copiedMessage, setCopiedMessage] = useState<"confirmed" | "canceled" | null>(null);
 
   useEffect(() => {
     setStatus(reservation.status);
@@ -358,6 +418,13 @@ function ReservationCard({
 
   function save() {
     onSave({ status, payment_method: paymentMethod || null, payment_status: paymentStatus, admin_note: note });
+  }
+
+  async function copyMessage(kind: "confirmed" | "canceled") {
+    const message = kind === "confirmed" ? buildConfirmedMessage(reservation) : buildCanceledMessage(reservation);
+    await navigator.clipboard.writeText(message);
+    setCopiedMessage(kind);
+    window.setTimeout(() => setCopiedMessage(null), 1800);
   }
 
   return (
@@ -373,7 +440,10 @@ function ReservationCard({
           </a>
           {reservation.email ? <p className="text-sm font-medium text-workroom-muted">{reservation.email}</p> : null}
         </div>
-        <StatusBadge status={reservation.status} />
+        <div className="grid justify-items-end gap-1">
+          <StatusBadge status={reservation.status} />
+          {isArchived ? <span className="text-xs font-black text-workroom-muted">보관됨</span> : null}
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -383,6 +453,12 @@ function ReservationCard({
         <a className={buttonClass("secondary", "sm")} href={`sms:${reservation.phone}`}>
           문자 보내기
         </a>
+        <button className={buttonClass("accent", "sm")} onClick={() => void copyMessage("confirmed")} type="button">
+          {copiedMessage === "confirmed" ? "복사됨" : "확정 문구 복사"}
+        </button>
+        <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("canceled")} type="button">
+          {copiedMessage === "canceled" ? "복사됨" : "취소 문구 복사"}
+        </button>
       </div>
 
       {conflictCount > 0 ? (
@@ -486,12 +562,98 @@ function ReservationCard({
         <button className={buttonClass("primary", "lg")} onClick={save} type="button">
           변경사항 저장
         </button>
-        <button className={buttonClass("secondary", "md")} onClick={onArchive} type="button">
-          보관 처리
-        </button>
+        {isArchived ? (
+          <p className={`${tintCard("yellow")} p-3 text-sm font-bold`}>이 예약은 보관 처리되어 진행 예약 목록에서 숨겨져 있습니다.</p>
+        ) : (
+          <button className={buttonClass("secondary", "md")} onClick={onArchive} type="button">
+            보관 처리
+          </button>
+        )}
+      </div>
+
+      <div className="mt-5">
+        <p className="text-sm font-black">변경 이력</p>
+        {auditLogs.length ? (
+          <div className="mt-2 grid gap-2">
+            {auditLogs.map((log) => (
+              <div className={`${tintCard("mint")} p-3 text-sm`} key={log.id}>
+                <p className="font-bold">{describeAuditLog(log)}</p>
+                <p className="mt-1 text-xs font-medium text-workroom-muted">{formatAuditTime(log.created_at)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={`${tintCard("yellow")} mt-2 p-3 text-sm font-bold`}>
+            아직 기록된 변경 이력이 없습니다. 새로 저장하는 변경부터 기록됩니다.
+          </p>
+        )}
       </div>
     </article>
   );
+}
+
+function buildConfirmedMessage(reservation: Reservation) {
+  const passName = reservation.pass_name_snapshot || reservation.pass_type;
+  return [
+    "[WORKROOM by 4REST]",
+    `${reservation.name}님, 예약이 확정되었습니다.`,
+    "",
+    `이용권: ${passName}`,
+    `일시: ${formatDate(reservation.date)} ${formatTimeRange(reservation.start_time, reservation.end_time)}`,
+    `인원: ${reservation.people}명`,
+    reservation.price_at_booking ? `금액: ${formatPrice(reservation.price_at_booking)}` : null,
+    "",
+    "결제와 이용 안내는 방문 전 다시 안내드릴게요.",
+    "Out of office, Into Workroom.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildCanceledMessage(reservation: Reservation) {
+  const passName = reservation.pass_name_snapshot || reservation.pass_type;
+  return [
+    "[WORKROOM by 4REST]",
+    `${reservation.name}님, 요청하신 예약은 현재 확정이 어렵습니다.`,
+    "",
+    `이용권: ${passName}`,
+    `신청 일시: ${formatDate(reservation.date)} ${formatTimeRange(reservation.start_time, reservation.end_time)}`,
+    "",
+    "가능한 시간대를 다시 확인해 주시면 조정 도와드릴게요.",
+  ].join("\n");
+}
+
+function describeAuditLog(log: ReservationAuditLog) {
+  const changes: string[] = [];
+  if (log.before_status !== log.after_status) {
+    changes.push(`상태 ${labelStatus(log.before_status)} → ${labelStatus(log.after_status)}`);
+  }
+  if (log.before_payment_status !== log.after_payment_status) {
+    changes.push(`결제 ${labelPayment(log.before_payment_status)} → ${labelPayment(log.after_payment_status)}`);
+  }
+  if (log.before_admin_note !== log.after_admin_note) {
+    changes.push("관리자 메모 변경");
+  }
+  if (!changes.length && log.action === "archived") return "보관 처리";
+  if (!changes.length) return "예약 정보 변경";
+  return changes.join(" · ");
+}
+
+function labelStatus(status: ReservationStatus | null) {
+  return status ? statusLabel[status] : "-";
+}
+
+function labelPayment(status: PaymentStatus | null) {
+  return status ? paymentStatusLabels[status] : "-";
+}
+
+function formatAuditTime(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function getConflictCount(target: Reservation, reservations: Reservation[]) {

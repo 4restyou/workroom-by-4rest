@@ -48,6 +48,18 @@ const guideItems: [string, string][] = [
   ["동반", "함께 이용하는 분은 별도 좌석 예약이 필요합니다."],
 ];
 
+const fitItems = [
+  "노트북 작업, 공부, 글쓰기처럼 조용히 오래 앉아 있는 일",
+  "상반신 증명사진, 간단 프로필, 작은 제품 촬영",
+  "2-5명이 나누는 짧은 회의나 가벼운 협업",
+];
+
+const cautionItems = [
+  "큰 소리의 모임, 파티, 장시간 통화 중심 이용",
+  "강한 냄새가 나는 음식이나 주변을 많이 어지럽히는 작업",
+  "사전 협의 없는 상업 촬영, 장비 반입이 큰 촬영",
+];
+
 export default function Home() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
 
@@ -195,6 +207,36 @@ export default function Home() {
             </article>
           ))}
         </div>
+      </Section>
+
+      <Section eyebrow="Fit check" title="이런 이용이면 잘 맞아요" accent="lilac">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <article className={`${tintCard("mint")} p-5`}>
+            <h3 className="text-xl font-black">좋아요</h3>
+            <ul className="mt-4 grid gap-3">
+              {fitItems.map((item) => (
+                <li className="flex gap-3 text-sm font-bold leading-6" key={item}>
+                  <span aria-hidden>✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+          <article className={`${tintCard("yellow")} p-5`}>
+            <h3 className="text-xl font-black">먼저 물어봐 주세요</h3>
+            <ul className="mt-4 grid gap-3">
+              {cautionItems.map((item) => (
+                <li className="flex gap-3 text-sm font-bold leading-6" key={item}>
+                  <span aria-hidden>!</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </div>
+        <Link className={buttonClass("secondary", "md", "mt-4 w-full sm:w-auto")} to="/faq">
+          이용안내 더 보기
+        </Link>
       </Section>
 
       <Section eyebrow="How to use" title="예약은 길게 말하지 않고" accent="coral">

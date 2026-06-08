@@ -2,9 +2,10 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Calendar from "../components/Calendar";
 import Section from "../components/Section";
+import { trackEvent } from "../lib/analytics";
 import { defaultPasses } from "../lib/defaultPasses";
 import { computeFullDates, type IntervalInput } from "../lib/availability";
-import { formatDateInputValue, formatPhone, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
+import { formatDate, formatDateInputValue, formatPhone, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
@@ -30,6 +31,17 @@ type PassOption = Pass & {
   group: "시간권" | "종일권" | "주간 / 월권" | "문의";
 };
 
+type SubmittedReservation = {
+  passName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  people: number;
+  name: string;
+  phone: string;
+  price: number | null;
+};
+
 const customInquiryPass: PassOption = {
   id: "custom-inquiry",
   name: "기타 문의",
@@ -46,6 +58,7 @@ export default function Reserve() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [submittedReservation, setSubmittedReservation] = useState<SubmittedReservation | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
   const [trap, setTrap] = useState(""); // honeypot: real users never fill this
@@ -196,6 +209,7 @@ export default function Reserve() {
 
   function selectPass(passName: string) {
     setForm((current) => ({ ...current, ...reservationWindowForPass(passName), pass_type: passName }));
+    trackEvent("reserve_pass_selected", { pass_type: passName });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -216,6 +230,7 @@ export default function Reserve() {
     // Honeypot: a bot filled the hidden field — pretend success, skip the insert.
     if (trap.trim()) {
       setSuccess(true);
+      setSubmittedReservation(null);
       setForm({ ...emptyForm, date: todayValue() });
       return;
     }
@@ -302,6 +317,23 @@ export default function Reserve() {
       return;
     }
 
+    setSubmittedReservation({
+      passName: selectedPass?.name ?? form.pass_type,
+      date: form.date,
+      startTime: form.start_time,
+      endTime: form.end_time,
+      people,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      price: selectedPass?.price ?? null,
+    });
+    trackEvent("reservation_submitted", {
+      pass_type: selectedPass?.name ?? form.pass_type,
+      people,
+      price: selectedPass?.price ?? null,
+      has_message: Boolean(form.message.trim()),
+      seat_type_id: selectedPass?.seat_type_id ?? null,
+    });
     setSuccess(true);
     setForm({ ...emptyForm, date: todayValue() });
   }
@@ -475,6 +507,30 @@ export default function Reserve() {
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
               확인 후 전화 또는 문자로 안내드릴게요. 확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.
             </p>
+
+            {submittedReservation ? (
+              <div className={`${tintCard("yellow")} mt-5 p-4`}>
+                <p className="text-sm font-black">신청 내용</p>
+                <dl className="mt-3 grid grid-cols-[74px_1fr] gap-x-3 gap-y-2 text-sm">
+                  <dt className="font-bold text-workroom-muted">이용권</dt>
+                  <dd className="font-black">{submittedReservation.passName}</dd>
+                  <dt className="font-bold text-workroom-muted">날짜</dt>
+                  <dd className="font-black">{formatDate(submittedReservation.date)}</dd>
+                  <dt className="font-bold text-workroom-muted">시간</dt>
+                  <dd className="font-black">
+                    {submittedReservation.startTime} - {submittedReservation.endTime}
+                  </dd>
+                  <dt className="font-bold text-workroom-muted">인원</dt>
+                  <dd className="font-black">{submittedReservation.people}명</dd>
+                  <dt className="font-bold text-workroom-muted">예약자</dt>
+                  <dd className="font-black">
+                    {submittedReservation.name} · {submittedReservation.phone}
+                  </dd>
+                  <dt className="font-bold text-workroom-muted">금액</dt>
+                  <dd className="font-black">{submittedReservation.price ? formatPrice(submittedReservation.price) : "확인 후 안내"}</dd>
+                </dl>
+              </div>
+            ) : null}
 
             {noticeItems.length ? (
               <div className="mt-5 grid gap-3">

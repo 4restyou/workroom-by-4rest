@@ -68,6 +68,20 @@ export type ReservationNotification = {
   created_at: string;
 };
 
+export type ReservationAuditLog = {
+  id: string;
+  reservation_id: string;
+  actor_id: string | null;
+  action: string;
+  before_status: ReservationStatus | null;
+  after_status: ReservationStatus | null;
+  before_payment_status: PaymentStatus | null;
+  after_payment_status: PaymentStatus | null;
+  before_admin_note: string | null;
+  after_admin_note: string | null;
+  created_at: string;
+};
+
 export type Reservation = {
   id: string;
   profile_id: string | null;
