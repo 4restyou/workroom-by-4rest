@@ -129,7 +129,7 @@ export default function NotificationBell() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(20rem,calc(100vw-2rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-surface p-4">
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(20rem,calc(100vw-2rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-surface p-4 shadow-xl">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-black">알림</h2>
             <button className={buttonClass("secondary", "sm")} onClick={() => setOpen(false)} type="button">
@@ -156,7 +156,7 @@ export default function NotificationBell() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed right-3 top-[70px] z-[60] w-[min(20rem,calc(100vw-1.5rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-yellow"
+          className="fixed right-3 top-[70px] z-[60] w-[min(20rem,calc(100vw-1.5rem))] animate-pop-in rounded-card border-2 border-workroom-ink bg-workroom-yellow shadow-xl"
         >
           <button type="button" onClick={() => goTo(toast)} className="block w-full p-4 pr-9 text-left">
             <p className="text-sm font-black">{toast.title}</p>
