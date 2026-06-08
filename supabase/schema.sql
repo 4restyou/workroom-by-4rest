@@ -14,6 +14,7 @@ create table if not exists profiles (
 alter table profiles add column if not exists full_name text;
 alter table profiles add column if not exists phone text;
 alter table profiles add column if not exists address text;
+alter table profiles add column if not exists consented_at timestamp with time zone;
 alter table profiles add column if not exists membership_status text not null default 'approved';
 alter table profiles alter column membership_status set default 'approved';
 
@@ -257,10 +258,12 @@ create trigger prevent_member_privilege_update
 before update on profiles
 for each row execute function public.prevent_member_privilege_update();
 
+drop function if exists public.update_my_profile(text, text, text);
 create or replace function public.update_my_profile(
   p_full_name text,
   p_phone text,
-  p_address text
+  p_address text,
+  p_consent boolean default false
 )
 returns profiles
 language plpgsql
@@ -274,18 +277,20 @@ begin
   set
     full_name = nullif(trim(p_full_name), ''),
     phone = nullif(trim(p_phone), ''),
-    address = nullif(trim(p_address), '')
+    address = nullif(trim(p_address), ''),
+    consented_at = case when p_consent and consented_at is null then now() else consented_at end
   where id = auth.uid()
   returning * into updated_profile;
 
   if updated_profile.id is null then
-    insert into public.profiles (id, email, full_name, phone, address)
+    insert into public.profiles (id, email, full_name, phone, address, consented_at)
     values (
       auth.uid(),
       coalesce((auth.jwt() ->> 'email'), ''),
       nullif(trim(p_full_name), ''),
       nullif(trim(p_phone), ''),
-      nullif(trim(p_address), '')
+      nullif(trim(p_address), ''),
+      case when p_consent then now() else null end
     )
     returning * into updated_profile;
   end if;

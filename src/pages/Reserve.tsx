@@ -117,6 +117,8 @@ export default function Reserve() {
   }
 
   const needsLogin = hasSupabaseConfig && authChecked && !profile;
+  // Logged in, but the profile isn't complete (name, phone, privacy consent).
+  const needsProfile = Boolean(profile) && (!profile?.full_name || !profile?.phone || !profile?.consented_at);
 
   useEffect(() => {
     async function loadOperatingInfo() {
@@ -205,6 +207,25 @@ export default function Reserve() {
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  // Picking a future date: the "current time" default no longer makes sense, so
+  // start at that day's opening time while keeping the same booking duration.
+  function selectDate(date: string) {
+    setForm((current) => {
+      if (date === today) return { ...current, date };
+      const weekday = new Date(`${date}T00:00:00`).getDay();
+      const open = hoursByWeekday[weekday]?.open_time?.slice(0, 5) ?? "09:00";
+      const close = hoursByWeekday[weekday]?.close_time?.slice(0, 5) ?? "22:00";
+      const toMin = (t: string) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const toHHMM = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+      const duration = Math.max(30, toMin(current.end_time) - toMin(current.start_time));
+      const endMin = Math.min(toMin(open) + duration, toMin(close));
+      return { ...current, date, start_time: open, end_time: toHHMM(endMin) };
+    });
   }
 
   function selectPass(passName: string) {
@@ -364,6 +385,16 @@ export default function Reserve() {
               구글로 로그인하고 예약하기
             </button>
           </div>
+        ) : needsProfile ? (
+          <div className={`${card} p-6 text-center`}>
+            <p className="text-lg font-bold">예약 전 회원정보를 완성해 주세요</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
+              이름·연락처와 개인정보 수집·이용 동의를 마치면 예약할 수 있어요. 처음 한 번만 입력하면 됩니다.
+            </p>
+            <Link className={buttonClass("primary", "lg", "mt-5 w-full sm:w-auto")} to="/account?tab=profile">
+              회원정보 입력하러 가기
+            </Link>
+          </div>
         ) : (
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <input
@@ -428,7 +459,7 @@ export default function Reserve() {
                   month={calendarMonth}
                   selected={form.date}
                   minMonth={startOfMonth(new Date())}
-                  onSelect={(date) => updateField("date", date)}
+                  onSelect={(date) => selectDate(date)}
                   onMonthChange={setCalendarMonth}
                   isDisabled={isDateDisabled}
                   isFull={isDateFull}

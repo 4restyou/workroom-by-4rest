@@ -38,6 +38,7 @@ export default function Account() {
   const [inquiryEditDraft, setInquiryEditDraft] = useState("");
   const [activeTab, setActiveTab] = useState<AccountTab>(tabParam === "profile" ? "profile" : "reservations");
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
+  const [consent, setConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -66,6 +67,7 @@ export default function Account() {
           phone: loadedProfile?.phone ?? "",
           address: loadedProfile?.address ?? "",
         });
+        setConsent(Boolean(loadedProfile?.consented_at));
 
         const { data, error: reservationsError } = await supabase
           .from("reservations")
@@ -196,6 +198,10 @@ export default function Account() {
       setError("이름과 연락처는 필수입니다.");
       return;
     }
+    if (!consent) {
+      setError("개인정보 수집·이용에 동의해 주세요.");
+      return;
+    }
 
     setIsSaving(true);
     const nextProfile = {
@@ -209,6 +215,7 @@ export default function Account() {
       p_full_name: nextProfile.full_name,
       p_phone: nextProfile.phone,
       p_address: nextProfile.address ?? "",
+      p_consent: consent,
     });
     setIsSaving(false);
 
@@ -284,6 +291,21 @@ export default function Account() {
                 <label className="grid gap-2 text-sm font-bold">
                   주소
                   <input placeholder="선택 입력" value={form.address} onChange={(event) => updateField("address", event.target.value)} />
+                </label>
+                <label className={`${tintCard("yellow")} flex items-start gap-3 p-4 text-sm font-bold`}>
+                  <input
+                    className="mt-0.5 h-5 w-5 shrink-0"
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(event) => setConsent(event.target.checked)}
+                  />
+                  <span className="font-medium leading-6">
+                    <span className="font-bold">[필수]</span> 개인정보 수집·이용에 동의합니다. 예약 운영을 위해 이름·연락처·이메일을 수집하며,{" "}
+                    <Link className="font-bold underline underline-offset-2" to="/privacy" target="_blank">
+                      개인정보처리방침
+                    </Link>
+                    을 따릅니다.
+                  </span>
                 </label>
                 {success ? <p className={`${tintCard("mint")} p-3 text-sm font-bold`}>{success}</p> : null}
                 <button className={buttonClass("primary", "lg")} disabled={isSaving} type="submit">

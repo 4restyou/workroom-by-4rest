@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import MoneyInput from "../components/MoneyInput";
 import Section from "../components/Section";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { getCurrentProfile } from "../lib/profiles";
@@ -301,7 +302,7 @@ export default function AdminSettings() {
                   </label>
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     가격(원)
-                    <input min={0} type="number" value={pass.price} onChange={(event) => updatePass(index, "price", Number(event.target.value))} />
+                    <MoneyInput value={pass.price} onChange={(value) => updatePass(index, "price", value)} />
                   </label>
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     좌석
@@ -335,7 +336,7 @@ export default function AdminSettings() {
               </label>
               <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                 가격(원)
-                <input min={0} type="number" value={newPassPrice} onChange={(event) => setNewPassPrice(event.target.value)} />
+                <MoneyInput value={Number(newPassPrice) || 0} onChange={(value) => setNewPassPrice(String(value))} />
               </label>
               <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                 좌석
