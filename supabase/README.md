@@ -104,9 +104,13 @@ VITE_TOSS_CLIENT_KEY=test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm
   **Verify JWT OFF** → Deploy
 - 시크릿:
 ```
-supabase secrets set TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6
+supabase secrets set \
+  TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6 \
+  ALLOWED_ORIGINS=https://workroomby4rest.netlify.app
 ```
   (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 는 Supabase가 자동 제공)
+  커스텀 도메인을 붙이면 `ALLOWED_ORIGINS`에 쉼표로 추가합니다.
+  예: `https://workroomby4rest.netlify.app,https://workroom.4rest.co.kr`
 
 ## 4) 스키마
 `payment_key` 컬럼이 필요합니다 → `migrations/0003_payment.sql`(또는 `schema.sql`) 적용.
@@ -124,7 +128,7 @@ supabase secrets set TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6
 - 대시보드 Edge Functions → 함수 `refund-reservation` 생성 → 코드 붙여넣기 →
   **Verify JWT ON** → Deploy
   - (호출자 본인 토큰으로 소유권을 서버에서 재검증하므로 JWT 검증을 켭니다.)
-- 시크릿은 `confirm-payment` 와 동일한 `TOSS_SECRET_KEY` 를 그대로 사용
+- 시크릿은 `confirm-payment` 와 동일한 `TOSS_SECRET_KEY`, `ALLOWED_ORIGINS` 를 그대로 사용
   (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` 자동 제공).
 - 미결제(무료/대기) 예약 취소는 서버 호출 없이 상태만 `canceled` 로 변경됩니다.
 - 환불 성공 시 `payment_status` 가 `refunded` 로 바뀌고 예약현황에 **환불완료** 배지 표시.
