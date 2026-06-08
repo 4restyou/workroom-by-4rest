@@ -11,6 +11,8 @@ import AdminSettings from "./pages/AdminSettings";
 import AdminStats from "./pages/AdminStats";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
+import PaymentFail from "./pages/PaymentFail";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import Privacy from "./pages/Privacy";
 import Reserve from "./pages/Reserve";
 import Terms from "./pages/Terms";
@@ -28,6 +30,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="reserve" element={<Reserve />} />
           <Route path="terms" element={<Terms />} />
           <Route path="privacy" element={<Privacy />} />
+          <Route path="payment/success" element={<PaymentSuccess />} />
+          <Route path="payment/fail" element={<PaymentFail />} />
           <Route path="admin" element={<AdminLogin />} />
           <Route path="admin/members" element={<AdminMembers />} />
           <Route path="admin/reservations" element={<AdminReservations />} />

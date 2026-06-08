@@ -2,10 +2,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
-import { formatDate, formatPhone, formatTimeRange, statusLabel, todayValue } from "../lib/format";
+import { formatDate, formatPhone, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
+import { hasTossConfig, requestReservationPayment } from "../lib/toss";
+import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Profile, Reservation, ReservationInquiry } from "../lib/types";
 
 type AccountTab = "reservations" | "profile";
@@ -114,6 +115,23 @@ export default function Account() {
 
     setInquiries((current) => [...current, data as ReservationInquiry]);
     setInquiryDrafts((current) => ({ ...current, [reservationId]: "" }));
+  }
+
+  async function pay(reservation: Reservation) {
+    if (!profile) return;
+    setError("");
+    try {
+      await requestReservationPayment({
+        customerKey: profile.id,
+        orderId: reservation.id,
+        orderName: reservation.pass_name_snapshot || reservation.pass_type,
+        amount: reservation.price_at_booking ?? 0,
+        customerName: profile.full_name ?? undefined,
+        customerEmail: profile.email ?? undefined,
+      });
+    } catch (payError) {
+      setError(payError instanceof Error ? payError.message : "결제를 시작하지 못했습니다.");
+    }
   }
 
   function startEdit(reservation: Reservation) {
@@ -302,6 +320,20 @@ export default function Account() {
                             <StatusBadge status={reservation.status} />
                           </div>
                           <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
+
+                          {reservation.status === "confirmed" && (reservation.price_at_booking ?? 0) > 0 ? (
+                            <div className="mt-3">
+                              {reservation.payment_status === "paid" ? (
+                                <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
+                              ) : hasTossConfig ? (
+                                <button className={buttonClass("accent", "sm")} onClick={() => void pay(reservation)} type="button">
+                                  {formatPrice(reservation.price_at_booking ?? 0)} 결제하기
+                                </button>
+                              ) : (
+                                <span className={badge("yellow")}>결제 대기</span>
+                              )}
+                            </div>
+                          ) : null}
 
                           {active ? (
                             editingId === reservation.id ? (

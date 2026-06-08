@@ -122,6 +122,7 @@ alter table reservations add column if not exists pass_name_snapshot text;
 alter table reservations add column if not exists price_at_booking integer;
 alter table reservations add column if not exists seat_type_id uuid references seat_types(id) on delete set null;
 alter table reservations add column if not exists notified_at timestamp with time zone;
+alter table reservations add column if not exists payment_key text;
 
 alter table profiles enable row level security;
 alter table reservations enable row level security;

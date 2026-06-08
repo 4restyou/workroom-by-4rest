@@ -72,3 +72,42 @@ Supabase 대시보드 → **Database → Webhooks → Create a new hook**
 나중에 카카오 알림톡으로 바꾸려면, 카카오 비즈니스 채널 + 알림톡 템플릿(심사)을
 Solapi에 등록한 뒤, `sendSms` 의 Solapi 호출을 `kakaoOptions`(pfId/templateId)를 포함한
 알림톡 발송으로 바꾸면 됩니다(같은 `/messages/v4/send` 엔드포인트).
+
+---
+
+# 온라인 결제 (Toss Payments) — 확정 후 결제
+
+흐름: 관리자가 예약을 **확정** → 회원이 **내정보 > 예약현황**에서 `결제하기` →
+Toss 결제창 → `/payment/success` 에서 **confirm-payment 함수**가 secretKey로
+승인·금액검증 후 예약을 `결제완료`로 바꿉니다.
+
+## 1) Toss Payments 키
+- https://docs.tosspayments.com — **clientKey(공개)**, **secretKey(비밀)** 발급
+- 테스트 키로 먼저 검증 가능:
+  - clientKey: `test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm`
+  - secretKey: `test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6`
+- 실제 결제는 가맹 심사 완료 후 **라이브 키**로 교체.
+
+## 2) 프론트 키 (Netlify 환경변수)
+Netlify → Site settings → Environment variables 에 추가 후 **재배포**:
+```
+VITE_TOSS_CLIENT_KEY=test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm
+```
+(키가 없으면 결제 버튼 대신 "결제 대기"로 표시됩니다.)
+
+## 3) confirm-payment 함수 배포 + 시크릿
+- 대시보드 Edge Functions → 함수 `confirm-payment` 생성 → 코드 붙여넣기 →
+  **Verify JWT OFF** → Deploy
+- 시크릿:
+```
+supabase secrets set TOSS_SECRET_KEY=test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6
+```
+  (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 는 Supabase가 자동 제공)
+
+## 4) 스키마
+`payment_key` 컬럼이 필요합니다 → `migrations/0003_payment.sql`(또는 `schema.sql`) 적용.
+
+## 5) 테스트
+- 회원으로 예약 → 관리자 확정 → 예약현황에서 `결제하기` → 테스트 카드로 결제
+- 성공하면 예약현황에 **결제완료** 배지가 보여야 합니다.
+- 안 되면 confirm-payment **Logs** 확인.
