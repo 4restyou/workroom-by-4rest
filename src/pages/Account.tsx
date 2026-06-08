@@ -369,7 +369,9 @@ export default function Account() {
                                   {formatPrice(reservation.price_at_booking ?? 0)} 결제하기
                                 </button>
                               ) : (
-                                <span className={badge("yellow")}>결제 대기</span>
+                                <p className="text-xs font-medium text-workroom-muted">
+                                  결제 안내는 확정 후 문자로 보내드립니다.
+                                </p>
                               )}
                             </div>
                           ) : null}

@@ -38,6 +38,9 @@ const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
 const ADMIN_PHONE = (Deno.env.get("ADMIN_PHONE") ?? "").replace(/\D/g, "");
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
+const PAYMENT_NOTICE =
+  Deno.env.get("PAYMENT_NOTICE") ??
+  "예약 확정 시 결제 링크를 보내드립니다. 월권(자유/지정)은 결제 완료 후 확정되며, 시간권·주간권은 현장 결제도 가능합니다.";
 
 const STATUS_MESSAGE: Record<string, string> = {
   confirmed: "예약이 확정되었습니다.",
@@ -103,6 +106,14 @@ Deno.serve(async (request) => {
     const row = payload.record;
 
     if (payload.type === "INSERT" && row) {
+      // Member-facing: booking received + how payment works.
+      if (row.phone) {
+        await sendSms(
+          row.phone,
+          `[WORKROOM] 예약 신청이 접수되었습니다.\n${reservationLine(row)}\n${PAYMENT_NOTICE}\n문의: 010-4931-3298\n${SITE_URL}`,
+        );
+      }
+      // Operator-facing: new reservation alert.
       if (ADMIN_PHONE) {
         await sendSms(ADMIN_PHONE, `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`);
       }
