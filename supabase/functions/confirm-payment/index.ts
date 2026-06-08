@@ -23,6 +23,10 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown error";
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -59,9 +63,9 @@ Deno.serve(async (request) => {
       },
       body: JSON.stringify({ paymentKey, orderId, amount }),
     });
-    const result = await confirm.json();
+    const result = (await confirm.json()) as { code?: string; message?: string };
     if (!confirm.ok) {
-      console.error("[confirm-payment] toss error", confirm.status, result);
+      console.error("[confirm-payment] toss error", { status: confirm.status, code: result?.code ?? "unknown" });
       return json({ ok: false, message: result?.message ?? "결제 승인에 실패했습니다." }, 400);
     }
 
@@ -74,7 +78,7 @@ Deno.serve(async (request) => {
 
     return json({ ok: true });
   } catch (error) {
-    console.error("[confirm-payment] handler error", error);
+    console.error("[confirm-payment] handler error", { message: errorMessage(error) });
     return json({ ok: false, message: "결제 처리 중 오류가 발생했습니다." }, 500);
   }
 });

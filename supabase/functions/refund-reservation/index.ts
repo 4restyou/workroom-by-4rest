@@ -28,6 +28,10 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown error";
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -80,9 +84,9 @@ Deno.serve(async (request) => {
         headers: { Authorization: `Basic ${btoa(`${TOSS_SECRET_KEY}:`)}`, "Content-Type": "application/json" },
         body: JSON.stringify({ cancelReason: "고객 예약 취소" }),
       });
-      const result = await cancel.json();
+      const result = (await cancel.json()) as { code?: string; message?: string };
       if (!cancel.ok) {
-        console.error("[refund-reservation] toss error", cancel.status, result);
+        console.error("[refund-reservation] toss error", { status: cancel.status, code: result?.code ?? "unknown" });
         return json({ ok: false, message: result?.message ?? "환불 처리에 실패했습니다." }, 400);
       }
     }
@@ -97,7 +101,7 @@ Deno.serve(async (request) => {
 
     return json({ ok: true, refunded: wasPaid });
   } catch (error) {
-    console.error("[refund-reservation] handler error", error);
+    console.error("[refund-reservation] handler error", { message: errorMessage(error) });
     return json({ ok: false, message: "취소 처리 중 오류가 발생했습니다." }, 500);
   }
 });

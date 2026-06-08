@@ -67,6 +67,10 @@ async function toHex(buffer: ArrayBuffer): Promise<string> {
     .join("");
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown error";
+}
+
 async function sendSms(to: string, text: string): Promise<void> {
   const phone = to.replace(/\D/g, "");
   if (!phone) return;
@@ -97,7 +101,7 @@ async function sendSms(to: string, text: string): Promise<void> {
   });
 
   if (!response.ok) {
-    console.error("[reservation-sms] solapi error", response.status, await response.text());
+    console.error("[reservation-sms] solapi error", { status: response.status });
   }
 }
 
@@ -156,7 +160,7 @@ Deno.serve(async (request) => {
 
     return new Response("ok", { status: 200 });
   } catch (error) {
-    console.error("[reservation-sms] handler error", error);
+    console.error("[reservation-sms] handler error", { message: errorMessage(error) });
     return new Response("error", { status: 200 }); // never fail the webhook
   }
 });
