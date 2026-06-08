@@ -36,6 +36,7 @@ const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
 const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
 const ADMIN_PHONE = (Deno.env.get("ADMIN_PHONE") ?? "").replace(/\D/g, "");
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
 
 const STATUS_MESSAGE: Record<string, string> = {
   confirmed: "예약이 확정되었습니다.",
@@ -102,7 +103,7 @@ Deno.serve(async (request) => {
 
     if (payload.type === "INSERT" && row) {
       if (ADMIN_PHONE) {
-        await sendSms(ADMIN_PHONE, `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.`);
+        await sendSms(ADMIN_PHONE, `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`);
       }
       return new Response("ok", { status: 200 });
     }
@@ -116,12 +117,12 @@ Deno.serve(async (request) => {
       // Member-facing: status moved to confirmed / canceled / no_show.
       const message = STATUS_MESSAGE[row.status];
       if (statusChanged && message && row.phone) {
-        await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}\n문의: 010-4931-3298`);
+        await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}\n문의: 010-4931-3298\n${SITE_URL}`);
       }
 
       // Operator-facing: the member edited the date/time (re-request).
       if (ADMIN_PHONE && timeChanged) {
-        await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 변경 요청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.`);
+        await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 변경 요청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`);
       }
 
       return new Response("ok", { status: 200 });
