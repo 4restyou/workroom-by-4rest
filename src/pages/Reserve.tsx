@@ -356,7 +356,7 @@ export default function Reserve() {
 
         {needsLogin ? (
           <div className={`${card} p-6 text-center`}>
-            <p className="text-lg font-black">예약은 회원만 가능합니다</p>
+            <p className="text-lg font-bold">예약은 회원만 가능합니다</p>
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
               구글 계정으로 로그인하면 선택하신 이용권 그대로 바로 예약할 수 있어요.
             </p>
@@ -381,15 +381,15 @@ export default function Reserve() {
             <div className="grid gap-3">
               {groupedPasses.map((group) => (
                 <fieldset className="grid gap-2" key={group.name}>
-                  <legend className="mb-1 text-xs font-black text-workroom-muted">{group.name}</legend>
+                  <legend className="mb-1 text-xs font-bold text-workroom-muted">{group.name}</legend>
                   {group.items.map((pass) => {
                     const isSelected = form.pass_type === pass.name;
                     return (
                       <label
-                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border-2 px-4 py-3 transition-transform duration-100 active:translate-x-[2px] active:translate-y-[2px] ${
+                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border px-4 py-3 transition-colors duration-100 ${
                           isSelected
                             ? "border-workroom-ink bg-workroom-yellow"
-                            : "border-workroom-ink bg-white hover:-translate-y-0.5"
+                            : "border-workroom-line bg-white hover:border-workroom-ink"
                         }`}
                         key={pass.id}
                       >
@@ -503,38 +503,38 @@ export default function Reserve() {
       {success ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true">
           <div className={`${card} max-h-[85vh] w-full max-w-lg overflow-y-auto p-6`}>
-            <p className="text-2xl font-black">예약 신청이 접수되었습니다 🎉</p>
+            <p className="text-2xl font-bold">예약 신청이 접수되었습니다 🎉</p>
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
               확인 후 전화 또는 문자로 안내드릴게요. 확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.
             </p>
 
             {submittedReservation ? (
               <div className={`${tintCard("yellow")} mt-5 p-4`}>
-                <p className="text-sm font-black">신청 내용</p>
+                <p className="text-sm font-bold">신청 내용</p>
                 <dl className="mt-3 grid grid-cols-[74px_1fr] gap-x-3 gap-y-2 text-sm">
                   <dt className="font-bold text-workroom-muted">이용권</dt>
-                  <dd className="font-black">{submittedReservation.passName}</dd>
+                  <dd className="font-bold">{submittedReservation.passName}</dd>
                   <dt className="font-bold text-workroom-muted">날짜</dt>
-                  <dd className="font-black">{formatDate(submittedReservation.date)}</dd>
+                  <dd className="font-bold">{formatDate(submittedReservation.date)}</dd>
                   <dt className="font-bold text-workroom-muted">시간</dt>
-                  <dd className="font-black">
+                  <dd className="font-bold">
                     {submittedReservation.startTime} - {submittedReservation.endTime}
                   </dd>
                   <dt className="font-bold text-workroom-muted">인원</dt>
-                  <dd className="font-black">{submittedReservation.people}명</dd>
+                  <dd className="font-bold">{submittedReservation.people}명</dd>
                   <dt className="font-bold text-workroom-muted">예약자</dt>
-                  <dd className="font-black">
+                  <dd className="font-bold">
                     {submittedReservation.name} · {submittedReservation.phone}
                   </dd>
                   <dt className="font-bold text-workroom-muted">금액</dt>
-                  <dd className="font-black">{submittedReservation.price ? formatPrice(submittedReservation.price) : "확인 후 안내"}</dd>
+                  <dd className="font-bold">{submittedReservation.price ? formatPrice(submittedReservation.price) : "확인 후 안내"}</dd>
                 </dl>
               </div>
             ) : null}
 
             {noticeItems.length ? (
               <div className="mt-5 grid gap-3">
-                <p className="text-sm font-black">이용 전 꼭 확인해 주세요</p>
+                <p className="text-sm font-bold">이용 전 꼭 확인해 주세요</p>
                 {noticeItems.map(([title, body]) => (
                   <div className={`${tintCard("mint")} p-3`} key={title}>
                     <p className="text-sm font-bold">{title}</p>
@@ -557,7 +557,7 @@ export default function Reserve() {
 function StepHeading({ step, title }: { step: string; title: string }) {
   return (
     <div className="mb-4 flex items-center gap-3">
-      <span className="grid h-8 w-8 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-yellow text-sm font-black">
+      <span className="grid h-8 w-8 place-items-center rounded-pill border border-workroom-line bg-workroom-yellow text-sm font-bold">
         {step}
       </span>
       <h2 className="text-xl font-bold">{title}</h2>

@@ -105,10 +105,10 @@ export default function Faq() {
         <div className="grid gap-6">
           {groups.map((group) => (
             <div className={`${card} grid gap-5 p-6`} key={group.title}>
-              <h2 className="text-lg font-black">{group.title}</h2>
+              <h2 className="text-lg font-bold">{group.title}</h2>
               {group.items.map((item) => (
                 <section key={item.q}>
-                  <h3 className="font-black">Q. {item.q}</h3>
+                  <h3 className="font-bold">Q. {item.q}</h3>
                   <div className="mt-2 grid gap-1.5">
                     {item.a.map((line, index) => (
                       <p className="text-sm font-medium leading-7 text-workroom-muted" key={index}>
@@ -123,7 +123,7 @@ export default function Faq() {
 
           <div className={`${tintCard("yellow")} flex flex-wrap items-center justify-between gap-4 p-6`}>
             <div>
-              <p className="font-black">더 궁금한 점이 있으신가요?</p>
+              <p className="font-bold">더 궁금한 점이 있으신가요?</p>
               <a className="mt-1 inline-block text-sm font-bold underline underline-offset-2" href={`tel:${SITE.phone}`}>
                 {SITE.phone}
               </a>

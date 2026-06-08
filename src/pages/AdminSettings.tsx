@@ -239,7 +239,7 @@ export default function AdminSettings() {
 
         <div className="grid gap-5">
           <section className={`${card} p-5`}>
-            <h2 className="text-xl font-black">좌석 유형</h2>
+            <h2 className="text-xl font-bold">좌석 유형</h2>
             <p className="mt-1 text-sm font-medium text-workroom-muted">
               예약 시 정원 계산에 쓰입니다. 칸은 차례로 좌석 이름 · 정원 · 정렬 순서 · 노출 여부입니다.
             </p>
@@ -284,7 +284,7 @@ export default function AdminSettings() {
           </section>
 
           <section className={`${card} p-5`}>
-            <h2 className="text-xl font-black">이용권 / 가격</h2>
+            <h2 className="text-xl font-bold">이용권 / 가격</h2>
             <p className="mt-1 text-sm font-medium text-workroom-muted">
               칸은 차례로 이름 · 설명 · 가격(원) · 좌석 · 정렬 · 노출이며, 노출을 끄거나 삭제로 정리할 수 있습니다.
             </p>
@@ -355,11 +355,11 @@ export default function AdminSettings() {
           </section>
 
           <section className={`${card} p-5`}>
-            <h2 className="text-xl font-black">운영 시간</h2>
+            <h2 className="text-xl font-bold">운영 시간</h2>
             <div className="mt-4 grid gap-3">
               {businessHours.map((hour, index) => (
                 <div className={`grid gap-3 ${cardFlat} p-4 sm:grid-cols-[80px_1fr_1fr_110px]`} key={hour.id}>
-                  <p className="self-center font-black">{weekdayLabels[hour.weekday]}</p>
+                  <p className="self-center font-bold">{weekdayLabels[hour.weekday]}</p>
                   <input type="time" value={hour.open_time.slice(0, 5)} onChange={(event) => updateBusinessHour(index, "open_time", event.target.value)} />
                   <input type="time" value={hour.close_time.slice(0, 5)} onChange={(event) => updateBusinessHour(index, "close_time", event.target.value)} />
                   <label className="flex items-center gap-2 text-sm font-bold">
@@ -372,7 +372,7 @@ export default function AdminSettings() {
           </section>
 
           <section className={`${card} p-5`}>
-            <h2 className="text-xl font-black">운영 안내</h2>
+            <h2 className="text-xl font-bold">운영 안내</h2>
             <div className="mt-4 grid gap-4">
               <label className={`flex items-center justify-between gap-3 ${cardFlat} p-4`}>
                 <span className="text-sm font-bold">

@@ -68,7 +68,7 @@ export default function Privacy() {
         <div className={`${card} grid gap-6 p-6`}>
           {sections.map((section) => (
             <section key={section.title}>
-              <h2 className="text-lg font-black">{section.title}</h2>
+              <h2 className="text-lg font-bold">{section.title}</h2>
               <div className="mt-2 grid gap-1.5">
                 {section.body.map((line, index) => (
                   <p className="text-sm font-medium leading-7 text-workroom-muted" key={index}>

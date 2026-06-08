@@ -274,7 +274,7 @@ export default function Account() {
             <div className={`mb-5 flex flex-wrap gap-2 ${cardFlat} p-2`}>
               {(Object.keys(tabLabels) as AccountTab[]).map((tab) => (
                 <button
-                  className={`rounded-pill border-2 px-5 py-2.5 text-sm font-bold transition-colors ${
+                  className={`rounded-pill border px-5 py-2.5 text-sm font-bold transition-colors ${
                     activeTab === tab
                       ? "border-workroom-ink bg-workroom-ink text-white"
                       : "border-transparent text-workroom-muted hover:text-workroom-ink"
@@ -292,7 +292,7 @@ export default function Account() {
               <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
                 <div>
                   <p className="text-sm font-bold text-workroom-muted">회원</p>
-                  <p className="mt-1 text-2xl font-black">{profile.full_name || "내 정보"}</p>
+                  <p className="mt-1 text-2xl font-bold">{profile.full_name || "내 정보"}</p>
                 </div>
                 {profile.role === "admin" ? (
                   <Link className={buttonClass("accent", "md")} to="/admin/reservations">
@@ -332,7 +332,7 @@ export default function Account() {
             {activeTab === "reservations" ? (
               <section className={`${card} p-5`}>
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-xl font-black">내 예약</h2>
+                  <h2 className="text-xl font-bold">내 예약</h2>
                   <Link className={buttonClass("accent", "sm")} to="/reserve">
                     예약하기
                   </Link>
@@ -345,7 +345,7 @@ export default function Account() {
                         <article className={`${cardFlat} p-4`} key={reservation.id}>
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-black">{reservation.pass_name_snapshot || reservation.pass_type}</p>
+                              <p className="font-bold">{reservation.pass_name_snapshot || reservation.pass_type}</p>
                               <p className="mt-1 text-sm font-medium text-workroom-muted">
                                 {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
                               </p>
@@ -379,7 +379,7 @@ export default function Account() {
                           {active ? (
                             editingId === reservation.id ? (
                               <div className="mt-4 grid gap-3 border-t-2 border-workroom-line pt-4">
-                                <p className="text-sm font-black">시간 수정 (저장하면 다시 확인 대기로 바뀝니다)</p>
+                                <p className="text-sm font-bold">시간 수정 (저장하면 다시 확인 대기로 바뀝니다)</p>
                                 <div className="grid gap-3 sm:grid-cols-3">
                                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                                     날짜
@@ -448,7 +448,7 @@ export default function Account() {
 
                           {reservation.status === "confirmed" ? (
                             <div className="mt-4 border-t-2 border-workroom-line pt-4">
-                              <p className="text-sm font-black">관리자에게 문의</p>
+                              <p className="text-sm font-bold">관리자에게 문의</p>
                               {inquiries
                                 .filter((inquiry) => inquiry.reservation_id === reservation.id)
                                 .map((inquiry) => (
@@ -489,8 +489,8 @@ export default function Account() {
                                           </button>
                                         ) : null}
                                         {inquiry.admin_reply ? (
-                                          <div className="mt-2 rounded-xl border-2 border-workroom-ink bg-white p-2.5">
-                                            <p className="text-xs font-black">운영자 답변</p>
+                                          <div className="mt-2 rounded-xl border border-workroom-line bg-white p-2.5">
+                                            <p className="text-xs font-bold">운영자 답변</p>
                                             <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6">{inquiry.admin_reply}</p>
                                           </div>
                                         ) : null}

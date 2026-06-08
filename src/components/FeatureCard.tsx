@@ -9,9 +9,9 @@ type FeatureCardProps = {
 
 export default function FeatureCard({ title, body, mark, accent = "mint" }: FeatureCardProps) {
   return (
-    <article className={`${card} p-5 transition-transform duration-150 hover:-translate-y-1`}>
+    <article className={`${card} p-5 transition-colors duration-150 hover:border-workroom-ink`}>
       <div
-        className={`mb-5 grid h-11 w-11 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-${accent} text-base font-black`}
+        className={`mb-5 grid h-10 w-10 place-items-center rounded-pill border border-workroom-line bg-workroom-${accent} text-sm font-bold`}
       >
         {mark}
       </div>

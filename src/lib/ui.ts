@@ -6,11 +6,11 @@ export type ButtonVariant = "primary" | "accent" | "secondary" | "mint" | "lilac
 export type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-pill border-2 border-workroom-ink font-bold leading-none " +
+  "inline-flex items-center justify-center gap-2 rounded-pill border border-workroom-ink font-bold leading-none " +
   "transition-[transform,background-color,opacity] duration-100 " +
   "hover:-translate-y-px " +
   "active:translate-y-0 active:opacity-90 " +
-  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow " +
   "disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0";
 
 const buttonVariants: Record<ButtonVariant, string> = {
@@ -35,20 +35,22 @@ export function buttonClass(
   return [buttonBase, buttonVariants[variant], buttonSizes[size], extra].filter(Boolean).join(" ");
 }
 
-// Card surfaces. Outline-only — depth comes from the 2px ink border. `cardFlat`
-// is kept as an alias for callers that referenced it.
-export const card = "rounded-card border-2 border-workroom-ink bg-workroom-surface";
+// Card surfaces. The brand keeps its bold CTA moments, while content panels use
+// a quieter line so the page feels more like a work lounge than a poster.
+export const card = "rounded-card border border-workroom-line bg-workroom-surface";
 export const cardFlat = card;
 
 export type TintColor = "yellow" | "mint" | "lilac" | "sky" | "coral" | "danger" | "ink";
 
 export function tintCard(color: TintColor, extra = "") {
   const bg = color === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${color}`;
-  return `rounded-card border-2 border-workroom-ink ${bg} ${extra}`.trim();
+  const border = color === "ink" ? "border-workroom-ink" : "border-workroom-line";
+  return `rounded-card border ${border} ${bg} ${extra}`.trim();
 }
 
 // Small label chip.
 export function badge(color: TintColor = "yellow", extra = "") {
   const bg = color === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${color} text-workroom-ink`;
-  return `inline-flex items-center rounded-pill border-2 border-workroom-ink px-3 py-1 text-xs font-bold ${bg} ${extra}`.trim();
+  const border = color === "ink" ? "border-workroom-ink" : "border-workroom-line";
+  return `inline-flex items-center rounded-pill border ${border} px-3 py-1 text-xs font-bold ${bg} ${extra}`.trim();
 }

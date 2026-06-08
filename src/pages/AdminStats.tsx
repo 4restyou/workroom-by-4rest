@@ -164,7 +164,7 @@ export default function AdminStats() {
 
         <section className={`mt-5 ${card} p-5`}>
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black">{periodLabels[period]} 예약 흐름</h2>
+            <h2 className="text-xl font-bold">{periodLabels[period]} 예약 흐름</h2>
             <p className="text-sm font-medium text-workroom-muted">최근 {groupedStats.length}개 구간</p>
           </div>
           <div className="overflow-x-auto">
@@ -198,7 +198,7 @@ export default function AdminStats() {
         </section>
 
         <section className={`mt-5 ${card} p-5`}>
-          <h2 className="mb-4 text-xl font-black">이용권별 예약/매출</h2>
+          <h2 className="mb-4 text-xl font-bold">이용권별 예약/매출</h2>
           <div className="grid gap-2">
             {passStats.map((stat) => (
               <div className={`grid gap-2 ${cardFlat} p-4 text-sm font-bold sm:grid-cols-[1fr_100px_160px]`} key={stat.name}>
@@ -223,7 +223,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <article className={`${card} p-5`}>
       <p className="text-sm font-bold text-workroom-muted">{label}</p>
-      <p className="mt-2 text-3xl font-black">{value}</p>
+      <p className="mt-2 text-3xl font-bold">{value}</p>
     </article>
   );
 }

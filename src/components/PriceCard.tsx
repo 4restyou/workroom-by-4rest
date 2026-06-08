@@ -10,7 +10,7 @@ type PriceCardProps = {
 export default function PriceCard({ pass }: PriceCardProps) {
   return (
     <Link
-      className={`group ${card} block p-5 transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-workroom-yellow`}
+      className={`group ${card} block p-5 transition-colors duration-150 hover:border-workroom-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow`}
       to={`/reserve?pass=${encodeURIComponent(pass.name)}`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -22,7 +22,7 @@ export default function PriceCard({ pass }: PriceCardProps) {
             <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
           </p>
         </div>
-        <p className="shrink-0 rounded-pill border-2 border-workroom-ink bg-workroom-yellow px-3 py-1 text-sm font-black">
+        <p className="shrink-0 rounded-pill border border-workroom-line bg-workroom-yellow px-3 py-1 text-sm font-bold">
           {formatPrice(pass.price)}
         </p>
       </div>

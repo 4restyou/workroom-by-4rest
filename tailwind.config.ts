@@ -19,12 +19,12 @@ export default {
     extend: {
       colors: {
         workroom: {
-          background: "#F4EEE1",
+          background: "#FAF8F1",
           surface: "#FFFFFF",
           ink: "#141414",
           text: "#141414",
           muted: "#5C5A54",
-          line: "#E2DAC9",
+          line: "#D8CFBE",
           yellow: "#F6E76F",
           mint: "#CDE8D6",
           lilac: "#DBD0F7",

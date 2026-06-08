@@ -21,14 +21,14 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="grid min-h-screen place-items-center bg-workroom-background p-6 text-center text-workroom-ink">
         <div className="max-w-md">
-          <p className="text-2xl font-black">잠시 문제가 발생했어요</p>
+          <p className="text-2xl font-bold">잠시 문제가 발생했어요</p>
           <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
             페이지를 새로고침하면 대부분 해결됩니다. 계속 발생하면 운영자에게 알려 주세요.
           </p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-5 rounded-pill border-2 border-workroom-ink bg-workroom-ink px-6 py-3 font-bold text-white"
+            className="mt-5 rounded-pill border border-workroom-ink bg-workroom-ink px-6 py-3 font-bold text-white"
           >
             새로고침
           </button>

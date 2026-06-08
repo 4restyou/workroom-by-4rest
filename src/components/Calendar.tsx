@@ -31,18 +31,18 @@ export default function Calendar({ month, selected, minMonth, onSelect, onMonthC
           type="button"
           disabled={!canPrev}
           onClick={() => onMonthChange(new Date(year, monthIndex - 1, 1))}
-          className="grid h-9 w-9 place-items-center rounded-pill border-2 border-workroom-ink bg-white text-sm font-black disabled:border-workroom-line disabled:text-workroom-line"
+          className="grid h-9 w-9 place-items-center rounded-pill border border-workroom-line bg-white text-sm font-bold disabled:text-workroom-line"
           aria-label="이전 달"
         >
           ‹
         </button>
-        <p className="text-sm font-black">
+        <p className="text-sm font-bold">
           {year}년 {monthIndex + 1}월
         </p>
         <button
           type="button"
           onClick={() => onMonthChange(new Date(year, monthIndex + 1, 1))}
-          className="grid h-9 w-9 place-items-center rounded-pill border-2 border-workroom-ink bg-white text-sm font-black"
+          className="grid h-9 w-9 place-items-center rounded-pill border border-workroom-line bg-white text-sm font-bold"
           aria-label="다음 달"
         >
           ›
@@ -72,12 +72,12 @@ export default function Calendar({ month, selected, minMonth, onSelect, onMonthC
               type="button"
               disabled={disabled}
               onClick={() => onSelect(dateStr)}
-              className={`relative grid h-11 place-items-center rounded-xl border-2 text-sm font-bold transition ${
+              className={`relative grid h-11 place-items-center rounded-xl border text-sm font-bold transition ${
                 isSelected
                   ? "border-workroom-ink bg-workroom-yellow"
                   : disabled
                     ? "cursor-not-allowed border-transparent text-workroom-line"
-                    : "border-workroom-ink bg-white hover:bg-workroom-mint"
+                    : "border-workroom-line bg-white hover:border-workroom-ink hover:bg-workroom-mint"
               }`}
             >
               {day}

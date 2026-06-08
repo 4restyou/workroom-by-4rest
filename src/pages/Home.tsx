@@ -127,7 +127,7 @@ export default function Home() {
           </div>
 
           <div className="relative">
-            <div className="overflow-hidden rounded-card border-2 border-workroom-ink">
+            <div className="overflow-hidden rounded-card border border-workroom-line">
               <img
                 className="aspect-[4/3] w-full object-cover"
                 src={heroImage}
@@ -185,15 +185,15 @@ export default function Home() {
         <div className="grid gap-3 sm:grid-cols-3">
           <article className={`${tintCard("ink")} p-5`}>
             <p className="text-sm font-black text-workroom-yellow">Mood</p>
-            <h2 className="mt-2 text-2xl font-black leading-tight">조용하지만 너무 엄숙하지 않게</h2>
+            <h2 className="mt-2 text-xl font-bold leading-tight">조용하지만 너무 엄숙하지 않게</h2>
           </article>
           <article className={`${tintCard("yellow")} p-5`}>
             <p className="text-sm font-black text-workroom-muted">Use</p>
-            <h2 className="mt-2 text-2xl font-black leading-tight">작업, 촬영, 작은 대화까지</h2>
+            <h2 className="mt-2 text-xl font-bold leading-tight">작업, 촬영, 작은 대화까지</h2>
           </article>
           <article className={`${tintCard("mint")} p-5`}>
             <p className="text-sm font-black text-workroom-muted">Check</p>
-            <h2 className="mt-2 text-2xl font-black leading-tight">신청 후 확인 연락으로 확정</h2>
+            <h2 className="mt-2 text-xl font-bold leading-tight">신청 후 확인 연락으로 확정</h2>
           </article>
         </div>
       </section>
@@ -212,7 +212,7 @@ export default function Home() {
       <Section eyebrow="Fit check" title="이런 이용이면 잘 맞아요" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <article className={`${tintCard("mint")} p-5`}>
-            <h3 className="text-xl font-black">좋아요</h3>
+            <h3 className="text-xl font-bold">좋아요</h3>
             <ul className="mt-4 grid gap-3">
               {fitItems.map((item) => (
                 <li className="flex gap-3 text-sm font-bold leading-6" key={item}>
@@ -223,7 +223,7 @@ export default function Home() {
             </ul>
           </article>
           <article className={`${tintCard("yellow")} p-5`}>
-            <h3 className="text-xl font-black">먼저 물어봐 주세요</h3>
+            <h3 className="text-xl font-bold">먼저 물어봐 주세요</h3>
             <ul className="mt-4 grid gap-3">
               {cautionItems.map((item) => (
                 <li className="flex gap-3 text-sm font-bold leading-6" key={item}>
@@ -244,7 +244,7 @@ export default function Home() {
           {["원하는 이용권을 선택합니다.", "날짜와 시간을 선택합니다.", "예약 신청을 남깁니다.", "전화 또는 문자 안내 후 확정됩니다."].map(
             (item, index) => (
               <li key={item} className={`${card} p-5 font-medium`}>
-                <span className="mb-4 grid h-9 w-9 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-yellow text-sm font-black">
+                <span className="mb-4 grid h-9 w-9 place-items-center rounded-pill border border-workroom-line bg-workroom-yellow text-sm font-bold">
                   {index + 1}
                 </span>
                 {item}
@@ -260,7 +260,7 @@ export default function Home() {
       <Section eyebrow="Location" title="충장로, 금남로5가역 근처" accent="mint">
         <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
           <div className={`${card} p-5`}>
-            <p className="text-xl font-black">WORKROOM by 4REST</p>
+            <p className="text-xl font-bold">WORKROOM by 4REST</p>
             <p className="mt-1 font-medium text-workroom-muted">{ADDRESS}</p>
             <dl className="mt-5 grid gap-4">
               <div>

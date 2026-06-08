@@ -58,7 +58,7 @@ export default function PaymentSuccess() {
           {state === "loading" ? <p className="font-bold">결제를 확인하고 있습니다…</p> : null}
           {state === "ok" ? (
             <div>
-              <p className="text-lg font-black">결제가 완료되었습니다 🎉</p>
+              <p className="text-lg font-bold">결제가 완료되었습니다 🎉</p>
               <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">예약현황에서 결제 내역을 확인할 수 있습니다.</p>
             </div>
           ) : null}

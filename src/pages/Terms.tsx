@@ -80,7 +80,7 @@ export default function Terms() {
         <div className={`${card} grid gap-6 p-6`}>
           {articles.map((article) => (
             <section key={article.title}>
-              <h2 className="text-lg font-black">{article.title}</h2>
+              <h2 className="text-lg font-bold">{article.title}</h2>
               <div className="mt-2 grid gap-1.5">
                 {article.body.map((line, index) => (
                   <p className="text-sm font-medium leading-7 text-workroom-muted" key={index}>

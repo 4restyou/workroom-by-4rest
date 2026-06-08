@@ -309,7 +309,7 @@ export default function AdminReservations() {
         <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
           <section className={`${card} p-3`}>
             <div className="mb-3 flex items-center justify-between gap-3 px-2">
-              <h2 className="text-lg font-black">{archiveFilter === "archived" ? "보관 예약" : "예약 목록"}</h2>
+              <h2 className="text-lg font-bold">{archiveFilter === "archived" ? "보관 예약" : "예약 목록"}</h2>
               <span className="text-sm font-bold text-workroom-muted">{visibleReservations.length}건</span>
             </div>
             <div className="grid max-h-[680px] gap-2 overflow-y-auto pr-1">
@@ -360,15 +360,15 @@ function ReservationListItem({
     <button
       className={`rounded-card px-4 py-3 text-left ${
         isSelected
-          ? "border-2 border-workroom-ink bg-workroom-yellow"
-          : "border-2 border-workroom-ink bg-white hover:-translate-y-0.5 transition-transform"
+          ? "border border-workroom-ink bg-workroom-yellow"
+          : "border border-workroom-line bg-white transition-colors hover:border-workroom-ink"
       }`}
       onClick={onSelect}
       type="button"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-black">{reservation.name}</p>
+          <p className="font-bold">{reservation.name}</p>
           <p className="mt-1 text-xs font-medium text-workroom-muted">
             {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
           </p>
@@ -376,7 +376,7 @@ function ReservationListItem({
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
-          {reservation.deleted_at ? <span className="text-[11px] font-black text-workroom-muted">보관됨</span> : null}
+          {reservation.deleted_at ? <span className="text-[11px] font-bold text-workroom-muted">보관됨</span> : null}
         </div>
       </div>
     </button>
@@ -431,7 +431,7 @@ function ReservationCard({
     <article className={`${card} p-5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-2xl font-black">{reservation.name}</h3>
+          <h3 className="text-2xl font-bold">{reservation.name}</h3>
           <a
             href={`tel:${reservation.phone}`}
             className="mt-1 inline-block text-sm font-bold text-workroom-ink underline underline-offset-2"
@@ -442,7 +442,7 @@ function ReservationCard({
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
-          {isArchived ? <span className="text-xs font-black text-workroom-muted">보관됨</span> : null}
+          {isArchived ? <span className="text-xs font-bold text-workroom-muted">보관됨</span> : null}
         </div>
       </div>
 
@@ -462,7 +462,7 @@ function ReservationCard({
       </div>
 
       {conflictCount > 0 ? (
-        <p className={`${tintCard("yellow")} mt-4 p-3 text-sm font-black`}>
+        <p className={`${tintCard("yellow")} mt-4 p-3 text-sm font-bold`}>
           같은 시간대에 겹치는 예약이 {conflictCount}건 있습니다. 확정 전에 시간을 확인해 주세요.
         </p>
       ) : null}
@@ -489,7 +489,7 @@ function ReservationCard({
 
       {inquiries.length ? (
         <div className="mt-5">
-          <p className="text-sm font-black">회원 문의 {inquiries.length}건</p>
+          <p className="text-sm font-bold">회원 문의 {inquiries.length}건</p>
           <div className="mt-2 grid gap-3">
             {inquiries.map((inquiry) => {
               const draft = replyDrafts[inquiry.id] ?? inquiry.admin_reply ?? "";
@@ -572,7 +572,7 @@ function ReservationCard({
       </div>
 
       <div className="mt-5">
-        <p className="text-sm font-black">변경 이력</p>
+        <p className="text-sm font-bold">변경 이력</p>
         {auditLogs.length ? (
           <div className="mt-2 grid gap-2">
             {auditLogs.map((log) => (

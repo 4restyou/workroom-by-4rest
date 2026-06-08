@@ -23,15 +23,15 @@ describe("tintCard / badge", () => {
     expect(tintCard("ink")).toContain("text-white");
   });
 
-  it("renders a badge with an ink border", () => {
-    expect(badge("yellow")).toContain("border-2 border-workroom-ink");
+  it("renders a badge with a quiet outline", () => {
+    expect(badge("yellow")).toContain("border border-workroom-line");
     expect(badge("yellow")).toContain("bg-workroom-yellow");
   });
 });
 
 describe("card", () => {
-  it("is an outline surface with an ink border and no drop shadow", () => {
-    expect(card).toContain("border-2 border-workroom-ink");
+  it("is a quiet outline surface with no drop shadow", () => {
+    expect(card).toContain("border border-workroom-line");
     expect(card).not.toContain("shadow-hard");
   });
 });

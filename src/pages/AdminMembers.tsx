@@ -99,7 +99,7 @@ export default function AdminMembers() {
             <article className={`${card} p-5`} key={member.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="text-2xl font-black">{member.full_name || "이름 미입력"}</h2>
+                  <h2 className="text-2xl font-bold">{member.full_name || "이름 미입력"}</h2>
                   <a
                     href={`mailto:${member.email}`}
                     className="mt-1 block truncate text-sm font-medium text-workroom-muted underline underline-offset-2"
