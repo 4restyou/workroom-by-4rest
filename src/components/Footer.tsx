@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import logoSig from "../../assets/logo/logo_sig.png";
-import catImage from "../../assets/cat.svg";
+import CatBlink from "./CatBlink";
 import { SITE } from "../lib/site";
 
 export default function Footer() {
@@ -37,7 +37,7 @@ export default function Footer() {
                 </a>
               </div>
             </div>
-            <img className="h-24 w-auto shrink-0" src={catImage} alt="WORKROOM 고양이" />
+            <CatBlink className="h-24 w-auto shrink-0" />
           </div>
         </div>
 

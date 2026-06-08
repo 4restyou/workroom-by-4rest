@@ -142,3 +142,77 @@ summary:focus-visible {
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+/* Footer cat blink (CatBlink). The frames are halftone line art on a
+   transparent background, so exactly one frame is shown at a time (the others
+   fully transparent) — stacking with partial opacity would let the open eyes
+   bleed through the dot gaps. Eyes stay open most of the cycle, then a quick
+   open -> half -> closed -> half -> open flicker. ~4.2s cadence. */
+.cat-blink-open {
+  animation: cat-blink-open 4.2s infinite;
+}
+.cat-blink-half {
+  opacity: 0;
+  animation: cat-blink-half 4.2s infinite;
+}
+.cat-blink-closed {
+  opacity: 0;
+  animation: cat-blink-closed 4.2s infinite;
+}
+@keyframes cat-blink-open {
+  0%,
+  92.4% {
+    opacity: 1;
+  }
+  92.5%,
+  98.5% {
+    opacity: 0;
+  }
+  98.6%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes cat-blink-half {
+  0%,
+  92.4% {
+    opacity: 0;
+  }
+  92.5%,
+  93.9% {
+    opacity: 1;
+  }
+  94%,
+  97% {
+    opacity: 0;
+  }
+  97.1%,
+  98.5% {
+    opacity: 1;
+  }
+  98.6%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes cat-blink-closed {
+  0%,
+  93.9% {
+    opacity: 0;
+  }
+  94%,
+  97% {
+    opacity: 1;
+  }
+  97.1%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-blink-open,
+  .cat-blink-half,
+  .cat-blink-closed {
+    animation: none;
+  }
+}
