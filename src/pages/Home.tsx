@@ -100,14 +100,14 @@ export default function Home() {
   return (
     <main className="pb-28 sm:pb-0">
       {/* Hero */}
-      <section className="mx-auto max-w-5xl px-4 pb-6 pt-10 sm:pt-16">
-        <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr]">
+      <section className="mx-auto max-w-5xl px-4 pb-8 pt-12 sm:pb-14 sm:pt-20">
+        <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr] sm:gap-12">
           <div className="animate-pop-in">
             <span className={badge("yellow")}>09:00–22:00 · 예약제 운영</span>
-            <h1 className="mt-4 text-4xl font-black leading-[1.18] tracking-tight sm:text-6xl">
+            <h1 className="mt-4 text-4xl font-black leading-[1.28] tracking-tight sm:text-6xl">
               필요한 시간만큼
               <br />
-              머무는 <span className="rounded-[3px] bg-workroom-yellow px-2 py-0.5 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
+              머무는 <span className="hero-mark rounded-[3px] px-2 py-0.5 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
               <br />
               작업 공간
             </h1>
@@ -146,15 +146,13 @@ export default function Home() {
       </section>
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤" accent="mint">
-        <div className={`${card} p-6 sm:p-8`}>
-          <div className="max-w-3xl text-base font-medium leading-8 text-workroom-muted sm:text-lg">
-            <p>
-              카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
-            </p>
-            <p className="mt-5">
-              WORKROOM은 그 사이 어딘가의 공간을 생각하며 준비하고 있습니다. 슬렁슬렁 들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
-            </p>
-          </div>
+        <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
+          <p>
+            카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
+          </p>
+          <p className="mt-6">
+            WORKROOM은 그 사이 어딘가의 공간을 생각하며 준비하고 있습니다. 슬렁슬렁 들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
+          </p>
         </div>
       </Section>
 
@@ -195,14 +193,14 @@ export default function Home() {
       </section>
 
       <Section eyebrow="Guide" title="이용 기준은 가볍게, 분명하게" accent="sky">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
           {guideItems.map(([title, body]) => (
-            <article className={`${card} p-5`} key={title}>
-              <h3 className="text-lg font-bold">{title}</h3>
-              <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">{body}</p>
-            </article>
+            <div className="border-t-2 border-workroom-ink pt-3" key={title}>
+              <dt className="text-base font-bold">{title}</dt>
+              <dd className="mt-1.5 text-sm font-medium leading-6 text-workroom-muted">{body}</dd>
+            </div>
           ))}
-        </div>
+        </dl>
       </Section>
 
       <Section eyebrow="Fit check" title="이런 이용이면 잘 맞아요" accent="lilac">

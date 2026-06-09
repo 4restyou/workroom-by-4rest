@@ -216,3 +216,24 @@ summary:focus-visible {
     animation: none;
   }
 }
+
+/* Hero highlight marker: draws left-to-right once on load (a scroll-fill would
+   be pointless above the fold). */
+.hero-mark {
+  background-image: linear-gradient(#f6e76f, #f6e76f);
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 0% 100%;
+  animation: hero-mark-in 0.7s 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes hero-mark-in {
+  to {
+    background-size: 100% 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-mark {
+    background-size: 100% 100%;
+    animation: none;
+  }
+}
