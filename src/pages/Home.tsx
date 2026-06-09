@@ -104,10 +104,10 @@ export default function Home() {
         <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr] sm:gap-12">
           <div className="animate-pop-in">
             <span className={badge("yellow")}>09:00–22:00 · 예약제 운영</span>
-            <h1 className="mt-4 text-4xl font-black leading-[1.28] tracking-tight sm:text-6xl">
+            <h1 className="mt-4 text-4xl font-black leading-[1.5] tracking-tight sm:text-6xl">
               필요한 시간만큼
               <br />
-              머무는 <span className="hero-mark rounded-[3px] px-2 py-0.5 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
+              머무는 <span className="hero-mark rounded-[3px] px-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
               <br />
               작업 공간
             </h1>
