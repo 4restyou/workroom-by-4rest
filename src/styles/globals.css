@@ -237,3 +237,16 @@ summary:focus-visible {
     animation: none;
   }
 }
+
+/* Accessibility: honor a user's reduced-motion preference site-wide. Disables
+   blink/marker/pop-in animations, transitions and smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import FixedReserveButton from "./components/FixedReserveButton";
 import Footer from "./components/Footer";
@@ -51,7 +51,9 @@ export default function App() {
       </a>
       <Header isAdmin={isAdmin} />
       <div id="main" className="flex-1">
-        <Outlet />
+        <Suspense fallback={<p className="mx-auto max-w-5xl px-4 py-24 text-center text-sm font-bold text-workroom-muted">불러오는 중…</p>}>
+          <Outlet />
+        </Suspense>
       </div>
       {!isAdmin ? <Footer /> : null}
       {showReserveButton ? <FixedReserveButton /> : null}

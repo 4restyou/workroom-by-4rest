@@ -1,25 +1,28 @@
-import React from "react";
+import React, { lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
-import Account from "./pages/Account";
-import AdminLogin from "./pages/AdminLogin";
-import AdminMembers from "./pages/AdminMembers";
-import AdminReservations from "./pages/AdminReservations";
-import AdminSettings from "./pages/AdminSettings";
-import AdminStats from "./pages/AdminStats";
-import Auth from "./pages/Auth";
-import Faq from "./pages/Faq";
 import Home from "./pages/Home";
-import PaymentFail from "./pages/PaymentFail";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import Privacy from "./pages/Privacy";
-import Reserve from "./pages/Reserve";
-import Terms from "./pages/Terms";
 import { initAnalytics } from "./lib/analytics";
 import "./styles/globals.css";
+
+// Home stays eager (landing page); everything else is code-split so visitors
+// don't download the admin/booking pages up front.
+const Account = lazy(() => import("./pages/Account"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const AdminMembers = lazy(() => import("./pages/AdminMembers"));
+const AdminReservations = lazy(() => import("./pages/AdminReservations"));
+const AdminSettings = lazy(() => import("./pages/AdminSettings"));
+const AdminStats = lazy(() => import("./pages/AdminStats"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Faq = lazy(() => import("./pages/Faq"));
+const PaymentFail = lazy(() => import("./pages/PaymentFail"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Reserve = lazy(() => import("./pages/Reserve"));
+const Terms = lazy(() => import("./pages/Terms"));
 
 initAnalytics();
 
