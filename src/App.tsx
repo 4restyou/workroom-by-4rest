@@ -1,8 +1,10 @@
 import { useEffect, Suspense } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import BackToTop from "./components/BackToTop";
 import FixedReserveButton from "./components/FixedReserveButton";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
+import PageLoading from "./components/PageLoading";
 import { getCurrentProfile } from "./lib/profiles";
 import { supabase } from "./lib/supabase";
 
@@ -51,12 +53,13 @@ export default function App() {
       </a>
       <Header isAdmin={isAdmin} />
       <div id="main" className="flex-1">
-        <Suspense fallback={<p className="mx-auto max-w-5xl px-4 py-24 text-center text-sm font-bold text-workroom-muted">불러오는 중…</p>}>
+        <Suspense fallback={<PageLoading />}>
           <Outlet />
         </Suspense>
       </div>
       {!isAdmin ? <Footer /> : null}
       {showReserveButton ? <FixedReserveButton /> : null}
+      <BackToTop />
     </div>
   );
 }

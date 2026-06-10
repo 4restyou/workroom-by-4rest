@@ -250,3 +250,17 @@ summary:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* Scroll-reveal entrance (Reveal). The hidden start state only exists when the
+   user is OK with motion; reduced-motion users always see content. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
