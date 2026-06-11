@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import MoneyInput from "../components/MoneyInput";
@@ -33,6 +33,7 @@ const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 
 export default function AdminSettings() {
   const navigate = useNavigate();
+  const qrRef = useRef<HTMLDivElement>(null);
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
@@ -425,9 +426,9 @@ export default function AdminSettings() {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
-              <div className="w-fit rounded-card border-2 border-workroom-ink bg-white p-3">
+              <div ref={qrRef} className="w-fit rounded-card border-2 border-workroom-ink bg-white p-3">
                 {settings["attendance_qr_token"] ? (
-                  <QRCodeSVG value={`${window.location.origin}/checkin?t=${settings["attendance_qr_token"]}`} size={150} />
+                  <QRCodeSVG value={`${window.location.origin}/checkin?t=${settings["attendance_qr_token"]}`} size={150} marginSize={2} />
                 ) : (
                   <p className="grid h-[150px] w-[150px] place-items-center text-sm font-bold text-workroom-muted">토큰 없음</p>
                 )}
@@ -436,10 +437,15 @@ export default function AdminSettings() {
                 <p className="text-sm font-medium leading-6 text-workroom-muted">
                   이 QR을 출력해 매장에 붙이세요. 회원이 스캔하면 출근 도장이 찍혀요. (오늘 확정 예약자만 출근 가능)
                 </p>
-                <button className={buttonClass("secondary", "sm", "w-fit")} onClick={() => void regenerateToken()} type="button">
-                  QR 재발급
-                </button>
-                <p className="text-xs font-medium text-workroom-muted">재발급하면 기존 QR은 무효가 됩니다. (목표·보상은 ‘변경사항 저장’으로 적용)</p>
+                <div className="flex flex-wrap gap-2">
+                  <button className={buttonClass("accent", "sm")} disabled={!settings["attendance_qr_token"]} onClick={downloadQrSvg} type="button">
+                    SVG로 저장
+                  </button>
+                  <button className={buttonClass("secondary", "sm")} onClick={() => void regenerateToken()} type="button">
+                    QR 재발급
+                  </button>
+                </div>
+                <p className="text-xs font-medium text-workroom-muted">SVG는 벡터라 크게 인쇄해도 안 깨져요. 재발급하면 기존 QR은 무효가 됩니다. (목표·보상은 ‘변경사항 저장’으로 적용)</p>
               </div>
             </div>
           </section>
@@ -447,6 +453,21 @@ export default function AdminSettings() {
       </Section>
     </main>
   );
+
+  function downloadQrSvg() {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return;
+    const source = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${source}`], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "workroom-checkin-qr.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 
   async function regenerateToken() {
     if (!supabase) return;
