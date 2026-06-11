@@ -141,3 +141,32 @@ export type ReservationInsert = {
   message: string;
   status?: ReservationStatus;
 };
+
+export type Attendance = {
+  id: string;
+  profile_id: string;
+  reservation_id: string | null;
+  check_in_at: string;
+  check_out_at: string | null;
+  created_at: string;
+};
+
+export type Coupon = {
+  id: string;
+  profile_id: string;
+  code: string;
+  label: string;
+  status: "issued" | "used";
+  issued_at: string;
+  used_at: string | null;
+};
+
+export type CheckInResult = {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  already?: boolean;
+  stamps?: number;
+  goal?: number;
+  coupon?: boolean;
+};

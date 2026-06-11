@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import MoneyInput from "../components/MoneyInput";
 import Section from "../components/Section";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
@@ -136,10 +137,11 @@ export default function AdminSettings() {
         { onConflict: "weekday" },
       ),
       supabase.from("space_settings").upsert(
-        settingKeys.map((key) => ({
-          key,
-          value: settings[key] ?? "",
-        })),
+        [
+          ...settingKeys.map((key) => ({ key, value: settings[key] ?? "" })),
+          { key: "attendance_stamp_goal", value: settings["attendance_stamp_goal"] ?? "10" },
+          { key: "attendance_reward_label", value: settings["attendance_reward_label"] ?? "" },
+        ],
         { onConflict: "key" },
       ),
     ]);
@@ -399,10 +401,63 @@ export default function AdminSettings() {
                 ))}
             </div>
           </section>
+
+          <section className={`${card} p-5`}>
+            <h2 className="text-xl font-bold">출근부 (QR 출근)</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-2 text-sm font-bold">
+                스탬프 목표 (칸 수)
+                <input
+                  type="number"
+                  min={1}
+                  value={settings["attendance_stamp_goal"] ?? "10"}
+                  onChange={(event) => setSettings((current) => ({ ...current, attendance_stamp_goal: event.target.value }))}
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-bold">
+                보상 문구 (카드 완성 시)
+                <input
+                  placeholder="예: 음료 1잔 무료"
+                  value={settings["attendance_reward_label"] ?? ""}
+                  onChange={(event) => setSettings((current) => ({ ...current, attendance_reward_label: event.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+              <div className="w-fit rounded-card border-2 border-workroom-ink bg-white p-3">
+                {settings["attendance_qr_token"] ? (
+                  <QRCodeSVG value={`${window.location.origin}/checkin?t=${settings["attendance_qr_token"]}`} size={150} />
+                ) : (
+                  <p className="grid h-[150px] w-[150px] place-items-center text-sm font-bold text-workroom-muted">토큰 없음</p>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <p className="text-sm font-medium leading-6 text-workroom-muted">
+                  이 QR을 출력해 매장에 붙이세요. 회원이 스캔하면 출근 도장이 찍혀요. (오늘 확정 예약자만 출근 가능)
+                </p>
+                <button className={buttonClass("secondary", "sm", "w-fit")} onClick={() => void regenerateToken()} type="button">
+                  QR 재발급
+                </button>
+                <p className="text-xs font-medium text-workroom-muted">재발급하면 기존 QR은 무효가 됩니다. (목표·보상은 ‘변경사항 저장’으로 적용)</p>
+              </div>
+            </div>
+          </section>
         </div>
       </Section>
     </main>
   );
+
+  async function regenerateToken() {
+    if (!supabase) return;
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const { error: tokenError } = await supabase.from("space_settings").upsert({ key: "attendance_qr_token", value: token }, { onConflict: "key" });
+    if (tokenError) {
+      setError(tokenError.message);
+      return;
+    }
+    setSettings((current) => ({ ...current, attendance_qr_token: token }));
+  }
 
   function updateSeatType<K extends keyof SeatType>(index: number, key: K, value: SeatType[K]) {
     setSeatTypes((current) => current.map((seatType, itemIndex) => (itemIndex === index ? { ...seatType, [key]: value } : seatType)));

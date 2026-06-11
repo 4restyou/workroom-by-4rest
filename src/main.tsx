@@ -11,12 +11,15 @@ import "./styles/globals.css";
 // Home stays eager (landing page); everything else is code-split so visitors
 // don't download the admin/booking pages up front.
 const Account = lazy(() => import("./pages/Account"));
+const AdminAttendance = lazy(() => import("./pages/AdminAttendance"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminMembers = lazy(() => import("./pages/AdminMembers"));
 const AdminReservations = lazy(() => import("./pages/AdminReservations"));
 const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 const AdminStats = lazy(() => import("./pages/AdminStats"));
+const Attendance = lazy(() => import("./pages/Attendance"));
 const Auth = lazy(() => import("./pages/Auth"));
+const CheckIn = lazy(() => import("./pages/CheckIn"));
 const Faq = lazy(() => import("./pages/Faq"));
 const PaymentFail = lazy(() => import("./pages/PaymentFail"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
@@ -37,12 +40,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="login" element={<Auth />} />
           <Route path="account" element={<Account />} />
           <Route path="reserve" element={<Reserve />} />
+          <Route path="attendance" element={<Attendance />} />
+          <Route path="checkin" element={<CheckIn />} />
           <Route path="faq" element={<Faq />} />
           <Route path="terms" element={<Terms />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="payment/success" element={<PaymentSuccess />} />
           <Route path="payment/fail" element={<PaymentFail />} />
           <Route path="admin" element={<AdminLogin />} />
+          <Route path="admin/attendance" element={<AdminAttendance />} />
           <Route path="admin/members" element={<AdminMembers />} />
           <Route path="admin/reservations" element={<AdminReservations />} />
           <Route path="admin/settings" element={<AdminSettings />} />

@@ -50,6 +50,7 @@ export default function Header({ isAdmin }: HeaderProps) {
         {isAdmin ? (
           <nav className="flex items-center gap-1 text-xs font-bold sm:gap-2 sm:text-sm">
             <NavLink className={adminNavClass} to="/admin/reservations">예약</NavLink>
+            <NavLink className={adminNavClass} to="/admin/attendance">출근</NavLink>
             <NavLink className={adminNavClass} to="/admin/stats">통계</NavLink>
             <NavLink className={adminNavClass} to="/admin/members">회원</NavLink>
             <NavLink className={adminNavClass} to="/admin/settings">설정</NavLink>

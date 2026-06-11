@@ -56,6 +56,11 @@ export default function AccountMenu({ isAdmin = false }: { isAdmin?: boolean }) 
               예약현황
             </Link>
           )}
+          {!isAdmin ? (
+            <Link className={itemClass} to="/attendance" onClick={() => setOpen(false)}>
+              출근부
+            </Link>
+          ) : null}
           <Link className={itemClass} to="/account?tab=profile" onClick={() => setOpen(false)}>
             회원정보
           </Link>
