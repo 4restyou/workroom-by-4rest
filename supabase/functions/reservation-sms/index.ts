@@ -107,14 +107,13 @@ async function sendSms(to: string, text: string): Promise<void> {
 
 Deno.serve(async (request) => {
   try {
-    if (WEBHOOK_SECRET) {
-      const receivedSecret = request.headers.get("x-workroom-webhook-secret") ?? "";
-      if (receivedSecret !== WEBHOOK_SECRET) {
-        console.warn("[reservation-sms] rejected unsigned webhook request");
-        return new Response("unauthorized", { status: 401 });
-      }
-    } else {
-      console.warn("[reservation-sms] WEBHOOK_SECRET is not configured");
+    // Fail closed: the webhook must present the shared secret. If WEBHOOK_SECRET
+    // is unset the function refuses all calls, so a leaked URL can't be abused
+    // to send SMS to arbitrary numbers.
+    const receivedSecret = request.headers.get("x-workroom-webhook-secret") ?? "";
+    if (!WEBHOOK_SECRET || receivedSecret !== WEBHOOK_SECRET) {
+      console.warn("[reservation-sms] rejected unauthenticated webhook request");
+      return new Response("unauthorized", { status: 401 });
     }
 
     const payload = (await request.json()) as WebhookPayload;
