@@ -1,4 +1,4 @@
-import cat1 from "../../assets/cat1.svg";
+import paw from "../../assets/paw.svg";
 import { card, tintCard } from "../lib/ui";
 
 type StampCardProps = {
@@ -29,7 +29,7 @@ export default function StampCard({ filled, goal, reward }: StampCardProps) {
             }`}
           >
             {on ? (
-              <img src={cat1} alt="" aria-hidden className="h-[62%] w-[62%] object-contain" />
+              <img src={paw} alt="" aria-hidden className="h-[58%] w-[58%] object-contain" />
             ) : (
               <span className="text-xs font-bold text-workroom-line">{index + 1}</span>
             )}
