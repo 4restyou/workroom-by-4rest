@@ -34,6 +34,7 @@ const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 export default function AdminSettings() {
   const navigate = useNavigate();
   const qrRef = useRef<HTMLDivElement>(null);
+  const [locationMsg, setLocationMsg] = useState("");
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
@@ -142,6 +143,9 @@ export default function AdminSettings() {
           ...settingKeys.map((key) => ({ key, value: settings[key] ?? "" })),
           { key: "attendance_stamp_goal", value: settings["attendance_stamp_goal"] ?? "10" },
           { key: "attendance_reward_label", value: settings["attendance_reward_label"] ?? "" },
+          { key: "attendance_lat", value: settings["attendance_lat"] ?? "" },
+          { key: "attendance_lng", value: settings["attendance_lng"] ?? "" },
+          { key: "attendance_radius_m", value: settings["attendance_radius_m"] ?? "150" },
         ],
         { onConflict: "key" },
       ),
@@ -448,6 +452,54 @@ export default function AdminSettings() {
                 <p className="text-xs font-medium text-workroom-muted">SVG는 벡터라 크게 인쇄해도 안 깨져요. 재발급하면 기존 QR은 무효가 됩니다. (목표·보상은 ‘변경사항 저장’으로 적용)</p>
               </div>
             </div>
+
+            <div className="mt-6 border-t-2 border-workroom-line pt-5">
+              <p className="text-sm font-black">위치 제한 (선택)</p>
+              <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">
+                매장 좌표를 설정하면 그 반경 안에서만 출근할 수 있어요. 비워두면 위치 제한 없이 QR만 사용해요. 위치는 출근 확인에만 쓰고 저장하지 않아요.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <label className="grid gap-2 text-sm font-bold">
+                  위도(lat)
+                  <input
+                    value={settings["attendance_lat"] ?? ""}
+                    onChange={(event) => setSettings((current) => ({ ...current, attendance_lat: event.target.value }))}
+                    placeholder="예: 35.1487"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-bold">
+                  경도(lng)
+                  <input
+                    value={settings["attendance_lng"] ?? ""}
+                    onChange={(event) => setSettings((current) => ({ ...current, attendance_lng: event.target.value }))}
+                    placeholder="예: 126.9156"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-bold">
+                  허용 반경(m)
+                  <input
+                    type="number"
+                    min={20}
+                    value={settings["attendance_radius_m"] ?? "150"}
+                    onChange={(event) => setSettings((current) => ({ ...current, attendance_radius_m: event.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className={buttonClass("secondary", "sm")} onClick={captureLocation} type="button">
+                  현재 위치로 설정
+                </button>
+                <button
+                  className={buttonClass("secondary", "sm")}
+                  onClick={() => setSettings((current) => ({ ...current, attendance_lat: "", attendance_lng: "" }))}
+                  type="button"
+                >
+                  위치 제한 끄기
+                </button>
+              </div>
+              {locationMsg ? <p className="mt-2 text-xs font-bold text-workroom-muted">{locationMsg}</p> : null}
+              <p className="mt-2 text-xs font-medium text-workroom-muted">‘현재 위치로 설정’은 매장에서 눌러주세요. 설정 후 ‘변경사항 저장’을 눌러야 적용돼요.</p>
+            </div>
           </section>
         </div>
       </Section>
@@ -467,6 +519,26 @@ export default function AdminSettings() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function captureLocation() {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setLocationMsg("이 기기에서 위치를 가져올 수 없어요.");
+      return;
+    }
+    setLocationMsg("위치 확인 중…");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setSettings((current) => ({
+          ...current,
+          attendance_lat: position.coords.latitude.toFixed(6),
+          attendance_lng: position.coords.longitude.toFixed(6),
+        }));
+        setLocationMsg("현재 위치를 입력했어요. ‘변경사항 저장’을 눌러 적용하세요.");
+      },
+      () => setLocationMsg("위치 권한이 거부됐어요."),
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
   }
 
   async function regenerateToken() {

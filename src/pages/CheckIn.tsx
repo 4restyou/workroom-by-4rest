@@ -8,6 +8,20 @@ import type { CheckInResult } from "../lib/types";
 
 type State = "checking" | "need-login" | "done";
 
+function getPosition(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+    );
+  });
+}
+
 export default function CheckIn() {
   const [params] = useSearchParams();
   const location = useLocation();
@@ -32,7 +46,13 @@ export default function CheckIn() {
         setState("need-login");
         return;
       }
-      const { data, error } = await supabase.rpc("attendance_check_in", { p_token: token });
+      // 현재 위치는 출근 확인에만 사용하고 저장하지 않습니다. (매장 좌표 미설정 시 위치는 무시됨)
+      const pos = await getPosition();
+      const { data, error } = await supabase.rpc("attendance_check_in", {
+        p_token: token,
+        p_lat: pos?.lat ?? null,
+        p_lng: pos?.lng ?? null,
+      });
       if (error) {
         setResult({ ok: false, message: "출근 처리 중 오류가 발생했습니다." });
       } else {
@@ -50,7 +70,14 @@ export default function CheckIn() {
     <main className="pb-16">
       <Section eyebrow="Check-in" title={title} accent={success ? "mint" : "yellow"}>
         <div className={`${card} grid gap-4 p-6`}>
-          {state === "checking" ? <p className="font-bold">출근을 확인하고 있어요…</p> : null}
+          {state === "checking" ? (
+            <div>
+              <p className="font-bold">출근을 확인하고 있어요…</p>
+              <p className="mt-2 text-xs font-medium leading-6 text-workroom-muted">
+                출근 확인을 위해 현재 위치를 잠시 확인할 수 있어요. 위치는 저장하지 않아요.
+              </p>
+            </div>
+          ) : null}
 
           {state === "need-login" ? (
             <>
