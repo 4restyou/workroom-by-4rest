@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import FeatureCard from "../components/FeatureCard";
+import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
 import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
@@ -12,29 +12,29 @@ import { SITE } from "../lib/site";
 
 const { address: ADDRESS, naverMapUrl: NAVER_MAP_URL, kakaoMapUrl: KAKAO_MAP_URL } = SITE;
 
-const features: { title: string; body: string; mark: string; accent: TintColor }[] = [
+const features: { title: string; body: string; icon: FeatureIcon; accent: TintColor }[] = [
   {
     title: "개인 작업석",
     body: "혼자 집중하기 좋은 자유석. 먼저 앉는 순서대로 이용합니다.",
-    mark: "1",
+    icon: "seat",
     accent: "mint",
   },
   {
     title: "공용 테이블",
     body: "가벼운 대화, 협업, 작은 모임을 위한 자리입니다.",
-    mark: "2",
+    icon: "table",
     accent: "lilac",
   },
   {
     title: "호리존 촬영",
     body: "상반신 증명사진과 간단 프로필 촬영을 운영자가 직접 진행합니다.",
-    mark: "3",
+    icon: "camera",
     accent: "sky",
   },
   {
     title: "커피 / 프린트",
     body: "커피는 이용권 기준으로 제공하고, 흑백 프린트는 5장까지 무료입니다.",
-    mark: "4",
+    icon: "coffee",
     accent: "coral",
   },
 ];
@@ -174,23 +174,6 @@ export default function Home() {
           기본 단위는 3시간권입니다. 1시간권은 운영하지 않고, 좌석 여유가 있을 때 1시간 단위 연장이 가능합니다.
         </p>
       </Section>
-
-      <section className="mx-auto max-w-5xl px-4 py-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <article className={`${tintCard("ink")} p-5`}>
-            <p className="text-sm font-black text-workroom-yellow">Mood</p>
-            <h2 className="mt-2 text-xl font-bold leading-tight">조용하지만 너무 엄숙하지 않게</h2>
-          </article>
-          <article className={`${tintCard("yellow")} p-5`}>
-            <p className="text-sm font-black text-workroom-muted">Use</p>
-            <h2 className="mt-2 text-xl font-bold leading-tight">작업, 촬영, 작은 대화까지</h2>
-          </article>
-          <article className={`${tintCard("mint")} p-5`}>
-            <p className="text-sm font-black text-workroom-muted">Check</p>
-            <h2 className="mt-2 text-xl font-bold leading-tight">신청 후 확인 연락으로 확정</h2>
-          </article>
-        </div>
-      </section>
 
       <Section eyebrow="Guide" title="이용 기준은 가볍게, 분명하게" accent="sky">
         <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
