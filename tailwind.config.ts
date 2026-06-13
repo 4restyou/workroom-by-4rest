@@ -58,6 +58,17 @@ export default {
           "Segoe UI",
           "sans-serif",
         ],
+        // Display face for headlines. Falls back to the body stack per glyph.
+        display: [
+          "GmarketSans",
+          "Pretendard Variable",
+          "Pretendard",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Apple SD Gothic Neo",
+          "Segoe UI",
+          "sans-serif",
+        ],
       },
       keyframes: {
         "pop-in": {

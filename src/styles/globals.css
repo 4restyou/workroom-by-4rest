@@ -5,6 +5,17 @@
 /* Pretendard Variable is loaded via the dynamic-subset stylesheet linked in
    index.html (public/fonts/pretendard.css). */
 
+/* Gmarket Sans Bold — display face for headlines only. Self-hosted and
+   subset to the glyphs used in the app (~38KB woff2). Body text stays on
+   Pretendard; missing glyphs fall back to Pretendard via the family stack. */
+@font-face {
+  font-family: "GmarketSans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/GmarketSansBold.subset.woff2") format("woff2");
+}
+
 :root {
   color: #141414;
   background: #faf8f1;
