@@ -16,6 +16,10 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith("/admin");
+  // Focused task flows hide the bottom tab bar so their own sticky actions own
+  // the bottom edge.
+  const isFocusedFlow = location.pathname === "/reserve" || location.pathname.startsWith("/checkin");
+  const showTabBar = !isAdmin && !isFocusedFlow;
 
   // First login onboarding: if a signed-in member hasn't completed their
   // profile (name, phone, privacy consent), send them to 회원정보 first.
@@ -53,13 +57,13 @@ export default function App() {
       <Header isAdmin={isAdmin} />
       {/* On mobile, the bottom tab bar overlays the bottom edge, so non-admin
           pages get extra bottom padding to keep content clear of it. */}
-      <div id="main" className={`flex-1 ${!isAdmin ? "pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:pb-0" : ""}`}>
+      <div id="main" className={`flex-1 ${showTabBar ? "pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:pb-0" : ""}`}>
         <Suspense fallback={<PageLoading />}>
           <Outlet />
         </Suspense>
       </div>
       {!isAdmin ? <Footer /> : null}
-      {!isAdmin ? <BottomTabBar /> : null}
+      {showTabBar ? <BottomTabBar /> : null}
       <BackToTop />
     </div>
   );

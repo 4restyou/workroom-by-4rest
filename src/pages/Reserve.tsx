@@ -66,6 +66,7 @@ export default function Reserve() {
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [fullDates, setFullDates] = useState<Set<string>>(new Set());
   const [seatCapacities, setSeatCapacities] = useState<Record<string, number>>({});
+  const [step, setStep] = useState(1); // wizard: 1 이용권 · 2 날짜·시간 · 3 정보·확인
 
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
@@ -233,8 +234,46 @@ export default function Reserve() {
     trackEvent("reserve_pass_selected", { pass_type: passName });
   }
 
+  // Validate the step the user is currently on before letting them advance.
+  function currentStepError(): string {
+    if (step === 1) {
+      if (!form.pass_type) return "이용권을 먼저 선택해 주세요.";
+    }
+    if (step === 2) {
+      if (!form.date || form.date < todayValue()) return "오늘 이후 날짜를 선택해 주세요.";
+      if (isClosedDay) return "선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.";
+      if (form.start_time >= form.end_time) return "종료 시간은 시작 시간보다 늦어야 해요.";
+      if (openHHMM && closeHHMM && (form.start_time < openHHMM || form.end_time > closeHHMM))
+        return `운영 시간(${openHHMM} - ${closeHHMM}) 안에서만 예약할 수 있어요.`;
+    }
+    return "";
+  }
+
+  function goToStep(target: number) {
+    setError("");
+    setStep(Math.min(3, Math.max(1, target)));
+    if (typeof window !== "undefined") {
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    }
+  }
+
+  function goNext() {
+    const stepError = currentStepError();
+    if (stepError) {
+      setError(stepError);
+      return;
+    }
+    goToStep(step + 1);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // On earlier steps the form submit (e.g. Enter key) just advances.
+    if (step < 3) {
+      goNext();
+      return;
+    }
     setError("");
     setSuccess(false);
 
@@ -357,9 +396,12 @@ export default function Reserve() {
     });
     setSuccess(true);
     setForm({ ...emptyForm, date: todayValue() });
+    setStep(1);
   }
 
   const groupedPasses = groupPasses(passes);
+  const selectedPassInfo = passes.find((pass) => pass.name === form.pass_type) ?? null;
+  const stepLabels = ["이용권", "날짜·시간", "정보·확인"];
 
   return (
     <main className="pb-28 sm:pb-12">
@@ -396,7 +438,7 @@ export default function Reserve() {
             </Link>
           </div>
         ) : (
-        <form className="grid gap-5" onSubmit={handleSubmit}>
+        <form className="grid gap-5" onSubmit={handleSubmit} noValidate>
           <input
             type="text"
             name="company"
@@ -407,7 +449,24 @@ export default function Reserve() {
             value={trap}
             onChange={(event) => setTrap(event.target.value)}
           />
-          <fieldset className={`${card} p-5`}>
+
+          {/* Progress */}
+          <ol className="grid grid-cols-3 gap-2">
+            {stepLabels.map((label, index) => {
+              const n = index + 1;
+              const reached = step >= n;
+              return (
+                <li className="grid gap-1.5" key={label}>
+                  <span className={`h-1.5 rounded-pill transition-colors ${reached ? "bg-workroom-ink" : "bg-workroom-line"}`} />
+                  <span className={`text-[11px] font-bold ${step === n ? "text-workroom-ink" : "text-workroom-muted"}`}>
+                    {n}. {label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
+          <fieldset className={`${card} p-5 ${step === 1 ? "" : "hidden"}`}>
             <StepHeading step="1" title="이용권" />
             <div className="grid gap-3">
               {groupedPasses.map((group) => (
@@ -447,7 +506,7 @@ export default function Reserve() {
             </div>
           </fieldset>
 
-          <fieldset className={`${card} p-5`}>
+          <fieldset className={`${card} p-5 ${step === 2 ? "" : "hidden"}`}>
             <StepHeading step="2" title="날짜와 시간" />
             {!form.pass_type ? (
               <p className={`mb-4 ${tintCard("yellow")} p-3 text-sm font-bold`}>먼저 이용권을 선택하면 좌석이 남은 날짜만 선택할 수 있어요.</p>
@@ -484,7 +543,7 @@ export default function Reserve() {
             </div>
           </fieldset>
 
-          <fieldset className={`${card} p-5`}>
+          <fieldset className={`${card} p-5 ${step === 3 ? "" : "hidden"}`}>
             <StepHeading step="3" title="예약자 정보" />
             <div className="grid gap-4">
               <Field label="이름">
@@ -518,15 +577,50 @@ export default function Reserve() {
             </div>
           </fieldset>
 
+          {/* Review summary on the final step */}
+          {step === 3 ? (
+            <div className={`${tintCard("yellow")} p-4`}>
+              <p className="text-sm font-bold">예약 요약</p>
+              <dl className="mt-3 grid grid-cols-[64px_1fr] gap-x-3 gap-y-2 text-sm">
+                <dt className="font-bold text-workroom-muted">이용권</dt>
+                <dd className="font-bold">{form.pass_type || "-"}</dd>
+                <dt className="font-bold text-workroom-muted">날짜</dt>
+                <dd className="font-bold">{form.date ? formatDate(form.date) : "-"}</dd>
+                <dt className="font-bold text-workroom-muted">시간</dt>
+                <dd className="font-bold">
+                  {form.start_time} - {form.end_time}
+                </dd>
+                <dt className="font-bold text-workroom-muted">금액</dt>
+                <dd className="font-bold">{selectedPassInfo?.price ? formatPrice(selectedPassInfo.price) : "확인 후 안내"}</dd>
+              </dl>
+            </div>
+          ) : null}
+
           {error ? <p className={`${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
-          <button className={buttonClass("primary", "lg")} disabled={isSubmitting || !reservationEnabled} type="submit">
-            {isSubmitting ? "보내는 중…" : reservationEnabled ? "예약 신청 →" : "예약 일시 중지"}
-          </button>
-
-          <Link className="text-center text-sm font-bold text-workroom-muted underline underline-offset-4 transition-colors hover:text-workroom-ink" to="/">
-            소개 페이지로 돌아가기
-          </Link>
+          {/* Sticky action bar (mobile) / inline (desktop) */}
+          <div className="sticky bottom-0 z-20 -mx-4 border-t-2 border-workroom-ink bg-workroom-background/95 px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-1">
+            <div className="mx-auto flex max-w-5xl gap-3">
+              {step > 1 ? (
+                <button className={buttonClass("secondary", "lg", "flex-1 sm:flex-none sm:px-8")} onClick={() => goToStep(step - 1)} type="button">
+                  이전
+                </button>
+              ) : (
+                <Link className={buttonClass("secondary", "lg", "flex-1 sm:flex-none sm:px-8")} to="/">
+                  그만두기
+                </Link>
+              )}
+              {step < 3 ? (
+                <button className={buttonClass("accent", "lg", "flex-[2]")} onClick={goNext} type="button">
+                  다음 →
+                </button>
+              ) : (
+                <button className={buttonClass("primary", "lg", "flex-[2]")} disabled={isSubmitting || !reservationEnabled} type="submit">
+                  {isSubmitting ? "보내는 중…" : reservationEnabled ? "예약 신청 →" : "예약 일시 중지"}
+                </button>
+              )}
+            </div>
+          </div>
         </form>
         )}
       </Section>
