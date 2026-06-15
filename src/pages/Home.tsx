@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
+import MemberDashboard from "../components/MemberDashboard";
 import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
@@ -62,6 +63,19 @@ const cautionItems = [
 
 export default function Home() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!supabase) {
+      setSignedIn(false);
+      return;
+    }
+    void supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     async function loadPasses() {
@@ -99,8 +113,12 @@ export default function Home() {
 
   return (
     <main className="pb-28 sm:pb-0">
-      {/* Hero */}
-      <section className="mx-auto max-w-5xl px-4 pb-8 pt-12 sm:pb-14 sm:pt-20">
+      {/* Signed-in members get a "today" dashboard in place of the marketing
+          hero; visitors (and the initial unknown state) see the hero. */}
+      {signedIn ? (
+        <MemberDashboard />
+      ) : (
+        <section className="mx-auto max-w-5xl px-4 pb-8 pt-12 sm:pb-14 sm:pt-20">
         <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr] sm:gap-12">
           <div className="animate-pop-in">
             <span className={badge("yellow")}>09:00–22:00 · 예약제 운영</span>
@@ -144,6 +162,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      )}
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤" accent="mint">
         <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
