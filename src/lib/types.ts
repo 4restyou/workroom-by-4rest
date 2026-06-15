@@ -161,6 +161,37 @@ export type Coupon = {
   used_at: string | null;
 };
 
+export type CardAccent = "yellow" | "mint" | "lilac" | "sky" | "coral";
+
+export type MemberCard = {
+  id: string;
+  profile_id: string;
+  display_name: string;
+  category: string;
+  occupation: string | null;
+  headline: string | null;
+  bio: string | null;
+  link_url: string | null;
+  instagram: string | null;
+  contact: string | null;
+  accent: CardAccent;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BoardPost = {
+  id: string;
+  profile_id: string | null;
+  author_name: string;
+  kind: "notice" | "message";
+  body: string;
+  color: CardAccent;
+  is_pinned: boolean;
+  is_hidden: boolean;
+  created_at: string;
+};
+
 export type CheckInResult = {
   ok: boolean;
   code?: string;

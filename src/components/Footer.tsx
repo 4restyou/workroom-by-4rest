@@ -42,7 +42,13 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t-2 border-workroom-line pt-5">
-          <div className="flex gap-4 text-xs font-bold">
+          <div className="flex flex-wrap gap-4 text-xs font-bold">
+            <Link className="transition-colors hover:text-workroom-muted" to="/directory">
+              명함첩
+            </Link>
+            <Link className="transition-colors hover:text-workroom-muted" to="/board">
+              메모판
+            </Link>
             <Link className="transition-colors hover:text-workroom-muted" to="/faq">
               이용안내
             </Link>

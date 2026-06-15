@@ -19,7 +19,10 @@ const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 const AdminStats = lazy(() => import("./pages/AdminStats"));
 const Attendance = lazy(() => import("./pages/Attendance"));
 const Auth = lazy(() => import("./pages/Auth"));
+const Board = lazy(() => import("./pages/Board"));
 const CheckIn = lazy(() => import("./pages/CheckIn"));
+const Directory = lazy(() => import("./pages/Directory"));
+const DirectoryEdit = lazy(() => import("./pages/DirectoryEdit"));
 const Faq = lazy(() => import("./pages/Faq"));
 const PaymentFail = lazy(() => import("./pages/PaymentFail"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
@@ -42,6 +45,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="reserve" element={<Reserve />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="checkin" element={<CheckIn />} />
+          <Route path="directory" element={<Directory />} />
+          <Route path="directory/edit" element={<DirectoryEdit />} />
+          <Route path="board" element={<Board />} />
           <Route path="faq" element={<Faq />} />
           <Route path="terms" element={<Terms />} />
           <Route path="privacy" element={<Privacy />} />

@@ -60,6 +60,8 @@ export default function Header({ isAdmin }: HeaderProps) {
           <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-4 sm:text-sm">
             <a className="hidden transition-colors hover:text-workroom-ink sm:inline" href="/#space">공간</a>
             <a className="hidden transition-colors hover:text-workroom-ink sm:inline" href="/#pricing">이용권</a>
+            <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/directory">명함첩</Link>
+            <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/board">메모판</Link>
             <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/faq">이용안내</Link>
             {profile ? (
               <AccountMenu isAdmin={profile.role === "admin"} />

@@ -33,13 +33,13 @@ const reserveIcon = (
     <path d="M3 9h18M8 3v4M16 3v4M9 14h6M9 17.5h4" />
   </svg>
 );
-const stampIcon = (
+// 출근부: 체크리스트가 달린 클립보드. 다른 아이콘과 동일하게 24px 박스를
+// 꽉 채우도록 그렸다.
+const attendanceIcon = (
   <svg {...iconProps}>
-    <ellipse cx="12" cy="15" rx="4.2" ry="3.4" />
-    <circle cx="6.5" cy="10" r="1.5" />
-    <circle cx="10" cy="7" r="1.5" />
-    <circle cx="14" cy="7" r="1.5" />
-    <circle cx="17.5" cy="10" r="1.5" />
+    <rect x="8" y="2.5" width="8" height="4" rx="1.2" />
+    <path d="M16 4.5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h2" />
+    <path d="M8.5 13l2.2 2.2L15 11" />
   </svg>
 );
 const userIcon = (
@@ -64,7 +64,7 @@ const loginIcon = (
 const memberTabs: Tab[] = [
   { to: "/", label: "홈", icon: homeIcon, match: (p) => p === "/" },
   { to: "/reserve", label: "예약", icon: reserveIcon, match: (p) => p.startsWith("/reserve") },
-  { to: "/attendance", label: "출근부", icon: stampIcon, match: (p) => p.startsWith("/attendance") || p.startsWith("/checkin") },
+  { to: "/attendance", label: "출근부", icon: attendanceIcon, match: (p) => p.startsWith("/attendance") || p.startsWith("/checkin") },
   { to: "/account", label: "내정보", icon: userIcon, match: (p) => p.startsWith("/account") },
 ];
 
