@@ -1,0 +1,130 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+
+type Tab = {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  match: (pathname: string) => boolean;
+};
+
+const iconProps = {
+  width: 22,
+  height: 22,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+const homeIcon = (
+  <svg {...iconProps}>
+    <path d="M3 10.5 12 3l9 7.5" />
+    <path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" />
+  </svg>
+);
+const reserveIcon = (
+  <svg {...iconProps}>
+    <rect x="3" y="5" width="18" height="16" rx="2.5" />
+    <path d="M3 9h18M8 3v4M16 3v4M9 14h6M9 17.5h4" />
+  </svg>
+);
+const stampIcon = (
+  <svg {...iconProps}>
+    <ellipse cx="12" cy="15" rx="4.2" ry="3.4" />
+    <circle cx="6.5" cy="10" r="1.5" />
+    <circle cx="10" cy="7" r="1.5" />
+    <circle cx="14" cy="7" r="1.5" />
+    <circle cx="17.5" cy="10" r="1.5" />
+  </svg>
+);
+const userIcon = (
+  <svg {...iconProps}>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20a7 7 0 0 1 14 0" />
+  </svg>
+);
+const infoIcon = (
+  <svg {...iconProps}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5M12 7.5h.01" />
+  </svg>
+);
+const loginIcon = (
+  <svg {...iconProps}>
+    <path d="M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+    <path d="M10 17l5-5-5-5M15 12H3" />
+  </svg>
+);
+
+const memberTabs: Tab[] = [
+  { to: "/", label: "홈", icon: homeIcon, match: (p) => p === "/" },
+  { to: "/reserve", label: "예약", icon: reserveIcon, match: (p) => p.startsWith("/reserve") },
+  { to: "/attendance", label: "출근부", icon: stampIcon, match: (p) => p.startsWith("/attendance") || p.startsWith("/checkin") },
+  { to: "/account", label: "내정보", icon: userIcon, match: (p) => p.startsWith("/account") },
+];
+
+const guestTabs: Tab[] = [
+  { to: "/", label: "홈", icon: homeIcon, match: (p) => p === "/" },
+  { to: "/reserve", label: "예약", icon: reserveIcon, match: (p) => p.startsWith("/reserve") },
+  { to: "/faq", label: "이용안내", icon: infoIcon, match: (p) => p.startsWith("/faq") },
+  { to: "/login", label: "로그인", icon: loginIcon, match: (p) => p.startsWith("/login") },
+];
+
+export default function BottomTabBar() {
+  const location = useLocation();
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!supabase) {
+      setSignedIn(false);
+      return;
+    }
+    void supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Until we know, assume guest tabs (they overlap on 홈/예약 so there's no flicker
+  // on the most common landing paths).
+  const tabs = signedIn ? memberTabs : guestTabs;
+
+  return (
+    <nav
+      aria-label="주요 메뉴"
+      className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
+    >
+      <ul className="mx-auto grid max-w-md grid-cols-4">
+        {tabs.map((tab) => {
+          const active = tab.match(location.pathname);
+          return (
+            <li key={tab.to}>
+              <Link
+                to={tab.to}
+                aria-current={active ? "page" : undefined}
+                className={`flex flex-col items-center gap-1 py-2 text-[11px] font-bold transition-colors ${
+                  active ? "text-workroom-ink" : "text-workroom-muted"
+                }`}
+              >
+                <span
+                  className={`grid h-9 w-12 place-items-center rounded-pill border transition-colors ${
+                    active ? "border-workroom-ink bg-workroom-yellow" : "border-transparent"
+                  }`}
+                >
+                  {tab.icon}
+                </span>
+                {tab.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}

@@ -1,7 +1,7 @@
 import { useEffect, Suspense } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BackToTop from "./components/BackToTop";
-import FixedReserveButton from "./components/FixedReserveButton";
+import BottomTabBar from "./components/BottomTabBar";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import PageLoading from "./components/PageLoading";
@@ -16,7 +16,6 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith("/admin");
-  const showReserveButton = !isAdmin && location.pathname !== "/reserve";
 
   // First login onboarding: if a signed-in member hasn't completed their
   // profile (name, phone, privacy consent), send them to 회원정보 first.
@@ -52,13 +51,15 @@ export default function App() {
         본문 바로가기
       </a>
       <Header isAdmin={isAdmin} />
-      <div id="main" className="flex-1">
+      {/* On mobile, the bottom tab bar overlays the bottom edge, so non-admin
+          pages get extra bottom padding to keep content clear of it. */}
+      <div id="main" className={`flex-1 ${!isAdmin ? "pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:pb-0" : ""}`}>
         <Suspense fallback={<PageLoading />}>
           <Outlet />
         </Suspense>
       </div>
       {!isAdmin ? <Footer /> : null}
-      {showReserveButton ? <FixedReserveButton /> : null}
+      {!isAdmin ? <BottomTabBar /> : null}
       <BackToTop />
     </div>
   );
