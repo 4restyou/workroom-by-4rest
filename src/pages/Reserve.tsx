@@ -626,8 +626,11 @@ export default function Reserve() {
       </Section>
 
       {success ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <div className={`${card} max-h-[85vh] w-full max-w-lg overflow-y-auto p-6`}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+          <div
+            className={`${card} animate-sheet-up max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-b-none rounded-t-card p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:rounded-card sm:pb-6`}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-pill bg-workroom-line sm:hidden" />
             <p className="text-2xl font-bold">예약 신청이 접수되었습니다 🎉</p>
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
               확인 후 전화 또는 문자로 안내드릴게요. 확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.

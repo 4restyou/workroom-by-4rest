@@ -6,12 +6,12 @@ export type ButtonVariant = "primary" | "accent" | "secondary" | "mint" | "lilac
 export type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-pill border border-workroom-ink font-bold leading-none " +
+  "inline-flex select-none items-center justify-center gap-2 rounded-pill border border-workroom-ink font-bold leading-none " +
   "transition-[transform,background-color,opacity] duration-100 " +
   "hover:-translate-y-px " +
-  "active:translate-y-0 active:opacity-90 " +
+  "active:translate-y-0 active:scale-[0.97] active:opacity-90 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow " +
-  "disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0";
+  "disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0 disabled:active:scale-100";
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary: "bg-workroom-ink text-white",

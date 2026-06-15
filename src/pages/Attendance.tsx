@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
+import Skeleton from "../components/Skeleton";
 import StampCard from "../components/StampCard";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
@@ -99,7 +100,15 @@ export default function Attendance() {
       <Section eyebrow="Attendance" title="출근부" accent="yellow">
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
         {isLoading ? (
-          <p className={`${tintCard("yellow")} p-4 font-bold`}>불러오는 중입니다…</p>
+          <div className="grid gap-5" aria-busy="true">
+            <Skeleton className="h-44" />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+            </div>
+            <Skeleton className="h-24" />
+          </div>
         ) : (
           <div className="grid gap-5">
             <StampCard filled={filled} goal={goal} reward={reward} />

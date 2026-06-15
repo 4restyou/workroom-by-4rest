@@ -108,12 +108,12 @@ export default function BottomTabBar() {
               <Link
                 to={tab.to}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 py-2 text-[11px] font-bold transition-colors ${
+                className={`flex select-none flex-col items-center gap-1 py-2 text-[11px] font-bold transition-colors ${
                   active ? "text-workroom-ink" : "text-workroom-muted"
                 }`}
               >
                 <span
-                  className={`grid h-9 w-12 place-items-center rounded-pill border transition-colors ${
+                  className={`grid h-9 w-12 place-items-center rounded-pill border transition-[transform,background-color,border-color] duration-100 active:scale-90 ${
                     active ? "border-workroom-ink bg-workroom-yellow" : "border-transparent"
                   }`}
                 >

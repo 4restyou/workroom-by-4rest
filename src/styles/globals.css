@@ -75,6 +75,16 @@ button {
   cursor: pointer;
 }
 
+/* App-like touch polish: drop the grey tap-flash on mobile, keep overscroll
+   from chaining to the page background (rubber-band), and don't let long-press
+   select the interactive chrome. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  overscroll-behavior-y: contain;
+}
+
 /* Text-like fields, selects and textareas. -webkit-appearance:none is the key
    line: iOS Safari otherwise paints its own native border/inner-shadow on top
    of ours, which looks like every field has a drop shadow on iPhone (it never
@@ -273,5 +283,43 @@ summary:focus-visible {
   .reveal.is-visible {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Bottom-sheet entrance: panels that dock to the bottom edge on mobile slide
+   up. (The reduced-motion reset above neutralizes this to an instant appear.) */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Skeleton shimmer for loading placeholders. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(20, 20, 20, 0.07);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton::after {
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+}
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
