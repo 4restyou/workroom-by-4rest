@@ -5,17 +5,16 @@
 /* Pretendard Variable is loaded via the dynamic-subset stylesheet linked in
    index.html (public/fonts/pretendard.css). */
 
-/* Gmarket Sans — display face for headlines only. Self-hosted and subset to
-   the glyphs used across the app (~37KB woff2). Uses the Medium weight so the
-   subset can cover every Korean syllable the UI renders (the older Bold subset
-   was missing some, which made headlines fall back to Pretendard mid-word).
-   Body text stays on Pretendard. */
+/* Gmarket Sans Bold — display face for headlines AND member-entered names.
+   Subset from the official TTF to the full Hangul syllables block, so any
+   Korean name renders in Gmarket without falling back to Pretendard mid-word
+   (~316KB woff2). Body text stays on Pretendard. */
 @font-face {
   font-family: "GmarketSans";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 700;
   font-display: swap;
-  src: url("/fonts/GmarketSansMedium.subset.woff2") format("woff2");
+  src: url("/fonts/GmarketSansBold.full.woff2") format("woff2");
 }
 
 :root {
