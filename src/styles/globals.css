@@ -5,15 +5,17 @@
 /* Pretendard Variable is loaded via the dynamic-subset stylesheet linked in
    index.html (public/fonts/pretendard.css). */
 
-/* Gmarket Sans Bold — display face for headlines only. Self-hosted and
-   subset to the glyphs used in the app (~38KB woff2). Body text stays on
-   Pretendard; missing glyphs fall back to Pretendard via the family stack. */
+/* Gmarket Sans — display face for headlines only. Self-hosted and subset to
+   the glyphs used across the app (~37KB woff2). Uses the Medium weight so the
+   subset can cover every Korean syllable the UI renders (the older Bold subset
+   was missing some, which made headlines fall back to Pretendard mid-word).
+   Body text stays on Pretendard. */
 @font-face {
   font-family: "GmarketSans";
   font-style: normal;
-  font-weight: 700;
+  font-weight: 400 700;
   font-display: swap;
-  src: url("/fonts/GmarketSansBold.subset.woff2") format("woff2");
+  src: url("/fonts/GmarketSansMedium.subset.woff2") format("woff2");
 }
 
 :root {
@@ -42,6 +44,13 @@ body {
   background-image: radial-gradient(rgba(20, 20, 20, 0.026) 1px, transparent 1px);
   background-size: 26px 26px;
   background-position: -13px -13px;
+}
+
+/* Subtle paper grain for the directory business cards. A fractal-noise SVG
+   layered at low opacity over the card's accent colour. */
+.paper {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
 }
 
 body,

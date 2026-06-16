@@ -300,6 +300,27 @@ export default function Home() {
         </div>
       </Section>
 
+      <Section eyebrow="Community" title="혼자지만, 같이 쓰는" accent="lilac">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Link className={`${tintCard("mint")} group flex flex-col gap-2 p-6 transition-transform hover:-translate-y-0.5`} to="/directory">
+            <span className="text-2xl">📇</span>
+            <h3 className="text-xl font-bold">멤버 명함첩</h3>
+            <p className="text-sm font-medium leading-6 text-workroom-ink/75">
+              워크룸을 함께 쓰는 사람들의 명함. 이름·업종·카테고리로 찾아보고, 내 명함도 올려보세요.
+            </p>
+            <span className="mt-1 text-sm font-black underline underline-offset-4">명함첩 열기 →</span>
+          </Link>
+          <Link className={`${tintCard("coral")} group flex flex-col gap-2 p-6 transition-transform hover:-translate-y-0.5`} to="/board">
+            <span className="text-2xl">📌</span>
+            <h3 className="text-xl font-bold">메모판</h3>
+            <p className="text-sm font-medium leading-6 text-workroom-ink/75">
+              운영자 공지와 회원들의 한마디가 붙는 공간. 하고 싶은 말, 바라는 점을 포스트잇처럼 남겨주세요.
+            </p>
+            <span className="mt-1 text-sm font-black underline underline-offset-4">메모판 열기 →</span>
+          </Link>
+        </div>
+      </Section>
+
       <section className="mx-auto max-w-5xl px-4 pb-12 pt-4">
         <div className={`${tintCard("ink")} p-6 sm:flex sm:items-center sm:justify-between sm:gap-6`}>
           <div>

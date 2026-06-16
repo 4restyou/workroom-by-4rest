@@ -106,7 +106,7 @@ export default function DirectoryEdit() {
     const payload = {
       profile_id: uid,
       display_name: form.display_name.trim(),
-      category: form.category,
+      category: form.category.trim() || "기타",
       occupation: form.occupation.trim() || null,
       headline: form.headline.trim() || null,
       bio: form.bio.trim() || null,
@@ -177,11 +177,21 @@ export default function DirectoryEdit() {
 
             <div className="grid gap-1.5">
               <label className={labelClass} htmlFor="category">카테고리</label>
-              <select id="category" className={fieldClass} value={form.category} onChange={(e) => update("category", e.target.value)}>
+              <input
+                id="category"
+                className={fieldClass}
+                list="card-category-options"
+                value={form.category}
+                onChange={(e) => update("category", e.target.value)}
+                maxLength={20}
+                placeholder="목록에서 고르거나 직접 입력하세요"
+              />
+              <datalist id="card-category-options">
                 {CARD_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c} />
                 ))}
-              </select>
+              </datalist>
+              <p className="text-xs font-medium text-workroom-muted">제시된 카테고리를 골라도 되고, 원하는 분류를 직접 입력해도 돼요.</p>
             </div>
 
             <div className="grid gap-1.5">

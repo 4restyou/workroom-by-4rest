@@ -10,44 +10,77 @@ import type { MemberCard } from "../lib/types";
 const instaUrl = (handle: string) =>
   `https://instagram.com/${handle.replace(/^@/, "").trim()}`;
 
+// Fisher–Yates: visitors see a fresh ordering each visit rather than newest-first.
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function CardView({ card }: { card: MemberCard }) {
+  const [open, setOpen] = useState(false);
+  const hasDetails = Boolean(card.headline || card.bio || card.link_url || card.contact);
+
   return (
-    <article
-      className={`flex flex-col gap-2 rounded-card border-2 border-workroom-ink p-5 shadow-hard ${ACCENT_BG[card.accent]}`}
-    >
-      <div className="flex items-start justify-between gap-2">
+    <div className="flex flex-col">
+      {/* 실제 명함 비율(90×50mm = 9:5), 종이 질감 */}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => hasDetails && setOpen((v) => !v)}
+        className={`paper relative flex aspect-[9/5] w-full flex-col justify-between rounded-[10px] border-2 border-workroom-ink p-4 text-left shadow-hard transition-transform ${ACCENT_BG[card.accent]} ${hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-workroom-ink/55">WORKROOM</span>
+          <span className="shrink-0 rounded-pill border border-workroom-ink bg-workroom-surface/80 px-2 py-0.5 text-[10px] font-black">
+            {card.category}
+          </span>
+        </div>
+
         <div className="min-w-0">
-          <h3 className="truncate text-lg font-black leading-tight">{card.display_name}</h3>
+          <h3 className="truncate font-display text-xl font-bold leading-tight">{card.display_name}</h3>
           {card.occupation ? (
             <p className="mt-0.5 truncate text-sm font-bold text-workroom-ink/70">{card.occupation}</p>
           ) : null}
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="truncate text-xs font-bold text-workroom-ink/65">
+              {card.instagram ? `@${card.instagram.replace(/^@/, "")}` : " "}
+            </span>
+            {hasDetails ? (
+              <span className="shrink-0 text-[11px] font-black text-workroom-ink/60">{open ? "접기 ▲" : "자세히 ▾"}</span>
+            ) : null}
+          </div>
         </div>
-        <span className="shrink-0 rounded-pill border border-workroom-ink bg-workroom-surface px-2.5 py-1 text-[11px] font-black">
-          {card.category}
-        </span>
-      </div>
+      </button>
 
-      {card.headline ? <p className="text-sm font-bold leading-6">{card.headline}</p> : null}
-      {card.bio ? <p className="whitespace-pre-line text-sm font-medium leading-6 text-workroom-ink/80">{card.bio}</p> : null}
-
-      {(card.instagram || card.link_url || card.contact) && (
-        <div className="mt-1 flex flex-wrap gap-2 border-t border-workroom-ink/15 pt-3 text-xs font-bold">
-          {card.instagram ? (
-            <a className="rounded-pill border border-workroom-ink bg-workroom-surface px-3 py-1 hover:bg-white" href={instaUrl(card.instagram)} rel="noreferrer" target="_blank">
-              @{card.instagram.replace(/^@/, "")}
-            </a>
-          ) : null}
-          {card.link_url ? (
-            <a className="rounded-pill border border-workroom-ink bg-workroom-surface px-3 py-1 hover:bg-white" href={card.link_url} rel="noreferrer" target="_blank">
-              링크
-            </a>
-          ) : null}
-          {card.contact ? (
-            <span className="rounded-pill border border-workroom-ink bg-workroom-surface px-3 py-1">{card.contact}</span>
-          ) : null}
+      {/* 펼치면 보이는 상세 */}
+      {hasDetails && open ? (
+        <div className="mt-2 animate-pop-in rounded-card border border-workroom-line bg-workroom-surface p-4">
+          {card.headline ? <p className="text-sm font-bold leading-6">{card.headline}</p> : null}
+          {card.bio ? <p className="mt-1 whitespace-pre-line text-sm font-medium leading-6 text-workroom-ink/80">{card.bio}</p> : null}
+          {(card.instagram || card.link_url || card.contact) && (
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-workroom-line pt-3 text-xs font-bold">
+              {card.instagram ? (
+                <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={instaUrl(card.instagram)} rel="noreferrer" target="_blank">
+                  @{card.instagram.replace(/^@/, "")}
+                </a>
+              ) : null}
+              {card.link_url ? (
+                <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={card.link_url} rel="noreferrer" target="_blank">
+                  링크
+                </a>
+              ) : null}
+              {card.contact ? (
+                <span className="rounded-pill border border-workroom-ink px-3 py-1">{card.contact}</span>
+              ) : null}
+            </div>
+          )}
         </div>
-      )}
-    </article>
+      ) : null}
+    </div>
   );
 }
 
@@ -74,20 +107,27 @@ export default function Directory() {
       const { data, error: loadError } = await supabase
         .from("member_cards")
         .select("*")
-        .eq("is_published", true)
-        .order("updated_at", { ascending: false });
+        .eq("is_published", true);
       if (loadError) {
         setError("명함을 불러오지 못했어요.");
         setIsLoading(false);
         return;
       }
-      const list = (data ?? []) as MemberCard[];
+      const list = shuffle((data ?? []) as MemberCard[]);
       setCards(list);
       if (uid) setHasCard(list.some((c) => c.profile_id === uid));
       setIsLoading(false);
     }
     void load();
   }, []);
+
+  // Preset categories first, then any custom ones members typed in.
+  const categories = useMemo(() => {
+    const extras = cards
+      .map((c) => c.category)
+      .filter((c) => c && !CARD_CATEGORIES.includes(c as (typeof CARD_CATEGORIES)[number]));
+    return ["전체", ...CARD_CATEGORIES, ...Array.from(new Set(extras))];
+  }, [cards]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -129,7 +169,7 @@ export default function Directory() {
 
         {/* 카테고리 필터 */}
         <div className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-1">
-          {["전체", ...CARD_CATEGORIES].map((c) => {
+          {categories.map((c) => {
             const active = category === c;
             return (
               <button
