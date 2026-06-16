@@ -169,6 +169,7 @@ export type MemberCard = {
   display_name: string;
   category: string;
   occupation: string | null;
+  company: string | null;
   headline: string | null;
   bio: string | null;
   link_url: string | null;

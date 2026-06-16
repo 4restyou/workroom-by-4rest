@@ -6,11 +6,13 @@ import { supabase } from "../lib/supabase";
 import { ACCENT_BG, ACCENT_LABEL, ACCENTS, CARD_CATEGORIES } from "../lib/directory";
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { CardAccent, MemberCard } from "../lib/types";
+import paperTexture from "../../assets/paper-texture.webp";
 
 type Form = {
   display_name: string;
   category: string;
   occupation: string;
+  company: string;
   headline: string;
   bio: string;
   link_url: string;
@@ -24,6 +26,7 @@ const EMPTY: Form = {
   display_name: "",
   category: "기타",
   occupation: "",
+  company: "",
   headline: "",
   bio: "",
   link_url: "",
@@ -74,6 +77,7 @@ export default function DirectoryEdit() {
           display_name: c.display_name,
           category: c.category,
           occupation: c.occupation ?? "",
+          company: c.company ?? "",
           headline: c.headline ?? "",
           bio: c.bio ?? "",
           link_url: c.link_url ?? "",
@@ -108,6 +112,7 @@ export default function DirectoryEdit() {
       display_name: form.display_name.trim(),
       category: form.category.trim() || "기타",
       occupation: form.occupation.trim() || null,
+      company: form.company.trim() || null,
       headline: form.headline.trim() || null,
       bio: form.bio.trim() || null,
       link_url: form.link_url.trim() || null,
@@ -155,19 +160,29 @@ export default function DirectoryEdit() {
           <div className="grid gap-5">
             {error ? <p className={`${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
-            {/* 미리보기 */}
-            <div className={`rounded-card border-2 border-workroom-ink p-5 shadow-hard ${ACCENT_BG[form.accent]}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="truncate text-lg font-black">{form.display_name || "이름"}</h3>
-                  {form.occupation ? <p className="mt-0.5 truncate text-sm font-bold text-workroom-ink/70">{form.occupation}</p> : null}
+            {/* 미리보기 (실제 명함 비율 · 종이 질감) */}
+            <div className="grid gap-1.5">
+              <span className={labelClass}>미리보기</span>
+              <div
+                style={{ backgroundImage: `url(${paperTexture})` }}
+                className="relative flex aspect-[9/5] w-full max-w-sm flex-col justify-between overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)]"
+              >
+                <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${ACCENT_BG[form.accent]}`} />
+                <div className="flex items-start justify-between gap-2 pl-1.5">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-workroom-muted">
+                    <span className={`h-2 w-2 rounded-full ${ACCENT_BG[form.accent]}`} />
+                    {form.category || "카테고리"}
+                  </span>
+                  <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] text-workroom-line">WORKROOM</span>
                 </div>
-                <span className="shrink-0 rounded-pill border border-workroom-ink bg-workroom-surface px-2.5 py-1 text-[11px] font-black">
-                  {form.category}
-                </span>
+                <div className="min-w-0 pl-1.5">
+                  <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{form.display_name || "이름"}</h3>
+                  {form.occupation || form.company ? (
+                    <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{[form.occupation, form.company].filter(Boolean).join(" · ")}</p>
+                  ) : null}
+                  {form.headline ? <p className="mt-1.5 truncate text-xs font-medium text-workroom-ink/65">{form.headline}</p> : null}
+                </div>
               </div>
-              {form.headline ? <p className="mt-2 text-sm font-bold">{form.headline}</p> : null}
-              {form.bio ? <p className="mt-1 whitespace-pre-line text-sm font-medium text-workroom-ink/80">{form.bio}</p> : null}
             </div>
 
             <div className="grid gap-1.5">
@@ -194,9 +209,15 @@ export default function DirectoryEdit() {
               <p className="text-xs font-medium text-workroom-muted">제시된 카테고리를 골라도 되고, 원하는 분류를 직접 입력해도 돼요.</p>
             </div>
 
-            <div className="grid gap-1.5">
-              <label className={labelClass} htmlFor="occupation">업종 / 직함</label>
-              <input id="occupation" className={fieldClass} value={form.occupation} onChange={(e) => update("occupation", e.target.value)} placeholder="예: 브랜드 디자이너, 프리랜서 작가" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <label className={labelClass} htmlFor="occupation">업종 / 직함</label>
+                <input id="occupation" className={fieldClass} value={form.occupation} onChange={(e) => update("occupation", e.target.value)} placeholder="예: 브랜드 디자이너" />
+              </div>
+              <div className="grid gap-1.5">
+                <label className={labelClass} htmlFor="company">회사 / 소속</label>
+                <input id="company" className={fieldClass} value={form.company} onChange={(e) => update("company", e.target.value)} placeholder="예: 포레스트 스튜디오 (선택)" />
+              </div>
             </div>
 
             <div className="grid gap-1.5">

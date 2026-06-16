@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Section from "../components/Section";
 import Skeleton from "../components/Skeleton";
@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { ACCENT_BG, CARD_CATEGORIES } from "../lib/directory";
 import { buttonClass, tintCard } from "../lib/ui";
 import type { MemberCard } from "../lib/types";
+import paperTexture from "../../assets/paper-texture.webp";
 
 const instaUrl = (handle: string) =>
   `https://instagram.com/${handle.replace(/^@/, "").trim()}`;
@@ -22,47 +23,51 @@ function shuffle<T>(arr: T[]): T[] {
 
 function CardView({ card }: { card: MemberCard }) {
   const [open, setOpen] = useState(false);
-  const hasDetails = Boolean(card.headline || card.bio || card.link_url || card.contact);
+  // The front carries the identity (name·role·company·headline). Expanding
+  // reveals the longer bio and contact links.
+  const hasDetails = Boolean(card.bio || card.link_url || card.contact || card.instagram);
+  const subline = [card.occupation, card.company].filter(Boolean).join(" · ");
 
   return (
     <div className="flex flex-col">
-      {/* 실제 명함 비율(90×50mm = 9:5), 종이 질감 */}
+      {/* 실제 명함 비율(90×50mm = 9:5), 흰 종이 질감 */}
       <button
         type="button"
         aria-expanded={open}
         onClick={() => hasDetails && setOpen((v) => !v)}
-        className={`paper relative flex aspect-[9/5] w-full flex-col justify-between rounded-[10px] border-2 border-workroom-ink p-4 text-left shadow-hard transition-transform ${ACCENT_BG[card.accent]} ${hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"}`}
+        style={{ backgroundImage: `url(${paperTexture})` }}
+        className={`relative flex aspect-[9/5] w-full flex-col justify-between overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform ${
+          hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
+        }`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-workroom-ink/55">WORKROOM</span>
-          <span className="shrink-0 rounded-pill border border-workroom-ink bg-workroom-surface/80 px-2 py-0.5 text-[10px] font-black">
+        {/* 좌측 컬러 띠 (브랜드 포인트) */}
+        <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${ACCENT_BG[card.accent]}`} />
+
+        <div className="flex items-start justify-between gap-2 pl-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-workroom-muted">
+            <span className={`h-2 w-2 rounded-full ${ACCENT_BG[card.accent]}`} />
             {card.category}
           </span>
+          <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] text-workroom-line">WORKROOM</span>
         </div>
 
-        <div className="min-w-0">
-          <h3 className="truncate font-display text-xl font-bold leading-tight">{card.display_name}</h3>
-          {card.occupation ? (
-            <p className="mt-0.5 truncate text-sm font-bold text-workroom-ink/70">{card.occupation}</p>
-          ) : null}
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-bold text-workroom-ink/65">
-              {card.instagram ? `@${card.instagram.replace(/^@/, "")}` : " "}
-            </span>
-            {hasDetails ? (
-              <span className="shrink-0 text-[11px] font-black text-workroom-ink/60">{open ? "접기 ▲" : "자세히 ▾"}</span>
-            ) : null}
-          </div>
+        <div className="min-w-0 pl-1.5">
+          <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{card.display_name}</h3>
+          {subline ? <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{subline}</p> : null}
+          {card.headline ? <p className="mt-1.5 truncate text-xs font-medium text-workroom-ink/65">{card.headline}</p> : null}
         </div>
+
+        {hasDetails ? (
+          <span className="absolute bottom-3 right-4 text-[10px] font-black text-workroom-muted">{open ? "접기 ▲" : "자세히 ▾"}</span>
+        ) : null}
       </button>
 
       {/* 펼치면 보이는 상세 */}
       {hasDetails && open ? (
         <div className="mt-2 animate-pop-in rounded-card border border-workroom-line bg-workroom-surface p-4">
-          {card.headline ? <p className="text-sm font-bold leading-6">{card.headline}</p> : null}
-          {card.bio ? <p className="mt-1 whitespace-pre-line text-sm font-medium leading-6 text-workroom-ink/80">{card.bio}</p> : null}
+          {card.bio ? <p className="whitespace-pre-line text-sm font-medium leading-6 text-workroom-ink/80">{card.bio}</p> : null}
           {(card.instagram || card.link_url || card.contact) && (
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-workroom-line pt-3 text-xs font-bold">
+            <div className={`flex flex-wrap gap-2 text-xs font-bold ${card.bio ? "mt-3 border-t border-workroom-line pt-3" : ""}`}>
               {card.instagram ? (
                 <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={instaUrl(card.instagram)} rel="noreferrer" target="_blank">
                   @{card.instagram.replace(/^@/, "")}
@@ -92,6 +97,19 @@ export default function Directory() {
   const [category, setCategory] = useState<string>("전체");
   const [signedIn, setSignedIn] = useState(false);
   const [hasCard, setHasCard] = useState(false);
+
+  // Scroll-aware fade on the category row: only fades the side that has more
+  // chips to reveal, so the edge reads as "scroll for more" not "cut off".
+  const chipRef = useRef<HTMLDivElement>(null);
+  const [fade, setFade] = useState({ left: false, right: false });
+  function syncFade() {
+    const el = chipRef.current;
+    if (!el) return;
+    setFade({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    });
+  }
 
   useEffect(() => {
     async function load() {
@@ -129,12 +147,24 @@ export default function Directory() {
     return ["전체", ...CARD_CATEGORIES, ...Array.from(new Set(extras))];
   }, [cards]);
 
+  useEffect(() => {
+    syncFade();
+    window.addEventListener("resize", syncFade);
+    return () => window.removeEventListener("resize", syncFade);
+  }, [categories]);
+
+  const maskImage = useMemo(() => {
+    const left = fade.left ? "transparent 0, #000 1.75rem" : "#000 0";
+    const right = fade.right ? "#000 calc(100% - 1.75rem), transparent 100%" : "#000 100%";
+    return `linear-gradient(to right, ${left}, ${right})`;
+  }, [fade]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return cards.filter((c) => {
       if (category !== "전체" && c.category !== category) return false;
       if (!q) return true;
-      return [c.display_name, c.occupation, c.category, c.headline, c.bio]
+      return [c.display_name, c.occupation, c.company, c.category, c.headline, c.bio]
         .filter(Boolean)
         .some((field) => (field as string).toLowerCase().includes(q));
     });
@@ -143,9 +173,13 @@ export default function Directory() {
   return (
     <main className="pb-16">
       <Section eyebrow="Directory" title="멤버 명함첩" accent="mint">
-        <p className="mb-5 max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
+        <p className="max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
           워크룸을 함께 쓰는 사람들. 이름·업종·카테고리로 찾아보고, 내 명함도 올려보세요.
         </p>
+        <p className="mb-5 mt-1 max-w-2xl text-xs font-medium leading-6 text-workroom-muted">
+          명함은 본인이 직접 등록·수정·삭제할 수 있어요. 공개로 설정한 명함만 이 목록에 표시됩니다.
+        </p>
+
         <div className="mb-5 flex flex-wrap items-center gap-3">
           <Link className={buttonClass("primary", "sm")} to="/directory/edit">
             {hasCard ? "내 명함 수정" : signedIn ? "내 명함 등록" : "로그인하고 명함 등록"}
@@ -168,7 +202,12 @@ export default function Directory() {
         </div>
 
         {/* 카테고리 필터 */}
-        <div className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-1">
+        <div
+          ref={chipRef}
+          onScroll={syncFade}
+          style={{ maskImage, WebkitMaskImage: maskImage }}
+          className="mb-6 flex gap-2 overflow-x-auto px-0.5 pb-1"
+        >
           {categories.map((c) => {
             const active = category === c;
             return (
@@ -192,12 +231,12 @@ export default function Directory() {
 
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
-            <Skeleton className="h-44" />
-            <Skeleton className="h-44" />
-            <Skeleton className="h-44" />
+            <Skeleton className="aspect-[9/5]" />
+            <Skeleton className="aspect-[9/5]" />
+            <Skeleton className="aspect-[9/5]" />
           </div>
         ) : filtered.length ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((card) => (
               <CardView card={card} key={card.id} />
             ))}
@@ -217,10 +256,6 @@ export default function Directory() {
             ) : null}
           </div>
         )}
-
-        <p className="mt-6 text-xs font-medium leading-6 text-workroom-muted">
-          명함은 본인이 직접 등록·수정·삭제할 수 있어요. 공개로 설정한 명함만 이 목록에 표시됩니다.
-        </p>
       </Section>
     </main>
   );
