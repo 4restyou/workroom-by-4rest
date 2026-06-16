@@ -23,10 +23,11 @@ function shuffle<T>(arr: T[]): T[] {
 
 function CardView({ card }: { card: MemberCard }) {
   const [open, setOpen] = useState(false);
-  // The front carries the identity (name·role·company·headline). Expanding
-  // reveals the longer bio and contact links.
-  const hasDetails = Boolean(card.bio || card.link_url || card.contact || card.instagram);
   const subline = [card.occupation, card.company].filter(Boolean).join(" · ");
+  // A long headline gets clamped on the (fixed-ratio) front, so it also needs
+  // the expander to be readable in full.
+  const longHeadline = (card.headline?.trim().length ?? 0) > 38;
+  const hasDetails = Boolean(card.bio || card.link_url || card.contact || card.instagram || longHeadline);
 
   return (
     <div className="flex flex-col">
@@ -47,24 +48,27 @@ function CardView({ card }: { card: MemberCard }) {
           <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] text-workroom-line">WORKROOM</span>
         </div>
 
-        <div className="min-w-0">
-          <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{card.display_name}</h3>
-          {subline ? <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{subline}</p> : null}
-          <div className="mt-1.5 flex items-end justify-between gap-3">
-            <p className="min-w-0 flex-1 truncate text-xs font-medium text-workroom-ink/65">{card.headline ?? ""}</p>
-            {hasDetails ? (
-              <span className="shrink-0 text-[10px] font-black text-workroom-muted">{open ? "접기 ▲" : "자세히 ▾"}</span>
-            ) : null}
+        <div>
+          <div className="min-w-0">
+            <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{card.display_name}</h3>
+            {subline ? <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{subline}</p> : null}
+            {card.headline ? <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-5 text-workroom-ink/65">{card.headline}</p> : null}
           </div>
+          {hasDetails ? (
+            <div className="mt-2 text-center text-[10px] font-black text-workroom-muted">{open ? "접기 ▲" : "자세히 ▾"}</div>
+          ) : null}
         </div>
       </button>
 
-      {/* 펼치면 보이는 상세 */}
+      {/* 펼치면 보이는 상세: 한 줄 소개 전문 + 소개 + 연락 */}
       {hasDetails && open ? (
         <div className="mt-2 animate-pop-in rounded-card border border-workroom-line bg-workroom-surface p-4">
-          {card.bio ? <p className="whitespace-pre-line text-sm font-medium leading-6 text-workroom-ink/80">{card.bio}</p> : null}
+          {card.headline ? <p className="text-sm font-bold leading-6 text-workroom-ink">{card.headline}</p> : null}
+          {card.bio ? (
+            <p className={`whitespace-pre-line text-sm font-medium leading-6 text-workroom-ink/80 ${card.headline ? "mt-1.5" : ""}`}>{card.bio}</p>
+          ) : null}
           {(card.instagram || card.link_url || card.contact) && (
-            <div className={`flex flex-wrap gap-2 text-xs font-bold ${card.bio ? "mt-3 border-t border-workroom-line pt-3" : ""}`}>
+            <div className={`flex flex-wrap gap-2 text-xs font-bold ${card.headline || card.bio ? "mt-3 border-t border-workroom-line pt-3" : ""}`}>
               {card.instagram ? (
                 <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={instaUrl(card.instagram)} rel="noreferrer" target="_blank">
                   @{card.instagram.replace(/^@/, "")}
@@ -72,7 +76,7 @@ function CardView({ card }: { card: MemberCard }) {
               ) : null}
               {card.link_url ? (
                 <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={card.link_url} rel="noreferrer" target="_blank">
-                  링크
+                  홈페이지
                 </a>
               ) : null}
               {card.contact ? (

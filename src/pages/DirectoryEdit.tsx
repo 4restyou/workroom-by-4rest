@@ -234,7 +234,7 @@ export default function DirectoryEdit() {
                 <input id="instagram" className={fieldClass} value={form.instagram} onChange={(e) => update("instagram", e.target.value)} placeholder="@handle" />
               </div>
               <div className="grid gap-1.5">
-                <label className={labelClass} htmlFor="link_url">링크</label>
+                <label className={labelClass} htmlFor="link_url">홈페이지</label>
                 <input id="link_url" className={fieldClass} value={form.link_url} onChange={(e) => update("link_url", e.target.value)} placeholder="https://" />
               </div>
               <div className="grid gap-1.5">
