@@ -37,7 +37,7 @@ function CardView({ card }: { card: MemberCard }) {
         aria-expanded={open}
         onClick={() => hasDetails && setOpen((v) => !v)}
         style={{ backgroundImage: `url(${paperTexture})` }}
-        className={`relative flex aspect-[9/5] w-full flex-col justify-between overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform ${
+        className={`relative flex min-h-[168px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform sm:min-h-[184px] ${
           hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
         }`}
       >
