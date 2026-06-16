@@ -174,7 +174,7 @@ export default function DirectoryEdit() {
                   <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] text-workroom-line">WORKROOM</span>
                 </div>
                 <div className="min-w-0">
-                  <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{form.display_name || "이름"}</h3>
+                  <h3 className="truncate text-2xl font-extrabold leading-tight tracking-tight text-workroom-ink">{form.display_name || "이름"}</h3>
                   {form.occupation || form.company ? (
                     <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{[form.occupation, form.company].filter(Boolean).join(" · ")}</p>
                   ) : null}

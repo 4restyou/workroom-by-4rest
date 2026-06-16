@@ -96,7 +96,7 @@ export default function MemberDashboard() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-workroom-muted">오늘도 좋은 작업</p>
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
             {data ? `${data.name}님, 안녕하세요` : "안녕하세요"}
           </h1>
         </div>

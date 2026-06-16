@@ -50,7 +50,7 @@ function CardView({ card }: { card: MemberCard }) {
 
         <div>
           <div className="min-w-0">
-            <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{card.display_name}</h3>
+            <h3 className="truncate text-2xl font-extrabold leading-tight tracking-tight text-workroom-ink">{card.display_name}</h3>
             {subline ? <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{subline}</p> : null}
             {card.headline ? <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-5 text-workroom-ink/65">{card.headline}</p> : null}
           </div>
