@@ -46,6 +46,16 @@ body {
   background-position: -13px -13px;
 }
 
+/* Horizontal scroller without a visible scrollbar (category chips). The fade
+   mask already signals that there's more to scroll. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Subtle paper grain for the directory business cards. A fractal-noise SVG
    layered at low opacity over the card's accent colour. */
 .paper {

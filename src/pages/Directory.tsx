@@ -40,26 +40,23 @@ function CardView({ card }: { card: MemberCard }) {
           hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
         }`}
       >
-        {/* 좌측 컬러 띠 (브랜드 포인트) */}
-        <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${ACCENT_BG[card.accent]}`} />
-
-        <div className="flex items-start justify-between gap-2 pl-1.5">
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-workroom-muted">
-            <span className={`h-2 w-2 rounded-full ${ACCENT_BG[card.accent]}`} />
+        <div className="flex items-start justify-between gap-2">
+          <span className={`inline-flex items-center rounded-pill px-2.5 py-1 text-[11px] font-black text-workroom-ink ${ACCENT_BG[card.accent]}`}>
             {card.category}
           </span>
           <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] text-workroom-line">WORKROOM</span>
         </div>
 
-        <div className="min-w-0 pl-1.5">
+        <div className="min-w-0">
           <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{card.display_name}</h3>
           {subline ? <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{subline}</p> : null}
-          {card.headline ? <p className="mt-1.5 truncate text-xs font-medium text-workroom-ink/65">{card.headline}</p> : null}
+          <div className="mt-1.5 flex items-end justify-between gap-3">
+            <p className="min-w-0 flex-1 truncate text-xs font-medium text-workroom-ink/65">{card.headline ?? ""}</p>
+            {hasDetails ? (
+              <span className="shrink-0 text-[10px] font-black text-workroom-muted">{open ? "접기 ▲" : "자세히 ▾"}</span>
+            ) : null}
+          </div>
         </div>
-
-        {hasDetails ? (
-          <span className="absolute bottom-3 right-4 text-[10px] font-black text-workroom-muted">{open ? "접기 ▲" : "자세히 ▾"}</span>
-        ) : null}
       </button>
 
       {/* 펼치면 보이는 상세 */}
@@ -206,7 +203,7 @@ export default function Directory() {
           ref={chipRef}
           onScroll={syncFade}
           style={{ maskImage, WebkitMaskImage: maskImage }}
-          className="mb-6 flex gap-2 overflow-x-auto px-0.5 pb-1"
+          className="no-scrollbar mb-6 flex gap-2 overflow-x-auto px-0.5 pb-1"
         >
           {categories.map((c) => {
             const active = category === c;
