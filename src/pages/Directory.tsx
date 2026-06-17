@@ -24,9 +24,9 @@ function shuffle<T>(arr: T[]): T[] {
 function CardView({ card }: { card: MemberCard }) {
   const [open, setOpen] = useState(false);
   const subline = [card.occupation, card.company].filter(Boolean).join(" · ");
-  // A long headline gets clamped on the (fixed-ratio) front, so it also needs
-  // the expander to be readable in full.
-  const longHeadline = (card.headline?.trim().length ?? 0) > 38;
+  // Headline shows as a single line on the (fixed-height) front; longer ones
+  // are read in full via the expander.
+  const longHeadline = (card.headline?.trim().length ?? 0) > 20;
   const hasDetails = Boolean(card.bio || card.link_url || card.contact || card.instagram || longHeadline);
 
   return (
@@ -37,7 +37,7 @@ function CardView({ card }: { card: MemberCard }) {
         aria-expanded={open}
         onClick={() => hasDetails && setOpen((v) => !v)}
         style={{ backgroundImage: `url(${paperTexture})` }}
-        className={`relative flex min-h-[168px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform sm:min-h-[184px] ${
+        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform sm:h-[188px] ${
           hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
         }`}
       >
@@ -52,7 +52,7 @@ function CardView({ card }: { card: MemberCard }) {
           <div className="min-w-0">
             <h3 className="truncate font-display text-2xl font-bold leading-tight text-workroom-ink">{card.display_name}</h3>
             {subline ? <p className="mt-0.5 truncate text-[13px] font-bold text-workroom-muted">{subline}</p> : null}
-            {card.headline ? <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-5 text-workroom-ink/65">{card.headline}</p> : null}
+            {card.headline ? <p className="mt-1.5 truncate text-xs font-medium leading-5 text-workroom-ink/65">{card.headline}</p> : null}
           </div>
           {hasDetails ? (
             <div className="mt-2 text-center text-[10px] font-black text-workroom-muted">{open ? "접기 ▲" : "자세히 ▾"}</div>

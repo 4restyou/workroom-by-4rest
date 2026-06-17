@@ -165,7 +165,7 @@ export default function DirectoryEdit() {
               <span className={labelClass}>미리보기</span>
               <div
                 style={{ backgroundImage: `url(${paperTexture})` }}
-                className="relative flex min-h-[168px] w-full max-w-sm flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] sm:min-h-[184px]"
+                className="relative flex h-[180px] w-full max-w-sm flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] sm:h-[188px]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className={`inline-flex items-center rounded-pill px-2.5 py-1 text-[11px] font-black text-workroom-ink ${ACCENT_BG[form.accent]}`}>
@@ -220,7 +220,8 @@ export default function DirectoryEdit() {
 
             <div className="grid gap-1.5">
               <label className={labelClass} htmlFor="headline">한 줄 소개</label>
-              <input id="headline" className={fieldClass} value={form.headline} onChange={(e) => update("headline", e.target.value)} maxLength={40} placeholder="나를 한 줄로 표현한다면?" />
+              <input id="headline" className={fieldClass} value={form.headline} onChange={(e) => update("headline", e.target.value)} maxLength={20} placeholder="나를 한 줄로 (20자 이내)" />
+              <p className="text-xs font-medium text-workroom-muted">{form.headline.length}/20자 · 명함 앞면에 한 줄로 표시돼요.</p>
             </div>
 
             <div className="grid gap-1.5">
