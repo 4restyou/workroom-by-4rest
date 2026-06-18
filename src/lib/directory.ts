@@ -25,22 +25,24 @@ export const CARD_CATEGORIES = [
 
 export type CardCategory = (typeof CARD_CATEGORIES)[number];
 
-export const ACCENTS: CardAccent[] = ["yellow", "mint", "lilac", "sky", "coral"];
+// Palette is limited to yellow (primary) + sky (secondary). The picker only
+// offers these two; legacy values (mint/lilac/coral) still resolve via ACCENT_BG.
+export const ACCENTS: CardAccent[] = ["yellow", "sky"];
 
 export const ACCENT_LABEL: Record<CardAccent, string> = {
   yellow: "노랑",
-  mint: "민트",
-  lilac: "라일락",
   sky: "하늘",
-  coral: "코랄",
+  mint: "하늘",
+  lilac: "하늘",
+  coral: "노랑",
 };
 
 // Tailwind background per accent. Listed literally so the content scanner keeps
-// them (mirrors lib/ui tint usage).
+// them. Legacy tints collapse onto the kept two so the directory stays on-palette.
 export const ACCENT_BG: Record<CardAccent, string> = {
   yellow: "bg-workroom-yellow",
-  mint: "bg-workroom-mint",
-  lilac: "bg-workroom-lilac",
   sky: "bg-workroom-sky",
-  coral: "bg-workroom-coral",
+  mint: "bg-workroom-sky",
+  lilac: "bg-workroom-sky",
+  coral: "bg-workroom-yellow",
 };

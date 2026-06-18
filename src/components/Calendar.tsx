@@ -77,7 +77,7 @@ export default function Calendar({ month, selected, minMonth, onSelect, onMonthC
                   ? "border-workroom-ink bg-workroom-yellow"
                   : disabled
                     ? "cursor-not-allowed border-transparent text-workroom-line"
-                    : "border-workroom-line bg-white hover:border-workroom-ink hover:bg-workroom-mint"
+                    : "border-workroom-line bg-white hover:border-workroom-ink hover:bg-workroom-sky"
               }`}
             >
               {day}

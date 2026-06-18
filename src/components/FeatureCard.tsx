@@ -1,4 +1,4 @@
-import { card, type TintColor } from "../lib/ui";
+import { card, normTint, type TintColor } from "../lib/ui";
 
 export type FeatureIcon = "seat" | "table" | "camera" | "coffee";
 
@@ -38,10 +38,10 @@ type FeatureCardProps = {
   accent?: TintColor;
 };
 
-export default function FeatureCard({ title, body, icon, accent = "mint" }: FeatureCardProps) {
+export default function FeatureCard({ title, body, icon, accent = "yellow" }: FeatureCardProps) {
   return (
     <article className={`${card} p-5 transition-colors duration-150 hover:border-workroom-ink`}>
-      <div className={`mb-3 grid h-10 w-10 place-items-center rounded-pill border border-workroom-line bg-workroom-${accent} text-workroom-ink`}>
+      <div className={`mb-3 grid h-10 w-10 place-items-center rounded-pill border border-workroom-line bg-workroom-${normTint(accent)} text-workroom-ink`}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           {icons[icon]}
         </svg>

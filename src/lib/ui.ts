@@ -17,8 +17,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
   primary: "bg-workroom-ink text-white",
   accent: "bg-workroom-yellow text-workroom-ink",
   secondary: "bg-workroom-surface text-workroom-ink",
-  mint: "bg-workroom-mint text-workroom-ink",
-  lilac: "bg-workroom-lilac text-workroom-ink",
+  mint: "bg-workroom-sky text-workroom-ink",
+  lilac: "bg-workroom-sky text-workroom-ink",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
@@ -42,15 +42,26 @@ export const cardFlat = card;
 
 export type TintColor = "yellow" | "mint" | "lilac" | "sky" | "coral" | "danger" | "ink";
 
+// Palette discipline: the site runs on black/white/grey + yellow (primary) and
+// sky (secondary), with danger kept only for errors. Older / leftover tints are
+// collapsed onto that set here so every call site reduces to the same palette.
+const COLLAPSE: Partial<Record<TintColor, TintColor>> = { mint: "sky", lilac: "sky", coral: "yellow" };
+
+export function normTint(color: TintColor): TintColor {
+  return COLLAPSE[color] ?? color;
+}
+
 export function tintCard(color: TintColor, extra = "") {
-  const bg = color === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${color}`;
-  const border = color === "ink" ? "border-workroom-ink" : "border-workroom-line";
+  const c = normTint(color);
+  const bg = c === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${c}`;
+  const border = c === "ink" ? "border-workroom-ink" : "border-workroom-line";
   return `rounded-card border ${border} ${bg} ${extra}`.trim();
 }
 
 // Small label chip.
 export function badge(color: TintColor = "yellow", extra = "") {
-  const bg = color === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${color} text-workroom-ink`;
-  const border = color === "ink" ? "border-workroom-ink" : "border-workroom-line";
+  const c = normTint(color);
+  const bg = c === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${c} text-workroom-ink`;
+  const border = c === "ink" ? "border-workroom-ink" : "border-workroom-line";
   return `inline-flex items-center rounded-pill border ${border} px-3 py-1 text-xs font-bold ${bg} ${extra}`.trim();
 }

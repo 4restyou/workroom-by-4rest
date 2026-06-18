@@ -4,12 +4,11 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   // These backgrounds are composed at runtime (e.g. `bg-workroom-${color}` in
   // lib/ui.ts and FeatureCard), so Tailwind's content scanner can't see them.
+  // Palette is limited to yellow (primary) + sky (secondary) + danger (errors);
+  // legacy mint/lilac/coral are collapsed onto these in lib/ui + lib/directory.
   safelist: [
     "bg-workroom-yellow",
-    "bg-workroom-mint",
-    "bg-workroom-lilac",
     "bg-workroom-sky",
-    "bg-workroom-coral",
     "bg-workroom-danger",
     "bg-workroom-ink",
     "text-white",

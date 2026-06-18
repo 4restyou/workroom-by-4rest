@@ -3,7 +3,7 @@ import type { ReservationStatus } from "../lib/types";
 
 const statusClass: Record<ReservationStatus, string> = {
   pending: "bg-workroom-yellow text-workroom-ink",
-  confirmed: "bg-workroom-mint text-workroom-ink",
+  confirmed: "bg-workroom-sky text-workroom-ink",
   canceled: "bg-workroom-surface text-workroom-muted",
   completed: "bg-workroom-ink text-white",
   no_show: "bg-workroom-danger text-workroom-ink",

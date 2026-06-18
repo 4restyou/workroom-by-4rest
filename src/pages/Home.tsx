@@ -19,25 +19,25 @@ const features: { title: string; body: string; icon: FeatureIcon; accent: TintCo
     title: "개인 작업석",
     body: "혼자 집중하기 좋은 자유석. 먼저 앉는 순서대로 이용합니다.",
     icon: "seat",
-    accent: "mint",
+    accent: "yellow",
   },
   {
     title: "공용 테이블",
     body: "가벼운 대화, 협업, 작은 모임을 위한 자리입니다.",
     icon: "table",
-    accent: "lilac",
+    accent: "sky",
   },
   {
     title: "호리존 촬영",
     body: "상반신 증명사진과 간단 프로필 촬영을 운영자가 직접 진행합니다.",
     icon: "camera",
-    accent: "sky",
+    accent: "yellow",
   },
   {
     title: "커피 / 프린트",
     body: "커피는 이용권 기준으로 제공하고, 흑백 프린트는 5장까지 무료입니다.",
     icon: "coffee",
-    accent: "coral",
+    accent: "sky",
   },
 ];
 

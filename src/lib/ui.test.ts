@@ -18,9 +18,15 @@ describe("buttonClass", () => {
 
 describe("tintCard / badge", () => {
   it("maps a tint colour to its background", () => {
-    expect(tintCard("mint")).toContain("bg-workroom-mint");
+    expect(tintCard("yellow")).toContain("bg-workroom-yellow");
     expect(tintCard("ink")).toContain("bg-workroom-ink");
     expect(tintCard("ink")).toContain("text-white");
+  });
+
+  it("collapses legacy tints onto the limited palette (yellow + sky)", () => {
+    expect(tintCard("mint")).toContain("bg-workroom-sky");
+    expect(tintCard("lilac")).toContain("bg-workroom-sky");
+    expect(tintCard("coral")).toContain("bg-workroom-yellow");
   });
 
   it("renders a badge with a quiet outline", () => {
