@@ -6,3 +6,7 @@ dist/
 *.log
 screenshot-*.png
 supabase/.temp/
+
+# Python cache (from .claude skill scripts)
+__pycache__/
+*.pyc
