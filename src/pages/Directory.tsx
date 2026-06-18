@@ -173,7 +173,7 @@ export default function Directory() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Directory" title="멤버 명함첩" accent="mint">
+      <Section eyebrow="Directory" title="멤버 명함첩" accent="sky">
         <p className="max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
           워크룸을 함께 쓰는 사람들. 이름·업종·카테고리로 찾아보고, 내 명함도 올려보세요.
         </p>
@@ -243,7 +243,7 @@ export default function Directory() {
             ))}
           </div>
         ) : (
-          <div className={`${tintCard("mint")} p-8 text-center`}>
+          <div className={`${tintCard("sky")} p-8 text-center`}>
             <p className="font-black">
               {cards.length ? "조건에 맞는 명함이 없어요." : "아직 등록된 명함이 없어요."}
             </p>

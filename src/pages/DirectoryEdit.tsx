@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import Skeleton from "../components/Skeleton";
@@ -42,6 +42,7 @@ const labelClass = "block text-sm font-black";
 
 export default function DirectoryEdit() {
   const navigate = useNavigate();
+  const nameRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Form>(EMPTY);
   const [existing, setExisting] = useState<MemberCard | null>(null);
   const [uid, setUid] = useState<string | null>(null);
@@ -103,6 +104,7 @@ export default function DirectoryEdit() {
     if (!supabase || !uid) return;
     if (!form.display_name.trim()) {
       setError("표시할 이름을 입력해주세요.");
+      nameRef.current?.focus();
       return;
     }
     setBusy(true);
@@ -185,7 +187,7 @@ export default function DirectoryEdit() {
 
             <div className="grid gap-1.5">
               <label className={labelClass} htmlFor="display_name">이름 / 활동명 *</label>
-              <input id="display_name" className={fieldClass} value={form.display_name} onChange={(e) => update("display_name", e.target.value)} placeholder="예: 김작가" />
+              <input ref={nameRef} id="display_name" className={fieldClass} value={form.display_name} onChange={(e) => update("display_name", e.target.value)} placeholder="예: 김작가" />
             </div>
 
             <div className="grid gap-1.5">

@@ -59,19 +59,19 @@ function Note({
         <span className="shrink-0">{formatDate(post.created_at)}</span>
       </div>
       {(canManage || isAdmin) && (
-        <div className="flex flex-wrap gap-2 border-t border-workroom-ink/15 pt-2 text-[11px] font-black">
+        <div className="-mb-1 flex flex-wrap items-center gap-1 border-t border-workroom-ink/15 pt-1.5 text-[11px] font-black">
           {isAdmin ? (
             <>
-              <button type="button" className="underline underline-offset-2" onClick={() => onTogglePin(post)}>
+              <button type="button" className="rounded px-2 py-1 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink" onClick={() => onTogglePin(post)}>
                 {post.is_pinned ? "고정해제" : "고정"}
               </button>
-              <button type="button" className="underline underline-offset-2" onClick={() => onToggleHide(post)}>
+              <button type="button" className="rounded px-2 py-1 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink" onClick={() => onToggleHide(post)}>
                 {post.is_hidden ? "다시표시" : "숨기기"}
               </button>
             </>
           ) : null}
           {canManage ? (
-            <button type="button" className="ml-auto text-workroom-ink/70 underline underline-offset-2" onClick={() => onDelete(post)}>
+            <button type="button" className="ml-auto rounded px-2 py-1 text-workroom-ink/70 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink" onClick={() => onDelete(post)}>
               삭제
             </button>
           ) : null}
@@ -179,7 +179,7 @@ export default function Board() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Board" title="메모판" accent="coral">
+      <Section eyebrow="Board" title="메모판" accent="yellow">
         <p className="mb-5 max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
           운영자 공지와 회원들의 한마디가 붙는 공간이에요. 하고 싶은 말, 바라는 점을 포스트잇처럼 남겨주세요.
         </p>
@@ -193,6 +193,7 @@ export default function Board() {
               <textarea
                 className="min-h-[80px] w-full resize-y rounded-card border-2 border-workroom-ink bg-workroom-background px-4 py-3 text-sm font-bold placeholder:font-medium placeholder:text-workroom-muted focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
                 placeholder="하고 싶은 말을 남겨보세요"
+                aria-label="메모 내용"
                 value={body}
                 maxLength={300}
                 onChange={(e) => setBody(e.target.value)}
@@ -216,7 +217,8 @@ export default function Board() {
                     공지로 등록(상단 고정)
                   </label>
                 ) : null}
-                <button className={`${buttonClass("primary", "sm")} ml-auto`} disabled={busy || !body.trim()} onClick={() => void submit()} type="button">
+                <span className="ml-auto text-xs font-bold text-workroom-muted">{body.length}/300</span>
+                <button className={buttonClass("primary", "sm")} disabled={busy || !body.trim()} onClick={() => void submit()} type="button">
                   {busy ? "등록 중…" : "붙이기"}
                 </button>
               </div>
@@ -252,7 +254,7 @@ export default function Board() {
             ))}
           </ul>
         ) : (
-          <div className={`${tintCard("coral")} p-8 text-center`}>
+          <div className={`${tintCard("yellow")} p-8 text-center`}>
             <p className="font-black">아직 붙은 메모가 없어요.</p>
             <p className="mt-1 text-sm font-medium text-workroom-ink/70">첫 메모를 남겨보세요!</p>
           </div>
