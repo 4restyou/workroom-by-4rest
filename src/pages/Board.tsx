@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import Skeleton from "../components/Skeleton";
 import { supabase } from "../lib/supabase";
 import { ACCENT_BG, ACCENT_LABEL, ACCENTS } from "../lib/directory";
+import { PinIcon } from "../components/icons";
 import { buttonClass, tintCard } from "../lib/ui";
 import type { BoardPost, CardAccent } from "../lib/types";
 
@@ -50,7 +51,7 @@ function Note({
         <span className={`rounded-pill border border-workroom-ink px-2 py-0.5 text-[10px] font-black ${isNotice ? "bg-workroom-ink text-white" : "bg-workroom-surface"}`}>
           {isNotice ? "공지" : "한마디"}
         </span>
-        {post.is_pinned ? <span aria-label="고정됨" className="text-xs">📌</span> : null}
+        {post.is_pinned ? <PinIcon className="h-3.5 w-3.5" aria-label="고정됨" /> : null}
       </div>
       <p className="whitespace-pre-line break-words text-sm font-bold leading-6">{post.body}</p>
       <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-[11px] font-bold text-workroom-ink/60">
@@ -205,7 +206,7 @@ export default function Board() {
                       aria-label={ACCENT_LABEL[a]}
                       aria-pressed={color === a}
                       onClick={() => setColor(a)}
-                      className={`h-7 w-7 rounded-full border-2 ${ACCENT_BG[a]} ${color === a ? "border-workroom-ink ring-2 ring-workroom-ink ring-offset-2" : "border-workroom-ink/30"}`}
+                      className={`h-7 w-7 rounded-full border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 ${ACCENT_BG[a]} ${color === a ? "border-workroom-ink ring-2 ring-workroom-ink ring-offset-2" : "border-workroom-ink/30"}`}
                     />
                   ))}
                 </div>

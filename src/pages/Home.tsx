@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
+import { AlertIcon, BusIcon, CheckIcon, IdCardIcon, ParkingIcon, PinIcon, SubwayIcon } from "../components/icons";
 import MemberDashboard from "../components/MemberDashboard";
 import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
@@ -211,8 +212,8 @@ export default function Home() {
             <h3 className="text-xl font-bold">좋아요</h3>
             <ul className="mt-4 grid gap-3">
               {fitItems.map((item) => (
-                <li className="flex gap-3 text-sm font-bold leading-6" key={item}>
-                  <span aria-hidden>✓</span>
+                <li className="flex gap-2.5 text-sm font-bold leading-6" key={item}>
+                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -222,8 +223,8 @@ export default function Home() {
             <h3 className="text-xl font-bold">먼저 물어봐 주세요</h3>
             <ul className="mt-4 grid gap-3">
               {cautionItems.map((item) => (
-                <li className="flex gap-3 text-sm font-bold leading-6" key={item}>
-                  <span aria-hidden>!</span>
+                <li className="flex gap-2.5 text-sm font-bold leading-6" key={item}>
+                  <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -260,19 +261,19 @@ export default function Home() {
             <p className="mt-1 font-medium text-workroom-muted">{ADDRESS}</p>
             <dl className="mt-5 grid gap-4">
               <div>
-                <dt className="text-sm font-bold">🚇 지하철</dt>
+                <dt className="flex items-center gap-1.5 text-sm font-bold"><SubwayIcon className="h-4 w-4" /> 지하철</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
                   광주 1호선 <b className="font-bold text-workroom-ink">금남로5가역 1번 출구</b>에서 도보 약 3–5분.
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-bold">🚌 버스</dt>
+                <dt className="flex items-center gap-1.5 text-sm font-bold"><BusIcon className="h-4 w-4" /> 버스</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
                   ‘금남로5가역’ 정류장 하차. 경유 노선이 많아 출발지에서 지도 길찾기로 확인하는 게 가장 정확해요.
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-bold">🅿️ 주차</dt>
+                <dt className="flex items-center gap-1.5 text-sm font-bold"><ParkingIcon className="h-4 w-4" /> 주차</dt>
                 <dd className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
                   전용 주차장은 없습니다. 인근 <b className="font-bold text-workroom-ink">{SITE.parking.name}</b>({SITE.parking.address},
                   24시간)을 이용해 주세요. 30분 700원 · 1시간 1,400원 · 2시간 2,800원 · 4시간 5,600원 · 1일 8,000원. 월 정기주차도 가능합니다.
@@ -303,7 +304,7 @@ export default function Home() {
       <Section eyebrow="Community" title="혼자지만, 같이 쓰는" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <Link className={`${tintCard("mint")} group flex flex-col gap-2 p-6 transition-transform hover:-translate-y-0.5`} to="/directory">
-            <span className="text-2xl">📇</span>
+            <IdCardIcon className="h-7 w-7" />
             <h3 className="text-xl font-bold">멤버 명함첩</h3>
             <p className="text-sm font-medium leading-6 text-workroom-ink/75">
               워크룸을 함께 쓰는 사람들의 명함. 이름·업종·카테고리로 찾아보고, 내 명함도 올려보세요.
@@ -311,7 +312,7 @@ export default function Home() {
             <span className="mt-1 text-sm font-black underline underline-offset-4">명함첩 열기 →</span>
           </Link>
           <Link className={`${tintCard("coral")} group flex flex-col gap-2 p-6 transition-transform hover:-translate-y-0.5`} to="/board">
-            <span className="text-2xl">📌</span>
+            <PinIcon className="h-7 w-7" />
             <h3 className="text-xl font-bold">메모판</h3>
             <p className="text-sm font-medium leading-6 text-workroom-ink/75">
               운영자 공지와 회원들의 한마디가 붙는 공간. 하고 싶은 말, 바라는 점을 포스트잇처럼 남겨주세요.

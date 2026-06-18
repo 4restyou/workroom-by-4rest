@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
+import { CheckIcon } from "./icons";
 import type { Reservation } from "../lib/types";
 
 function kstToday(): string {
@@ -100,7 +101,11 @@ export default function MemberDashboard() {
             {data ? `${data.name}님, 안녕하세요` : "안녕하세요"}
           </h1>
         </div>
-        {data?.checkedInToday ? <span className={badge("mint")}>오늘 출근 완료 🐾</span> : null}
+        {data?.checkedInToday ? (
+          <span className={badge("mint", "gap-1")}>
+            <CheckIcon className="h-3.5 w-3.5" /> 오늘 출근 완료
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-[1.4fr_1fr]">

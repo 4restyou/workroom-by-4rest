@@ -254,7 +254,7 @@ export default function DirectoryEdit() {
                     onClick={() => update("accent", a)}
                     aria-label={ACCENT_LABEL[a]}
                     aria-pressed={form.accent === a}
-                    className={`h-10 w-10 rounded-full border-2 ${ACCENT_BG[a]} ${
+                    className={`h-10 w-10 rounded-full border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 ${ACCENT_BG[a]} ${
                       form.accent === a ? "border-workroom-ink ring-2 ring-workroom-ink ring-offset-2" : "border-workroom-ink/30"
                     }`}
                   />

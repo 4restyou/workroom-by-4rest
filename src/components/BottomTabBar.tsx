@@ -108,7 +108,7 @@ export default function BottomTabBar() {
               <Link
                 to={tab.to}
                 aria-current={active ? "page" : undefined}
-                className={`flex select-none flex-col items-center gap-1 py-2 text-[11px] font-bold transition-colors ${
+                className={`flex select-none flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-workroom-ink ${
                   active ? "text-workroom-ink" : "text-workroom-muted"
                 }`}
               >

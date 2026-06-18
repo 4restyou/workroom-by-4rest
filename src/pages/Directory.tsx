@@ -37,7 +37,7 @@ function CardView({ card }: { card: MemberCard }) {
         aria-expanded={open}
         onClick={() => hasDetails && setOpen((v) => !v)}
         style={{ backgroundImage: `url(${paperTexture})` }}
-        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform sm:h-[188px] ${
+        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 sm:h-[188px] ${
           hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
         }`}
       >
@@ -216,7 +216,7 @@ export default function Directory() {
                 key={c}
                 type="button"
                 onClick={() => setCategory(c)}
-                className={`shrink-0 rounded-pill border-2 px-4 py-1.5 text-xs font-black transition-colors ${
+                className={`shrink-0 rounded-pill border-2 px-4 py-1.5 text-xs font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow focus-visible:ring-offset-2 ${
                   active
                     ? "border-workroom-ink bg-workroom-ink text-white"
                     : "border-workroom-ink bg-workroom-surface text-workroom-ink hover:bg-workroom-yellow"
