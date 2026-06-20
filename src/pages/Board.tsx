@@ -97,22 +97,47 @@ function tilt(id: string): string {
 function Note({
   post,
   canManage,
+  canEdit,
   isAdmin,
   onDelete,
   onTogglePin,
   onToggleHide,
+  onSave,
 }: {
   post: BoardPost;
   canManage: boolean;
+  canEdit: boolean;
   isAdmin: boolean;
   onDelete: (p: BoardPost) => void;
   onTogglePin: (p: BoardPost) => void;
   onToggleHide: (p: BoardPost) => void;
+  onSave: (p: BoardPost, body: string, color: CardAccent) => void | Promise<void>;
 }) {
   const isNotice = post.kind === "notice";
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(post.body);
+  const [draftColor, setDraftColor] = useState<CardAccent>(post.color);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!draft.trim()) return;
+    setSaving(true);
+    await onSave(post, draft.trim(), draftColor);
+    setSaving(false);
+    setEditing(false);
+  }
+  function cancel() {
+    setDraft(post.body);
+    setDraftColor(post.color);
+    setEditing(false);
+  }
+
+  const actionBtn =
+    "rounded px-2 py-1 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink";
+
   return (
     <li
-      className={`relative flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[post.color]} ${tilt(post.id)}`}
+      className={`relative flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${tilt(post.id)}`}
     >
       {/* 압정 */}
       <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
@@ -122,29 +147,70 @@ function Note({
         </span>
         {post.is_pinned ? <PinIcon className="h-3.5 w-3.5" aria-label="고정됨" /> : null}
       </div>
-      <p className="whitespace-pre-line break-words text-sm font-bold leading-6">{post.body}</p>
-      <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-[11px] font-bold text-workroom-ink/60">
-        <span className="truncate">{post.author_name}</span>
-        <span className="shrink-0">{formatDate(post.created_at)}</span>
-      </div>
-      {(canManage || isAdmin) && (
-        <div className="-mb-1 flex flex-wrap items-center gap-1 border-t border-workroom-ink/15 pt-1.5 text-[11px] font-black">
-          {isAdmin ? (
-            <>
-              <button type="button" className="rounded px-2 py-1 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink" onClick={() => onTogglePin(post)}>
-                {post.is_pinned ? "고정해제" : "고정"}
-              </button>
-              <button type="button" className="rounded px-2 py-1 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink" onClick={() => onToggleHide(post)}>
-                {post.is_hidden ? "다시표시" : "숨기기"}
-              </button>
-            </>
-          ) : null}
-          {canManage ? (
-            <button type="button" className="ml-auto rounded px-2 py-1 text-workroom-ink/70 underline underline-offset-2 hover:bg-workroom-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink" onClick={() => onDelete(post)}>
-              삭제
+
+      {editing ? (
+        <div className="grid gap-2">
+          <textarea
+            className="min-h-[84px] w-full resize-y rounded-[6px] border border-workroom-ink bg-workroom-surface px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-workroom-ink"
+            aria-label="메모 수정"
+            value={draft}
+            maxLength={300}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="flex items-center gap-1.5">
+            {ACCENTS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                aria-label={ACCENT_LABEL[a]}
+                aria-pressed={draftColor === a}
+                onClick={() => setDraftColor(a)}
+                className={`h-6 w-6 rounded-full border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 ${ACCENT_BG[a]} ${draftColor === a ? "border-workroom-ink ring-2 ring-workroom-ink ring-offset-2" : "border-workroom-ink/30"}`}
+              />
+            ))}
+            <span className="ml-auto text-[10px] font-bold text-workroom-ink/60">{draft.length}/300</span>
+          </div>
+          <div className="flex items-center gap-1 pt-0.5 text-[11px] font-black">
+            <button type="button" className={actionBtn} disabled={saving || !draft.trim()} onClick={() => void save()}>
+              {saving ? "저장 중…" : "저장"}
             </button>
-          ) : null}
+            <button type="button" className={actionBtn} onClick={cancel}>
+              취소
+            </button>
+          </div>
         </div>
+      ) : (
+        <>
+          <p className="whitespace-pre-line break-words text-sm font-bold leading-6">{post.body}</p>
+          <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-[11px] font-bold text-workroom-ink/60">
+            <span className="truncate">{post.author_name}</span>
+            <span className="shrink-0">{formatDate(post.created_at)}</span>
+          </div>
+          {canManage && (
+            <div className="-mb-1 flex flex-wrap items-center gap-1 border-t border-workroom-ink/15 pt-1.5 text-[11px] font-black">
+              {isAdmin ? (
+                <>
+                  <button type="button" className={actionBtn} onClick={() => onTogglePin(post)}>
+                    {post.is_pinned ? "고정해제" : "고정"}
+                  </button>
+                  <button type="button" className={actionBtn} onClick={() => onToggleHide(post)}>
+                    {post.is_hidden ? "다시표시" : "숨기기"}
+                  </button>
+                </>
+              ) : null}
+              {canEdit ? (
+                <button type="button" className={actionBtn} onClick={() => setEditing(true)}>
+                  수정
+                </button>
+              ) : null}
+              {canManage ? (
+                <button type="button" className={`${actionBtn} ml-auto text-workroom-ink/70`} onClick={() => onDelete(post)}>
+                  삭제
+                </button>
+              ) : null}
+            </div>
+          )}
+        </>
       )}
     </li>
   );
@@ -238,6 +304,19 @@ export default function Board() {
     await load();
   }
 
+  async function savePost(post: BoardPost, nextBody: string, nextColor: CardAccent) {
+    if (!supabase) return;
+    const { error: updateError } = await supabase
+      .from("board_posts")
+      .update({ body: nextBody, color: nextColor })
+      .eq("id", post.id);
+    if (updateError) {
+      setError("수정에 실패했어요. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    await load();
+  }
+
   async function togglePin(post: BoardPost) {
     if (!supabase) return;
     await supabase.from("board_posts").update({ is_pinned: !post.is_pinned }).eq("id", post.id);
@@ -322,9 +401,11 @@ export default function Board() {
                 post={post}
                 isAdmin={isAdmin}
                 canManage={isAdmin || post.profile_id === uid}
+                canEdit={!!uid && post.profile_id === uid}
                 onDelete={(p) => void removePost(p)}
                 onTogglePin={(p) => void togglePin(p)}
                 onToggleHide={(p) => void toggleHide(p)}
+                onSave={(p, b, c) => void savePost(p, b, c)}
               />
             ))}
           </ul>
