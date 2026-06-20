@@ -98,7 +98,7 @@ export default function BottomTabBar() {
   return (
     <nav
       aria-label="주요 메뉴"
-      className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
     >
       <ul className="mx-auto grid max-w-md grid-cols-4">
         {tabs.map((tab) => {
@@ -113,7 +113,7 @@ export default function BottomTabBar() {
                 }`}
               >
                 <span
-                  className={`grid h-9 w-12 place-items-center rounded-pill border transition-[transform,background-color,border-color] duration-100 active:scale-90 ${
+                  className={`grid h-9 w-12 place-items-center rounded-[5px] border transition-[transform,background-color,border-color] duration-100 active:scale-90 ${
                     active ? "border-workroom-ink bg-workroom-yellow" : "border-transparent"
                   }`}
                 >

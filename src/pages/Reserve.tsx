@@ -8,7 +8,8 @@ import { computeFullDates, type IntervalInput } from "../lib/availability";
 import { formatDate, formatDateInputValue, formatPhone, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
-import { buttonClass, card, tintCard } from "../lib/ui";
+import { SITE } from "../lib/site";
+import { badge, buttonClass, card, tintCard } from "../lib/ui";
 import type { BusinessHour, Pass, Profile, ReservationInsert } from "../lib/types";
 
 const emptyForm = {
@@ -155,7 +156,7 @@ export default function Reserve() {
   const reservationEnabled = settings.reservation_enabled !== "false";
   const noticeItems = (
     [
-      ["결제", settings.payment_notice],
+      ["결제", settings.payment_notice || `${SITE.booking.onlinePayment} ${SITE.booking.onsitePayment}`],
       ["취소·환불", settings.cancellation_notice],
       ["연장", settings.extension_notice],
       ["음식·소리", settings.etiquette_notice],
@@ -406,9 +407,13 @@ export default function Reserve() {
   return (
     <main className="pb-28 sm:pb-12">
       <Section eyebrow="Reserve" title="예약" accent="yellow">
-        <div className={`mb-6 ${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>
-          홈페이지 예약을 기준으로 운영합니다. 예약 신청 후 전화 또는 문자로 확인 안내를 드립니다.
-          {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
+        <div className="mb-6 grid gap-3 border-y border-workroom-ink py-4 text-sm font-bold leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div>
+            <p>회원 전용 예약 · 예약 신청 후 확인 문자를 보내드립니다.</p>
+            <p className="mt-1 font-medium text-workroom-muted">온라인 결제는 문자 수신 후 2시간 이내 · 현장 결제는 방문 시 바로 진행</p>
+            {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
+          </div>
+          <span className={badge("yellow")}>MEMBER ONLY</span>
         </div>
 
         {!reservationEnabled ? (

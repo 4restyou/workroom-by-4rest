@@ -4,7 +4,7 @@ import { badge, buttonClass, card, tintCard } from "./ui";
 describe("buttonClass", () => {
   it("includes the shared base, variant and size", () => {
     const cls = buttonClass("accent", "lg", "w-full");
-    expect(cls).toContain("rounded-pill");
+    expect(cls).toContain("rounded-[6px]");
     expect(cls).toContain("bg-workroom-yellow");
     expect(cls).toContain("text-base sm:text-lg");
     expect(cls).toContain("w-full");

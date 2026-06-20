@@ -7,11 +7,11 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t-2 border-workroom-ink bg-workroom-background">
-      <div className="mx-auto max-w-5xl px-4 py-10 pb-24 sm:pb-10">
-        <div className="grid gap-8 sm:grid-cols-[1.3fr_1fr_1fr]">
+    <footer className="border-t border-workroom-ink bg-workroom-background">
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:pb-8">
+        <div className="grid gap-8 sm:grid-cols-[1.1fr_1fr_1fr]">
           <div>
-            <img className="h-8 w-auto max-w-[140px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
+            <img className="h-5 w-auto max-w-[88px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
             <p className="mt-3 max-w-xs text-sm font-medium leading-6 text-workroom-muted">
               필요한 시간만큼 머무는 조용한 작업 공간. 충장로에서 예약제로 운영합니다.
             </p>
@@ -37,11 +37,11 @@ export default function Footer() {
                 </a>
               </div>
             </div>
-            <CatBlink className="h-24 w-auto shrink-0" />
+            <CatBlink className="h-16 w-auto shrink-0" />
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t-2 border-workroom-line pt-5">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-workroom-line pt-5">
           <div className="flex flex-wrap gap-4 text-xs font-bold">
             <Link className="transition-colors hover:text-workroom-muted" to="/directory">
               명함첩

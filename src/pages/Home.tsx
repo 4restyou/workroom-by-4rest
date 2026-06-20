@@ -9,7 +9,6 @@ import { defaultPasses } from "../lib/defaultPasses";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { badge, buttonClass, card, tintCard, type TintColor } from "../lib/ui";
 import type { Pass } from "../lib/types";
-import heroImage from "../../assets/workroom-hero.webp";
 import { SITE } from "../lib/site";
 
 const { address: ADDRESS, naverMapUrl: NAVER_MAP_URL, kakaoMapUrl: KAKAO_MAP_URL } = SITE;
@@ -42,7 +41,7 @@ const features: { title: string; body: string; icon: FeatureIcon; accent: TintCo
 ];
 
 const guideItems: [string, string][] = [
-  ["결제", "예약 확정 안내 후 카드 또는 계좌이체로 결제할 수 있습니다."],
+  ["결제", "온라인은 확인 문자에 포함된 링크에서 2시간 이내, 현장은 방문 시 결제합니다."],
   ["취소", "3시간권과 종일권은 예약 시간 전까지 당일 취소가 가능합니다."],
   ["연장", "이용 종료 후 15분까지는 유예되며, 이후 1시간 추가 요금이 적용됩니다."],
   ["소리", "통화는 조용히, 음악과 영상은 반드시 이어폰이나 헤드폰으로 이용합니다."],
@@ -119,50 +118,58 @@ export default function Home() {
       {signedIn ? (
         <MemberDashboard />
       ) : (
-        <section className="mx-auto max-w-5xl px-4 pb-8 pt-12 sm:pb-14 sm:pt-20">
-        <div className="grid items-center gap-8 sm:grid-cols-[1.05fr_0.95fr] sm:gap-12">
-          <div className="animate-pop-in">
-            <span className={badge("yellow")}>09:00–22:00 · 예약제 운영</span>
-            <h1 className="mt-4 font-display text-4xl font-bold leading-[1.5] tracking-tight sm:text-6xl">
-              필요한 시간만큼
-              <br />
-              머무는 <span className="hero-mark rounded-[3px] px-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]">조용한</span>
-              <br />
-              작업 공간
-            </h1>
-            <p className="mt-5 max-w-xl text-lg font-medium leading-8 text-workroom-muted">
-              카페보다 조용하고, 사무실보다 느슨하게.
-              <br />
-              혼자 일하거나 작은 모임을 갖기 좋은 자리입니다.
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link className={buttonClass("accent", "lg", "w-full sm:w-auto")} to="/reserve">
-                예약하기 →
-              </Link>
-              <a className={buttonClass("secondary", "lg", "w-full sm:w-auto")} href="#pricing">
-                이용권 보기
-              </a>
+        <section className="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:px-6 sm:pb-16 sm:pt-16">
+          <div className="grid gap-8 border-b border-workroom-ink pb-8 sm:grid-cols-12 sm:gap-10 sm:pb-12">
+            <div className="animate-pop-in sm:col-span-6 sm:self-center">
+              <span className={badge("yellow")}>MEMBER RESERVATION · 회원 예약</span>
+              <h1 className="mt-5 font-display text-[2.7rem] font-bold leading-[1.25] tracking-[-0.045em] sm:text-[4.25rem]">
+                필요한 시간만큼,
+                <br />
+                조용히 머무는
+                <br />
+                작업 공간
+              </h1>
+              <p className="mt-6 max-w-lg text-base font-medium leading-7 text-workroom-muted sm:text-lg sm:leading-8">
+                카페보다 조용하고 사무실보다 느슨하게. 혼자 집중하거나 작은 모임을 갖기 좋은 충장로의 예약제 공간입니다.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Link className={buttonClass("accent", "lg", "w-full sm:w-auto")} to="/reserve">
+                  예약 신청하기 <span aria-hidden>→</span>
+                </Link>
+                <a className={buttonClass("secondary", "lg", "w-full sm:w-auto")} href="#pricing">
+                  이용권 보기
+                </a>
+              </div>
+            </div>
+
+            <div className="sm:col-span-6">
+              <div className="grid aspect-[4/3] place-items-center border border-dashed border-workroom-muted bg-workroom-surface p-8 text-center">
+                <div>
+                  <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-workroom-ink text-2xl" aria-hidden>
+                    ◯
+                  </span>
+                  <p className="mt-5 text-xl font-bold">공간 사진 준비 중</p>
+                  <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">공사 완료 후 실제 공간 사진으로 교체됩니다.</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="overflow-hidden rounded-card border border-workroom-line">
-              <img
-                className="aspect-[4/3] w-full object-cover"
-                src={heroImage}
-                alt="WORKROOM 작업 공간"
-                loading="eager"
-              />
+          <dl className="grid grid-cols-3 divide-x divide-workroom-line border-b border-workroom-ink py-4 text-center sm:text-left">
+            <div className="px-3 first:pl-0 sm:flex sm:items-baseline sm:gap-2">
+              <dt className="text-[10px] font-bold uppercase tracking-widest text-workroom-muted">Hours</dt>
+              <dd className="mt-1 text-xs font-bold sm:text-sm">{SITE.hoursLabel}</dd>
             </div>
-            <div className="absolute -bottom-3 left-2 rotate-[-4deg]">
-              <span className={badge("mint", "text-sm")}>충장로 · 금남로5가역</span>
+            <div className="px-3 sm:flex sm:items-baseline sm:gap-2">
+              <dt className="text-[10px] font-bold uppercase tracking-widest text-workroom-muted">Location</dt>
+              <dd className="mt-1 text-xs font-bold sm:text-sm">충장로</dd>
             </div>
-            <div className="absolute right-2 -top-3 rotate-[5deg]">
-              <span className={badge("lilac", "text-sm")}>3시간권 12,000원~</span>
+            <div className="px-3 pr-0 sm:flex sm:items-baseline sm:gap-2">
+              <dt className="text-[10px] font-bold uppercase tracking-widest text-workroom-muted">Booking</dt>
+              <dd className="mt-1 text-xs font-bold sm:text-sm">회원 예약제</dd>
             </div>
-          </div>
-        </div>
-      </section>
+          </dl>
+        </section>
       )}
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤" accent="mint">
@@ -193,6 +200,16 @@ export default function Home() {
         <p className={`${tintCard("mint")} mt-4 px-4 py-3 text-sm font-bold`}>
           기본 단위는 3시간권입니다. 1시간권은 운영하지 않고, 좌석 여유가 있을 때 1시간 단위 연장이 가능합니다.
         </p>
+        <div className="mt-4 grid gap-px overflow-hidden rounded-card border border-workroom-ink bg-workroom-ink sm:grid-cols-2">
+          <div className="bg-workroom-surface p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">Online payment</p>
+            <p className="mt-2 text-sm font-bold leading-6">{SITE.booking.onlinePayment}</p>
+          </div>
+          <div className="bg-workroom-surface p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">On-site payment</p>
+            <p className="mt-2 text-sm font-bold leading-6">{SITE.booking.onsitePayment}</p>
+          </div>
+        </div>
       </Section>
 
       <Section eyebrow="Guide" title="이용 기준은 가볍게, 분명하게" accent="sky">

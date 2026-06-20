@@ -1,12 +1,12 @@
-// Shared visual language for the "Bold Outline" system: chunky 2px ink
-// borders, chunky radii and heavy type — no drop shadows. Depth is carried by
-// the line work; buttons get a light lift on hover and a press feedback.
+// Shared editorial visual language: restrained line work, compact radii and
+// a single yellow action colour. Components stay tactile without looking like
+// a collection of unrelated promotional cards.
 
 export type ButtonVariant = "primary" | "accent" | "secondary" | "mint" | "lilac";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "inline-flex select-none items-center justify-center gap-2 rounded-pill border border-workroom-ink font-bold leading-none " +
+  "inline-flex select-none items-center justify-center gap-2 rounded-[6px] border border-workroom-ink font-bold leading-none " +
   "transition-[transform,background-color,opacity] duration-100 " +
   "hover:-translate-y-px " +
   "active:translate-y-0 active:scale-[0.97] active:opacity-90 " +
@@ -63,5 +63,5 @@ export function badge(color: TintColor = "yellow", extra = "") {
   const c = normTint(color);
   const bg = c === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${c} text-workroom-ink`;
   const border = c === "ink" ? "border-workroom-ink" : "border-workroom-line";
-  return `inline-flex items-center rounded-pill border ${border} px-3 py-1 text-xs font-bold ${bg} ${extra}`.trim();
+  return `inline-flex items-center rounded-[4px] border ${border} px-2.5 py-1 text-[11px] font-bold ${bg} ${extra}`.trim();
 }

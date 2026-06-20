@@ -8,7 +8,7 @@ export default function PaymentFail() {
       <Section eyebrow="Payment" title="결제 안내" accent="coral">
         <div className={`${card} grid gap-4 p-6`}>
           <p className={`${tintCard("yellow")} p-3 text-sm font-bold`}>
-            현재 온라인 카드 결제는 사용하지 않습니다. 결제 안내는 예약 확정 후 문자로 보내드립니다.
+            결제가 완료되지 않았습니다. 확인 문자에 포함된 결제 링크에서 다시 진행하거나 방문 시 현장 결제를 이용해 주세요.
           </p>
           <Link className={buttonClass("primary", "lg", "w-full sm:w-auto")} to="/account?tab=reservations">
             예약현황으로 돌아가기

@@ -33,9 +33,9 @@ const groups: Group[] = [
       {
         q: "결제는 어떻게 하나요?",
         a: [
-          "예약 확정 후 문자로 결제 안내를 보내드립니다. 현재는 계좌이체 또는 현장 결제를 기준으로 운영합니다.",
-          "월권(자유석·지정석)은 이용 전 결제 확인 후 최종 확정됩니다.",
-          "시간권·주간권은 방문 시 현장 결제도 가능합니다.",
+          SITE.booking.confirmationLabel,
+          SITE.booking.onlinePayment,
+          SITE.booking.onsitePayment,
           "이용권 종류와 가격은 ‘예약하기’ 페이지에서 확인할 수 있습니다.",
         ],
       },

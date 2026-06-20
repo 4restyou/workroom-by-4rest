@@ -18,16 +18,16 @@ export default {
     extend: {
       colors: {
         workroom: {
-          background: "#FAF8F1",
-          surface: "#FFFFFF",
-          ink: "#141414",
-          text: "#141414",
-          muted: "#5C5A54",
-          line: "#D8CFBE",
-          yellow: "#F6E76F",
+          background: "#F7F5EF",
+          surface: "#FEFDF9",
+          ink: "#111111",
+          text: "#111111",
+          muted: "#625F58",
+          line: "#C8C2B7",
+          yellow: "#FFD91A",
           mint: "#CDE8D6",
           lilac: "#DBD0F7",
-          sky: "#C3DDF2",
+          sky: "#E8E5DC",
           coral: "#F6CBB8",
           danger: "#F6BDBD",
           // Deprecated alias: `purple` is actually the mint tone.
@@ -44,7 +44,7 @@ export default {
         sketch: "4px 4px 0 0 #141414",
       },
       borderRadius: {
-        card: "1.25rem",
+        card: "0.625rem",
         pill: "999px",
       },
       fontFamily: {
