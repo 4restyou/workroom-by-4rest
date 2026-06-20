@@ -260,7 +260,7 @@ export default function Account() {
             <div className={`mb-5 flex flex-wrap gap-2 ${cardFlat} p-2`}>
               {(Object.keys(tabLabels) as AccountTab[]).map((tab) => (
                 <button
-                  className={`rounded-pill border px-5 py-2.5 text-sm font-bold transition-colors ${
+                  className={`rounded-[5px] border px-5 py-2.5 text-sm font-bold transition-colors ${
                     activeTab === tab
                       ? "border-workroom-ink bg-workroom-ink text-white"
                       : "border-transparent text-workroom-muted hover:text-workroom-ink"

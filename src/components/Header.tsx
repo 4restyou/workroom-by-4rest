@@ -12,7 +12,7 @@ type HeaderProps = {
 };
 
 function adminNavClass({ isActive }: { isActive: boolean }) {
-  return `rounded-pill border px-2 py-1 transition-colors sm:px-3 sm:py-1.5 ${
+  return `rounded-[4px] border px-2 py-1 transition-colors sm:px-3 sm:py-1.5 ${
     isActive
       ? "border-workroom-ink bg-workroom-ink text-white"
       : "border-transparent text-workroom-muted hover:border-workroom-ink hover:text-workroom-ink"

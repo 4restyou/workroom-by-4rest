@@ -23,7 +23,7 @@ describe("tintCard / badge", () => {
     expect(tintCard("ink")).toContain("text-white");
   });
 
-  it("collapses legacy tints onto the limited palette (yellow + sky)", () => {
+  it("collapses legacy tints onto the limited palette", () => {
     expect(tintCard("mint")).toContain("bg-workroom-sky");
     expect(tintCard("lilac")).toContain("bg-workroom-sky");
     expect(tintCard("coral")).toContain("bg-workroom-yellow");

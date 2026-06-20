@@ -24,7 +24,7 @@ export default function BackToTop() {
       type="button"
       aria-label="맨 위로"
       onClick={toTop}
-      className="fixed bottom-6 right-6 z-30 hidden h-11 w-11 place-items-center rounded-pill border-2 border-workroom-ink bg-workroom-surface text-workroom-ink transition-transform hover:-translate-y-0.5 sm:grid"
+      className="fixed bottom-6 right-6 z-30 hidden h-11 w-11 place-items-center rounded-[5px] border border-workroom-ink bg-workroom-surface text-workroom-ink transition-transform hover:-translate-y-0.5 sm:grid"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <polyline points="18 15 12 9 6 15" />

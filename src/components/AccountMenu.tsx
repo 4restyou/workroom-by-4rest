@@ -29,7 +29,7 @@ export default function AccountMenu({ isAdmin = false }: { isAdmin?: boolean }) 
     navigate("/", { replace: true });
   }
 
-  const itemClass = "rounded-lg px-3 py-2 text-left text-sm font-bold transition-colors hover:bg-workroom-yellow";
+  const itemClass = "rounded-[4px] px-3 py-2 text-left text-sm font-bold transition-colors hover:bg-workroom-yellow";
 
   return (
     <div className="relative" ref={wrapperRef}>
@@ -46,7 +46,7 @@ export default function AccountMenu({ isAdmin = false }: { isAdmin?: boolean }) 
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-50 grid w-44 animate-pop-in gap-1 rounded-card border border-workroom-line bg-workroom-surface p-2 text-workroom-ink shadow-xl">
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 grid w-44 animate-pop-in gap-1 rounded-card border border-workroom-ink bg-workroom-surface p-2 text-workroom-ink">
           {isAdmin ? (
             <Link className={itemClass} to="/admin/reservations" onClick={() => setOpen(false)}>
               예약관리

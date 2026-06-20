@@ -8,6 +8,75 @@ import { PinIcon } from "../components/icons";
 import { buttonClass, tintCard } from "../lib/ui";
 import type { BoardPost, CardAccent } from "../lib/types";
 
+const DEMO_BOARD_POSTS: BoardPost[] = [
+  {
+    id: "demo-post-1",
+    profile_id: null,
+    author_name: "운영자",
+    kind: "notice",
+    body: "WORKROOM은 09:00–22:00 예약제로 운영합니다. 서로의 집중을 위해 통화는 짧고 조용하게 부탁드려요.",
+    color: "yellow",
+    is_pinned: true,
+    is_hidden: false,
+    created_at: "2026-06-18T10:00:00+09:00",
+  },
+  {
+    id: "demo-post-2",
+    profile_id: "demo-profile-1",
+    author_name: "모아",
+    kind: "message",
+    body: "오전 햇빛이 좋아서 작업이 술술 됐어요. 다음에는 종일권으로 올게요!",
+    color: "sky",
+    is_pinned: false,
+    is_hidden: false,
+    created_at: "2026-06-19T11:30:00+09:00",
+  },
+  {
+    id: "demo-post-3",
+    profile_id: "demo-profile-2",
+    author_name: "재이",
+    kind: "message",
+    body: "혹시 금요일 오후에 프론트엔드 스터디 같이 하실 분 있나요?",
+    color: "yellow",
+    is_pinned: false,
+    is_hidden: false,
+    created_at: "2026-06-19T15:10:00+09:00",
+  },
+  {
+    id: "demo-post-4",
+    profile_id: "demo-profile-3",
+    author_name: "여름",
+    kind: "message",
+    body: "프린터 사용법 알려주셔서 감사합니다 :) 결과물 잘 챙겨갑니다.",
+    color: "sky",
+    is_pinned: false,
+    is_hidden: false,
+    created_at: "2026-06-20T09:20:00+09:00",
+  },
+  {
+    id: "demo-post-5",
+    profile_id: "demo-profile-4",
+    author_name: "해인",
+    kind: "message",
+    body: "오늘 읽은 책: 일의 감각. 창가 자리에서 세 챕터 읽었어요.",
+    color: "yellow",
+    is_pinned: false,
+    is_hidden: false,
+    created_at: "2026-06-20T13:45:00+09:00",
+  },
+  {
+    id: "demo-post-6",
+    profile_id: "demo-profile-5",
+    author_name: "윤",
+    kind: "message",
+    body: "충장로에서 조용히 노트북 할 곳을 찾았는데 딱 좋네요.",
+    color: "sky",
+    is_pinned: false,
+    is_hidden: false,
+    created_at: "2026-06-20T17:05:00+09:00",
+  },
+];
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -43,12 +112,12 @@ function Note({
   const isNotice = post.kind === "notice";
   return (
     <li
-      className={`relative flex break-inside-avoid flex-col gap-2 rounded-[4px] border-2 border-workroom-ink p-4 shadow-hard transition-transform hover:rotate-0 ${ACCENT_BG[post.color]} ${tilt(post.id)}`}
+      className={`relative flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[post.color]} ${tilt(post.id)}`}
     >
       {/* 압정 */}
-      <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-workroom-ink bg-workroom-surface shadow-hard-sm" />
+      <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
       <div className="flex items-center justify-between gap-2">
-        <span className={`rounded-pill border border-workroom-ink px-2 py-0.5 text-[10px] font-black ${isNotice ? "bg-workroom-ink text-white" : "bg-workroom-surface"}`}>
+        <span className={`rounded-[4px] border border-workroom-ink px-2 py-0.5 text-[10px] font-black ${isNotice ? "bg-workroom-ink text-white" : "bg-workroom-surface"}`}>
           {isNotice ? "공지" : "한마디"}
         </span>
         {post.is_pinned ? <PinIcon className="h-3.5 w-3.5" aria-label="고정됨" /> : null}
@@ -98,6 +167,11 @@ export default function Board() {
 
   async function load() {
     if (!supabase) {
+      if (import.meta.env.DEV) {
+        setPosts(DEMO_BOARD_POSTS);
+        setIsLoading(false);
+        return;
+      }
       setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
       setIsLoading(false);
       return;
@@ -121,7 +195,8 @@ export default function Board() {
       setIsLoading(false);
       return;
     }
-    setPosts((data ?? []) as BoardPost[]);
+    const loaded = (data ?? []) as BoardPost[];
+    setPosts(import.meta.env.DEV && !loaded.length ? DEMO_BOARD_POSTS : loaded);
     setIsLoading(false);
   }
 
@@ -187,11 +262,11 @@ export default function Board() {
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
         {/* 작성 */}
-        <div className="mb-8 rounded-card border-2 border-workroom-ink bg-workroom-surface p-4 shadow-hard">
+        <div className="mb-8 rounded-card border border-workroom-ink bg-workroom-surface p-4">
           {uid ? (
             <div className="grid gap-3">
               <textarea
-                className="min-h-[80px] w-full resize-y rounded-card border-2 border-workroom-ink bg-workroom-background px-4 py-3 text-sm font-bold placeholder:font-medium placeholder:text-workroom-muted focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
+                className="min-h-[80px] w-full resize-y rounded-[6px] border border-workroom-ink bg-workroom-background px-4 py-3 text-sm font-bold placeholder:font-medium placeholder:text-workroom-muted focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
                 placeholder="하고 싶은 말을 남겨보세요"
                 aria-label="메모 내용"
                 value={body}

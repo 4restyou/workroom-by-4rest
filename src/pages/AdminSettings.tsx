@@ -430,7 +430,7 @@ export default function AdminSettings() {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
-              <div ref={qrRef} className="w-fit rounded-card border-2 border-workroom-ink bg-white p-3">
+              <div ref={qrRef} className="w-fit rounded-card border border-workroom-ink bg-white p-3">
                 {settings["attendance_qr_token"] ? (
                   <QRCodeSVG value={`${window.location.origin}/checkin?t=${settings["attendance_qr_token"]}`} size={150} marginSize={2} />
                 ) : (

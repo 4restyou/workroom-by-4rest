@@ -93,8 +93,8 @@ export default function MemberDashboard() {
   const filled = data ? (data.stamps === 0 ? 0 : data.stamps % data.goal === 0 ? data.goal : data.stamps % data.goal) : 0;
 
   return (
-    <section className="mx-auto max-w-5xl px-4 pb-6 pt-8 sm:pb-10 sm:pt-12">
-      <div className="flex items-center justify-between gap-3">
+    <section className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 sm:pb-12 sm:pt-16">
+      <div className="flex items-center justify-between gap-3 border-b border-workroom-ink pb-5">
         <div>
           <p className="text-sm font-bold text-workroom-muted">오늘도 좋은 작업</p>
           <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">

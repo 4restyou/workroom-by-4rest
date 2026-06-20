@@ -11,6 +11,111 @@ import paperTexture from "../../assets/paper-texture.webp";
 const instaUrl = (handle: string) =>
   `https://instagram.com/${handle.replace(/^@/, "").trim()}`;
 
+const DEMO_MEMBER_CARDS: MemberCard[] = [
+  {
+    id: "demo-card-1",
+    profile_id: "demo-profile-1",
+    display_name: "김모아",
+    category: "브랜딩",
+    occupation: "브랜드 디자이너",
+    company: "모아 스튜디오",
+    headline: "작은 브랜드의 말투와 표정을 만듭니다.",
+    bio: "로컬 브랜드의 이름, 로고, 패키지와 웹사이트를 함께 설계해요.",
+    link_url: null,
+    instagram: null,
+    contact: "hello@example.com",
+    accent: "yellow",
+    is_published: true,
+    created_at: "2026-06-10T09:00:00+09:00",
+    updated_at: "2026-06-10T09:00:00+09:00",
+  },
+  {
+    id: "demo-card-2",
+    profile_id: "demo-profile-2",
+    display_name: "이재이",
+    category: "개발 · IT",
+    occupation: "프론트엔드 개발자",
+    company: null,
+    headline: "작고 단단한 웹 서비스를 만듭니다.",
+    bio: "React와 TypeScript를 주로 사용하고, 좋은 인터랙션에 관심이 많습니다.",
+    link_url: null,
+    instagram: null,
+    contact: null,
+    accent: "sky",
+    is_published: true,
+    created_at: "2026-06-11T09:00:00+09:00",
+    updated_at: "2026-06-11T09:00:00+09:00",
+  },
+  {
+    id: "demo-card-3",
+    profile_id: "demo-profile-3",
+    display_name: "박여름",
+    category: "사진 · 영상",
+    occupation: "포토그래퍼",
+    company: "여름 사진관",
+    headline: "사람과 공간의 자연스러운 순간을 기록해요.",
+    bio: null,
+    link_url: null,
+    instagram: null,
+    contact: null,
+    accent: "yellow",
+    is_published: true,
+    created_at: "2026-06-12T09:00:00+09:00",
+    updated_at: "2026-06-12T09:00:00+09:00",
+  },
+  {
+    id: "demo-card-4",
+    profile_id: "demo-profile-4",
+    display_name: "정해인",
+    category: "글 · 출판",
+    occupation: "에디터",
+    company: null,
+    headline: "읽고 싶은 문장을 고르고 오래 남을 글을 다듬습니다.",
+    bio: "인터뷰와 브랜드 콘텐츠를 씁니다.",
+    link_url: null,
+    instagram: null,
+    contact: null,
+    accent: "sky",
+    is_published: true,
+    created_at: "2026-06-13T09:00:00+09:00",
+    updated_at: "2026-06-13T09:00:00+09:00",
+  },
+  {
+    id: "demo-card-5",
+    profile_id: "demo-profile-5",
+    display_name: "오윤",
+    category: "마케팅 · 기획",
+    occupation: "콘텐츠 기획자",
+    company: "느린 파도",
+    headline: "복잡한 이야기를 이해하기 쉬운 콘텐츠로 바꿉니다.",
+    bio: null,
+    link_url: null,
+    instagram: null,
+    contact: null,
+    accent: "yellow",
+    is_published: true,
+    created_at: "2026-06-14T09:00:00+09:00",
+    updated_at: "2026-06-14T09:00:00+09:00",
+  },
+  {
+    id: "demo-card-6",
+    profile_id: "demo-profile-6",
+    display_name: "최다정",
+    category: "일러스트 · 웹툰",
+    occupation: "일러스트레이터",
+    company: null,
+    headline: "일상의 작고 웃긴 장면을 그립니다.",
+    bio: "출판과 브랜드 일러스트 작업을 하고 있어요.",
+    link_url: null,
+    instagram: null,
+    contact: null,
+    accent: "sky",
+    is_published: true,
+    created_at: "2026-06-15T09:00:00+09:00",
+    updated_at: "2026-06-15T09:00:00+09:00",
+  },
+];
+
 // Fisher–Yates: visitors see a fresh ordering each visit rather than newest-first.
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -37,12 +142,12 @@ function CardView({ card }: { card: MemberCard }) {
         aria-expanded={open}
         onClick={() => hasDetails && setOpen((v) => !v)}
         style={{ backgroundImage: `url(${paperTexture})` }}
-        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[12px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left shadow-[0_10px_24px_-12px_rgba(20,20,20,0.4)] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 sm:h-[188px] ${
+        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[6px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 hover:border-workroom-ink sm:h-[188px] ${
           hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
         }`}
       >
         <div className="flex items-start justify-between gap-2">
-          <span className={`inline-flex items-center rounded-pill px-2.5 py-1 text-[11px] font-black text-workroom-ink ${ACCENT_BG[card.accent]}`}>
+          <span className={`inline-flex items-center rounded-[4px] px-2.5 py-1 text-[11px] font-black text-workroom-ink ${ACCENT_BG[card.accent]}`}>
             {card.category}
           </span>
           <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.18em] text-workroom-line">WORKROOM</span>
@@ -70,17 +175,17 @@ function CardView({ card }: { card: MemberCard }) {
           {(card.instagram || card.link_url || card.contact) && (
             <div className={`flex flex-wrap gap-2 text-xs font-bold ${card.headline || card.bio ? "mt-3 border-t border-workroom-line pt-3" : ""}`}>
               {card.instagram ? (
-                <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={instaUrl(card.instagram)} rel="noreferrer" target="_blank">
+                <a className="rounded-[4px] border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={instaUrl(card.instagram)} rel="noreferrer" target="_blank">
                   @{card.instagram.replace(/^@/, "")}
                 </a>
               ) : null}
               {card.link_url ? (
-                <a className="rounded-pill border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={card.link_url} rel="noreferrer" target="_blank">
+                <a className="rounded-[4px] border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={card.link_url} rel="noreferrer" target="_blank">
                   홈페이지
                 </a>
               ) : null}
               {card.contact ? (
-                <span className="rounded-pill border border-workroom-ink px-3 py-1">{card.contact}</span>
+                <span className="rounded-[4px] border border-workroom-ink px-3 py-1">{card.contact}</span>
               ) : null}
             </div>
           )}
@@ -115,6 +220,11 @@ export default function Directory() {
   useEffect(() => {
     async function load() {
       if (!supabase) {
+        if (import.meta.env.DEV) {
+          setCards(shuffle(DEMO_MEMBER_CARDS));
+          setIsLoading(false);
+          return;
+        }
         setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
         setIsLoading(false);
         return;
@@ -132,7 +242,8 @@ export default function Directory() {
         setIsLoading(false);
         return;
       }
-      const list = shuffle((data ?? []) as MemberCard[]);
+      const loaded = (data ?? []) as MemberCard[];
+      const list = shuffle(import.meta.env.DEV && !loaded.length ? DEMO_MEMBER_CARDS : loaded);
       setCards(list);
       if (uid) setHasCard(list.some((c) => c.profile_id === uid));
       setIsLoading(false);
@@ -193,7 +304,7 @@ export default function Directory() {
         {/* 검색 */}
         <div className="relative mb-3">
           <input
-            className="w-full rounded-pill border-2 border-workroom-ink bg-workroom-surface px-5 py-3 text-sm font-bold placeholder:text-workroom-muted focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
+            className="w-full rounded-[6px] border border-workroom-ink bg-workroom-surface px-5 py-3 text-sm font-bold placeholder:text-workroom-muted focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
             placeholder="이름 · 업종 · 키워드로 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -216,7 +327,7 @@ export default function Directory() {
                 key={c}
                 type="button"
                 onClick={() => setCategory(c)}
-                className={`shrink-0 rounded-pill border-2 px-4 py-1.5 text-xs font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow focus-visible:ring-offset-2 ${
+                className={`shrink-0 rounded-[4px] border px-4 py-1.5 text-xs font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow focus-visible:ring-offset-2 ${
                   active
                     ? "border-workroom-ink bg-workroom-ink text-white"
                     : "border-workroom-ink bg-workroom-surface text-workroom-ink hover:bg-workroom-yellow"
