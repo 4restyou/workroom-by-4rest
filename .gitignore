@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
+*.env.rtf
 .DS_Store
 *.log
 screenshot-*.png
