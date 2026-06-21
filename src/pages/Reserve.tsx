@@ -410,7 +410,7 @@ export default function Reserve() {
         <div className="mb-6 grid gap-3 border-y border-workroom-ink py-4 text-sm font-bold leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
             <p>회원 전용 예약 · 예약 신청 후 확인 문자를 보내드립니다.</p>
-            <p className="mt-1 font-medium text-workroom-muted">온라인 결제는 문자 수신 후 2시간 이내 · 현장 결제는 방문 시 바로 진행</p>
+            <p className="mt-1 font-medium text-workroom-muted">온라인 결제 링크는 예약 확인 후 별도 발송 · 링크 수신 후 2시간 이내 결제 · 현장 결제는 방문 시 진행</p>
             {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
           </div>
           <span className={badge("yellow")}>MEMBER ONLY</span>

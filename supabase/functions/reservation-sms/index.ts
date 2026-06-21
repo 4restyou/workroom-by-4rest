@@ -43,7 +43,7 @@ const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.ap
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
 const PAYMENT_NOTICE =
   Deno.env.get("PAYMENT_NOTICE") ??
-  "온라인 결제는 문자에 포함된 결제 링크에서 2시간 이내 완료해 주세요. 현장 결제는 방문 시 바로 진행할 수 있습니다.";
+  "온라인 결제를 선택하시면 예약 확인 후 별도의 결제 링크를 보내드립니다. 링크 수신 후 2시간 이내 결제해 주세요. 현장 결제는 방문 시 진행할 수 있습니다.";
 
 const STATUS_MESSAGE: Record<string, string> = {
   confirmed: "예약이 확정되었습니다.",

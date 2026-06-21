@@ -8,7 +8,7 @@ export const SITE = {
   booking: {
     memberOnly: true,
     confirmationLabel: "예약 신청 후 확인 문자를 보내드립니다.",
-    onlinePayment: "온라인 결제는 확인 문자에 포함된 결제 링크에서 2시간 이내 완료해 주세요.",
+    onlinePayment: "예약 확인 후 온라인 결제를 선택한 분께 별도의 결제 링크를 보내드립니다. 링크 수신 후 2시간 이내 결제해 주세요.",
     onsitePayment: "현장 결제는 방문 시 바로 진행할 수 있습니다.",
   },
   instagramUrl: "https://instagram.com/workroom_by4rest",
