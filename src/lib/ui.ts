@@ -40,6 +40,14 @@ export function buttonClass(
 export const card = "rounded-card border border-workroom-line bg-workroom-surface";
 export const cardFlat = card;
 
+// Shared press/lift feel for tappable surfaces (links/buttons styled as cards).
+// Transform-only, 150ms ease-out (micro-interaction range): lifts on hover and
+// settles with a subtle press on tap so taps feel acknowledged. Reduced-motion
+// users get the static end state (globals.css neutralises the transition).
+export const pressable =
+  "transition-[transform,background-color,border-color,opacity] duration-150 ease-out " +
+  "hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:opacity-95";
+
 export type TintColor = "yellow" | "mint" | "lilac" | "sky" | "coral" | "danger" | "ink";
 
 // Palette discipline: the site runs on black/white/grey + yellow (primary) and

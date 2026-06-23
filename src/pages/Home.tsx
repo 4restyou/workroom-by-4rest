@@ -7,7 +7,7 @@ import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
-import { badge, buttonClass, card, tintCard, type TintColor } from "../lib/ui";
+import { badge, buttonClass, card, pressable, tintCard, type TintColor } from "../lib/ui";
 import type { Pass } from "../lib/types";
 import { SITE } from "../lib/site";
 
@@ -320,7 +320,7 @@ export default function Home() {
 
       <Section eyebrow="Community" title="혼자지만, 같이 쓰는" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Link className={`${tintCard("mint")} group flex flex-col gap-2 p-6 transition-transform hover:-translate-y-0.5`} to="/directory">
+          <Link className={`${tintCard("mint")} ${pressable} group flex flex-col gap-2 p-6`} to="/directory">
             <IdCardIcon className="h-7 w-7" />
             <h3 className="text-xl font-bold">멤버 명함첩</h3>
             <p className="text-sm font-medium leading-6 text-workroom-ink/75">
@@ -328,7 +328,7 @@ export default function Home() {
             </p>
             <span className="mt-1 text-sm font-black underline underline-offset-4">명함첩 열기 →</span>
           </Link>
-          <Link className={`${tintCard("coral")} group flex flex-col gap-2 p-6 transition-transform hover:-translate-y-0.5`} to="/board">
+          <Link className={`${tintCard("coral")} ${pressable} group flex flex-col gap-2 p-6`} to="/board">
             <PinIcon className="h-7 w-7" />
             <h3 className="text-xl font-bold">메모판</h3>
             <p className="text-sm font-medium leading-6 text-workroom-ink/75">

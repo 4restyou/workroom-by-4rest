@@ -142,8 +142,8 @@ function CardView({ card }: { card: MemberCard }) {
         aria-expanded={open}
         onClick={() => hasDetails && setOpen((v) => !v)}
         style={{ backgroundImage: `url(${paperTexture})` }}
-        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[6px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 hover:border-workroom-ink sm:h-[188px] ${
-          hasDetails ? "cursor-pointer hover:-translate-y-0.5" : "cursor-default"
+        className={`relative flex h-[180px] w-full flex-col justify-between gap-3 overflow-hidden rounded-[6px] border border-workroom-line bg-workroom-surface bg-cover bg-center p-5 text-left transition-[transform,background-color,border-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-ink focus-visible:ring-offset-2 hover:border-workroom-ink sm:h-[188px] ${
+          hasDetails ? "cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]" : "cursor-default"
         }`}
       >
         <div className="flex items-start justify-between gap-2">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { badge, buttonClass, card, tintCard } from "../lib/ui";
+import { badge, buttonClass, card, pressable, tintCard } from "../lib/ui";
 import { CheckIcon } from "./icons";
 import type { Reservation } from "../lib/types";
 
@@ -151,7 +151,7 @@ export default function MemberDashboard() {
         </article>
 
         {/* Attendance + coupons */}
-        <Link to="/attendance" className={`${tintCard("yellow")} flex flex-col justify-between gap-3 p-5 transition-colors hover:border-workroom-ink`}>
+        <Link to="/attendance" className={`${tintCard("yellow")} ${pressable} flex flex-col justify-between gap-3 p-5 hover:border-workroom-ink`}>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-ink/70">출근 도장</p>
             <p className="mt-2 text-3xl font-black">

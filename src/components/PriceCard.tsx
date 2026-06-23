@@ -10,7 +10,7 @@ type PriceCardProps = {
 export default function PriceCard({ pass }: PriceCardProps) {
   return (
     <Link
-      className={`group ${card} block p-5 transition-colors duration-150 hover:border-workroom-ink hover:bg-workroom-yellow/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow sm:p-6`}
+      className={`group ${card} block p-5 transition-[transform,background-color,border-color] duration-150 ease-out hover:border-workroom-ink hover:bg-workroom-yellow/20 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow sm:p-6`}
       to={`/reserve?pass=${encodeURIComponent(pass.name)}`}
     >
       <div className="flex items-start justify-between gap-4">
