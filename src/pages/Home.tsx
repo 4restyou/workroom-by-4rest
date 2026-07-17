@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
 import { AlertIcon, BusIcon, CheckIcon, IdCardIcon, ParkingIcon, PinIcon, SubwayIcon } from "../components/icons";
@@ -16,25 +16,25 @@ const { address: ADDRESS, naverMapUrl: NAVER_MAP_URL, kakaoMapUrl: KAKAO_MAP_URL
 const features: { title: string; body: string; icon: FeatureIcon; accent: TintColor }[] = [
   {
     title: "개인 작업석",
-    body: "혼자 집중하기 좋은 자유석. 먼저 앉는 순서대로 이용합니다.",
+    body: "혼자 앉아 작업하기 좋은 자리입니다. 자유석으로 운영합니다.",
     icon: "seat",
     accent: "yellow",
   },
   {
     title: "공용 테이블",
-    body: "가벼운 대화, 협업, 작은 모임을 위한 자리입니다.",
+    body: "짧은 회의나 작은 모임에 사용할 수 있는 테이블입니다.",
     icon: "table",
     accent: "sky",
   },
   {
     title: "호리존 촬영",
-    body: "상반신 증명사진과 간단 프로필 촬영을 운영자가 직접 진행합니다.",
+    body: "상반신 증명사진, 간단한 프로필 촬영을 진행합니다.",
     icon: "camera",
     accent: "yellow",
   },
   {
     title: "커피 / 프린트",
-    body: "커피는 이용권 기준으로 제공하고, 흑백 프린트는 5장까지 무료입니다.",
+    body: "이용권에 따라 커피가 제공되고, 흑백 프린트는 5장까지 무료입니다.",
     icon: "coffee",
     accent: "sky",
   },
@@ -50,53 +50,55 @@ const guideItems: [string, string][] = [
 ];
 
 const fitItems = [
-  "노트북 작업, 공부, 글쓰기처럼 조용히 오래 앉아 있는 일",
-  "상반신 증명사진, 간단 프로필, 작은 제품 촬영",
-  "2-5명이 나누는 짧은 회의나 가벼운 협업",
+  "노트북 작업, 공부, 글쓰기처럼 조용한 시간이 필요한 경우",
+  "상반신 증명사진, 간단한 프로필 사진, 작은 제품 촬영",
+  "2-5명이 하는 짧은 회의나 가벼운 협업",
 ];
 
 const cautionItems = [
-  "큰 소리의 모임, 파티, 장시간 통화 중심 이용",
-  "강한 냄새가 나는 음식이나 주변을 많이 어지럽히는 작업",
+  "큰 소리가 나는 모임, 파티, 장시간 통화",
+  "냄새가 강한 음식이나 공간을 많이 어지럽히는 작업",
   "사전 협의 없는 상업 촬영, 장비 반입이 큰 촬영",
 ];
 
-const spacePhotos = [
+const heroPhotos = [
+  {
+    src: "/images/workroom/hero.webp",
+    title: "창가 작업석",
+    body: "밝은 창가 쪽에 마련된 작업 자리입니다.",
+  },
   {
     src: "/images/workroom/lounge.webp",
     title: "쉼공간",
-    body: "잠깐 쉬거나 가볍게 이야기 나누기 좋은 자리",
-    className: "sm:col-span-5",
+    body: "잠깐 쉬거나 이야기를 나눌 수 있는 공간입니다.",
   },
   {
     src: "/images/workroom/desk-window.webp",
     title: "창가 단독석",
-    body: "혼자 집중하기 좋은 자연광 자리",
-    className: "sm:col-span-4",
+    body: "혼자 집중해서 머물기 좋은 자리입니다.",
   },
   {
     src: "/images/workroom/shelf.webp",
-    title: "워크룸 무드",
-    body: "선반과 조명으로 정돈한 따뜻한 작업 분위기",
-    className: "sm:col-span-3",
+    title: "공간 한쪽",
+    body: "책과 조명, 소품을 두어 편하게 정리한 공간입니다.",
   },
   {
     src: "/images/workroom/table.webp",
     title: "다인석",
-    body: "작은 모임이나 협업에 어울리는 공용 테이블",
-    className: "sm:col-span-4",
+    body: "작은 모임이나 협업에 사용할 수 있는 테이블입니다.",
   },
   {
     src: "/images/workroom/night.webp",
     title: "야간 전경",
-    body: "저녁에도 차분하게 머물 수 있는 공간",
-    className: "sm:col-span-8",
+    body: "저녁에도 차분하게 이용할 수 있습니다.",
   },
 ];
 
 export default function Home() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const photoScrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -126,6 +128,29 @@ export default function Home() {
 
     void loadPasses();
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setActivePhoto((current) => (current + 1) % heroPhotos.length);
+    }, 4500);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const scroller = photoScrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({
+      left: activePhoto * scroller.clientWidth,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  }, [activePhoto]);
+
+  function handlePhotoScroll() {
+    const scroller = photoScrollerRef.current;
+    if (!scroller) return;
+    const nextIndex = Math.round(scroller.scrollLeft / scroller.clientWidth);
+    if (nextIndex !== activePhoto) setActivePhoto(nextIndex);
+  }
 
   async function shareLocation() {
     const shareData = {
@@ -163,7 +188,7 @@ export default function Home() {
                 작업 공간
               </h1>
               <p className="mt-6 max-w-lg text-base font-medium leading-7 text-workroom-muted sm:text-lg sm:leading-8">
-                카페보다 조용하고 사무실보다 느슨하게. 혼자 집중하거나 작은 모임을 갖기 좋은 충장로의 예약제 공간입니다.
+                충장로에 있는 예약제 작업 공간입니다. 혼자 작업하거나, 작은 모임을 할 때 이용할 수 있어요.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link className={buttonClass("accent", "lg", "w-full sm:w-auto")} to="/reserve">
@@ -177,14 +202,48 @@ export default function Home() {
 
             <div className="sm:col-span-6">
               <div className="overflow-hidden border border-workroom-ink bg-workroom-surface">
-                <img
-                  alt="WORKROOM 창가 작업 공간"
-                  className="aspect-[4/3] w-full object-cover"
-                  src="/images/workroom/hero.webp"
-                />
+                <div className="relative">
+                  <div
+                    aria-label="WORKROOM 공간 사진"
+                    className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto scroll-smooth"
+                    onScroll={handlePhotoScroll}
+                    ref={photoScrollerRef}
+                  >
+                    {heroPhotos.map((photo) => (
+                      <img
+                        alt={`WORKROOM ${photo.title}`}
+                        className="aspect-[4/3] w-full shrink-0 snap-center object-cover"
+                        draggable={false}
+                        key={photo.src}
+                        src={photo.src}
+                      />
+                    ))}
+                  </div>
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-pill border border-workroom-ink bg-workroom-surface/90 px-2 py-1">
+                    {heroPhotos.map((photo, index) => (
+                      <button
+                        aria-label={`${photo.title} 사진 보기`}
+                        className={`h-2.5 rounded-pill border border-workroom-ink transition-all ${
+                          activePhoto === index ? "w-7 bg-workroom-yellow" : "w-2.5 bg-workroom-surface"
+                        }`}
+                        key={photo.src}
+                        onClick={() => setActivePhoto(index)}
+                        type="button"
+                      />
+                    ))}
+                  </div>
+                </div>
                 <div className="border-t border-workroom-ink p-4">
-                  <p className="text-sm font-black uppercase tracking-[0.12em] text-workroom-muted">Chungjang-ro workroom</p>
-                  <p className="mt-1 text-xl font-bold">밝은 창가와 조용한 작업석이 있는 예약제 공간</p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-[0.12em] text-workroom-muted">Chungjang-ro workroom</p>
+                      <p className="mt-1 text-xl font-bold">{heroPhotos[activePhoto].title}</p>
+                      <p className="mt-1 text-sm font-medium leading-6 text-workroom-muted">{heroPhotos[activePhoto].body}</p>
+                    </div>
+                    <p className="shrink-0 text-sm font-bold text-workroom-muted">
+                      {activePhoto + 1}/{heroPhotos.length}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -207,37 +266,18 @@ export default function Home() {
         </section>
       )}
 
-      <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤" accent="mint">
-        <div className="grid gap-6 sm:grid-cols-[1fr_1.15fr] sm:items-start">
-          <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
-            <p>
-              카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
-            </p>
-            <p className="mt-6">
-              WORKROOM은 그 사이 어딘가의 공간입니다. 슬렁슬렁 들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
-            </p>
-          </div>
-          <div className="overflow-hidden border border-workroom-ink bg-workroom-surface">
-            <img alt="WORKROOM 쉼공간" className="aspect-[4/3] w-full object-cover" src="/images/workroom/lounge.webp" />
-          </div>
+      <Section id="space" eyebrow="About" title="조용히 머물 수 있는 작업 공간" accent="mint">
+        <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
+          <p>
+            WORKROOM은 예약제로 운영하는 작은 작업 공간입니다. 노트북 작업, 공부, 글쓰기처럼 조용한 시간이 필요할 때 이용하기 좋습니다.
+          </p>
+          <p className="mt-6">
+            혼자 머물 수 있는 자리와 함께 앉을 수 있는 테이블이 있고, 간단한 촬영이나 프린트도 이용할 수 있습니다.
+          </p>
         </div>
       </Section>
 
-      <Section eyebrow="Space photos" title="사진으로 먼저 둘러보기" accent="yellow">
-        <div className="grid gap-3 sm:grid-cols-12">
-          {spacePhotos.map((photo) => (
-            <figure className={`${card} overflow-hidden ${photo.className}`} key={photo.src}>
-              <img alt={`WORKROOM ${photo.title}`} className="aspect-[4/3] w-full object-cover" loading="lazy" src={photo.src} />
-              <figcaption className="border-t border-workroom-line p-4">
-                <p className="text-base font-bold">{photo.title}</p>
-                <p className="mt-1 text-sm font-medium leading-6 text-workroom-muted">{photo.body}</p>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      </Section>
-
-      <Section eyebrow="Features" title="작업이 너무 커지지 않게" accent="lilac">
+      <Section eyebrow="Features" title="이용할 수 있는 것" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map((feature) => (
             <FeatureCard key={feature.title} {...feature} />
@@ -245,7 +285,7 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section id="pricing" eyebrow="Plans / Pricing" title="처음에는 가볍게, 필요하면 오래" accent="yellow">
+      <Section id="pricing" eyebrow="Plans / Pricing" title="이용권 안내" accent="yellow">
         <div className="grid gap-3">
           {passes.map((pass) => (
             <PriceCard key={pass.id} pass={pass} />
@@ -266,7 +306,7 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section eyebrow="Guide" title="이용 기준은 가볍게, 분명하게" accent="sky">
+      <Section eyebrow="Guide" title="이용 전 확인해 주세요" accent="sky">
         <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
           {guideItems.map(([title, body]) => (
             <div className="border-t-2 border-workroom-ink pt-3" key={title}>
@@ -277,10 +317,10 @@ export default function Home() {
         </dl>
       </Section>
 
-      <Section eyebrow="Fit check" title="이런 이용이면 잘 맞아요" accent="lilac">
+      <Section eyebrow="Use cases" title="이런 경우에 이용하기 좋아요" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <article className={`${tintCard("mint")} p-5`}>
-            <h3 className="text-xl font-bold">좋아요</h3>
+            <h3 className="text-xl font-bold">추천하는 이용</h3>
             <ul className="mt-4 grid gap-3">
               {fitItems.map((item) => (
                 <li className="flex gap-2.5 text-sm font-bold leading-6" key={item}>
@@ -291,7 +331,7 @@ export default function Home() {
             </ul>
           </article>
           <article className={`${tintCard("yellow")} p-5`}>
-            <h3 className="text-xl font-bold">먼저 물어봐 주세요</h3>
+            <h3 className="text-xl font-bold">예약 전 문의가 필요한 이용</h3>
             <ul className="mt-4 grid gap-3">
               {cautionItems.map((item) => (
                 <li className="flex gap-2.5 text-sm font-bold leading-6" key={item}>
@@ -307,7 +347,7 @@ export default function Home() {
         </Link>
       </Section>
 
-      <Section eyebrow="How to use" title="예약은 길게 말하지 않고" accent="coral">
+      <Section eyebrow="How to use" title="예약 방법" accent="coral">
         <ol className="grid gap-3 sm:grid-cols-4">
           {["원하는 이용권을 선택합니다.", "날짜와 시간을 선택합니다.", "예약 신청을 남깁니다.", "전화 또는 문자 안내 후 확정됩니다."].map(
             (item, index) => (
@@ -372,13 +412,13 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section eyebrow="Community" title="혼자지만, 같이 쓰는" accent="lilac">
+      <Section eyebrow="Community" title="멤버 공간" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <Link className={`${tintCard("mint")} ${pressable} group flex flex-col gap-2 p-6`} to="/directory">
             <IdCardIcon className="h-7 w-7" />
             <h3 className="text-xl font-bold">멤버 명함첩</h3>
             <p className="text-sm font-medium leading-6 text-workroom-ink/75">
-              워크룸을 함께 쓰는 사람들의 명함. 이름·업종·카테고리로 찾아보고, 내 명함도 올려보세요.
+              워크룸을 이용하는 사람들의 명함을 볼 수 있습니다. 로그인 후 내 명함도 등록할 수 있어요.
             </p>
             <span className="mt-1 text-sm font-black underline underline-offset-4">명함첩 열기 →</span>
           </Link>
@@ -386,7 +426,7 @@ export default function Home() {
             <PinIcon className="h-7 w-7" />
             <h3 className="text-xl font-bold">메모판</h3>
             <p className="text-sm font-medium leading-6 text-workroom-ink/75">
-              운영자 공지와 회원들의 한마디가 붙는 공간. 하고 싶은 말, 바라는 점을 포스트잇처럼 남겨주세요.
+              운영자 공지와 회원 메모를 확인하는 공간입니다. 로그인 후 메모를 남길 수 있어요.
             </p>
             <span className="mt-1 text-sm font-black underline underline-offset-4">메모판 열기 →</span>
           </Link>
@@ -397,7 +437,7 @@ export default function Home() {
         <div className={`${tintCard("ink")} p-6 sm:flex sm:items-center sm:justify-between sm:gap-6`}>
           <div>
             <p className="text-sm font-black text-workroom-yellow">Reservation</p>
-            <h2 className="mt-2 text-3xl font-black tracking-tight">슬렁슬렁 들어올 준비가 됐다면</h2>
+            <h2 className="mt-2 text-3xl font-black tracking-tight">방문 전 예약을 남겨주세요</h2>
           </div>
           <Link className={buttonClass("accent", "lg", "mt-5 w-full sm:mt-0 sm:w-auto")} to="/reserve">
             예약 신청하기 →

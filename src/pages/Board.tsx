@@ -335,7 +335,7 @@ export default function Board() {
     <main className="pb-16">
       <Section eyebrow="Board" title="메모판" accent="yellow">
         <p className="mb-5 max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
-          운영자 공지와 회원들의 한마디가 붙는 공간이에요. 하고 싶은 말, 바라는 점을 포스트잇처럼 남겨주세요.
+          운영자 공지와 회원 메모를 확인하는 공간입니다. 로그인 후 메모를 남길 수 있습니다.
         </p>
 
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
