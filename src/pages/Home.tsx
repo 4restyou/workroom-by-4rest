@@ -61,6 +61,39 @@ const cautionItems = [
   "사전 협의 없는 상업 촬영, 장비 반입이 큰 촬영",
 ];
 
+const spacePhotos = [
+  {
+    src: "/images/workroom/lounge.webp",
+    title: "쉼공간",
+    body: "잠깐 쉬거나 가볍게 이야기 나누기 좋은 자리",
+    className: "sm:col-span-5",
+  },
+  {
+    src: "/images/workroom/desk-window.webp",
+    title: "창가 단독석",
+    body: "혼자 집중하기 좋은 자연광 자리",
+    className: "sm:col-span-4",
+  },
+  {
+    src: "/images/workroom/shelf.webp",
+    title: "워크룸 무드",
+    body: "선반과 조명으로 정돈한 따뜻한 작업 분위기",
+    className: "sm:col-span-3",
+  },
+  {
+    src: "/images/workroom/table.webp",
+    title: "다인석",
+    body: "작은 모임이나 협업에 어울리는 공용 테이블",
+    className: "sm:col-span-4",
+  },
+  {
+    src: "/images/workroom/night.webp",
+    title: "야간 전경",
+    body: "저녁에도 차분하게 머물 수 있는 공간",
+    className: "sm:col-span-8",
+  },
+];
+
 export default function Home() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -143,13 +176,15 @@ export default function Home() {
             </div>
 
             <div className="sm:col-span-6">
-              <div className="grid aspect-[4/3] place-items-center border border-dashed border-workroom-muted bg-workroom-surface p-8 text-center">
-                <div>
-                  <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-workroom-ink text-2xl" aria-hidden>
-                    ◯
-                  </span>
-                  <p className="mt-5 text-xl font-bold">공간 사진 준비 중</p>
-                  <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">공사 완료 후 실제 공간 사진으로 교체됩니다.</p>
+              <div className="overflow-hidden border border-workroom-ink bg-workroom-surface">
+                <img
+                  alt="WORKROOM 창가 작업 공간"
+                  className="aspect-[4/3] w-full object-cover"
+                  src="/images/workroom/hero.webp"
+                />
+                <div className="border-t border-workroom-ink p-4">
+                  <p className="text-sm font-black uppercase tracking-[0.12em] text-workroom-muted">Chungjang-ro workroom</p>
+                  <p className="mt-1 text-xl font-bold">밝은 창가와 조용한 작업석이 있는 예약제 공간</p>
                 </div>
               </div>
             </div>
@@ -173,13 +208,32 @@ export default function Home() {
       )}
 
       <Section id="space" eyebrow="About" title="카페와 사무실 사이, 그쯤" accent="mint">
-        <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
-          <p>
-            카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
-          </p>
-          <p className="mt-6">
-            WORKROOM은 그 사이 어딘가의 공간을 생각하며 준비하고 있습니다. 슬렁슬렁 들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
-          </p>
+        <div className="grid gap-6 sm:grid-cols-[1fr_1.15fr] sm:items-start">
+          <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
+            <p>
+              카페는 편하지만 오래 앉아 있으면 조금 눈치가 보이고, 사무실은 집중하기 좋지만 가끔은 너무 딱딱하고, 집은 편한데 이상하게 일이 잘 안 될 때가 있습니다.
+            </p>
+            <p className="mt-6">
+              WORKROOM은 그 사이 어딘가의 공간입니다. 슬렁슬렁 들어와도 되고, 조용히 오래 앉아 있어도 되고, 각자의 일을 각자의 속도로 이어갈 수 있는 곳입니다.
+            </p>
+          </div>
+          <div className="overflow-hidden border border-workroom-ink bg-workroom-surface">
+            <img alt="WORKROOM 쉼공간" className="aspect-[4/3] w-full object-cover" src="/images/workroom/lounge.webp" />
+          </div>
+        </div>
+      </Section>
+
+      <Section eyebrow="Space photos" title="사진으로 먼저 둘러보기" accent="yellow">
+        <div className="grid gap-3 sm:grid-cols-12">
+          {spacePhotos.map((photo) => (
+            <figure className={`${card} overflow-hidden ${photo.className}`} key={photo.src}>
+              <img alt={`WORKROOM ${photo.title}`} className="aspect-[4/3] w-full object-cover" loading="lazy" src={photo.src} />
+              <figcaption className="border-t border-workroom-line p-4">
+                <p className="text-base font-bold">{photo.title}</p>
+                <p className="mt-1 text-sm font-medium leading-6 text-workroom-muted">{photo.body}</p>
+              </figcaption>
+            </figure>
+          ))}
         </div>
       </Section>
 
