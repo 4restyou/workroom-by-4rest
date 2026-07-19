@@ -238,7 +238,7 @@ export default function Board() {
         setIsLoading(false);
         return;
       }
-      setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
+      setError("서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
       setIsLoading(false);
       return;
     }

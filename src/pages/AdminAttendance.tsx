@@ -14,6 +14,8 @@ type AttendanceRow = {
   profile: { full_name: string | null; phone: string | null } | null;
 };
 
+type MemberOption = { id: string; full_name: string | null; phone: string | null };
+
 type CouponRow = {
   id: string;
   code: string;
@@ -40,6 +42,8 @@ export default function AdminAttendance() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [manualQuery, setManualQuery] = useState("");
+  const [manualResults, setManualResults] = useState<MemberOption[]>([]);
 
   async function load() {
     if (!supabase) return;
@@ -87,6 +91,41 @@ export default function AdminAttendance() {
     }
     void checkAndLoad();
   }, [navigate]);
+
+  async function searchMembers(query: string) {
+    if (!supabase) return;
+    const q = query.trim();
+    setManualQuery(query);
+    if (q.length < 2) {
+      setManualResults([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("profiles")
+      .select("id,full_name,phone")
+      .eq("role", "user")
+      .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`)
+      .limit(8);
+    setManualResults((data ?? []) as MemberOption[]);
+  }
+
+  // QR을 찍기 어려운 회원(폰 미지참·워크인)을 관리자가 직접 출석 처리.
+  async function addManualAttendance(member: MemberOption) {
+    if (!supabase) return;
+    if (!window.confirm(`${member.full_name || "이름 미입력"}님을 지금 출석 처리할까요?`)) return;
+    setBusy("manual");
+    const { error: insertError } = await supabase.from("attendance").insert({ profile_id: member.id });
+    setBusy(null);
+    if (insertError) {
+      setError(insertError.message.includes("row-level security") ? "수기 출석 등록 권한이 없습니다. 마이그레이션(0021) 적용을 확인해 주세요." : insertError.message);
+      return;
+    }
+    setManualQuery("");
+    setManualResults([]);
+    setError("");
+    setSuccess(`${member.full_name || "회원"}님을 출석 처리했습니다.`);
+    await load();
+  }
 
   async function updateAttendance(id: string, payload: { check_in_at?: string; check_out_at?: string | null }, message: string) {
     if (!supabase) return;
@@ -151,6 +190,36 @@ export default function AdminAttendance() {
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
         {success ? <p className={`mb-4 ${tintCard("mint")} p-4 text-sm font-bold`}>{success}</p> : null}
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>불러오는 중입니다…</p> : null}
+
+        <details className={`${card} mb-5 p-4`}>
+          <summary className="cursor-pointer font-black">수기 출석 등록 (QR 없이 직접 처리)</summary>
+          <div className="mt-3 grid gap-2">
+            <input
+              placeholder="회원 이름 또는 연락처로 검색 (2자 이상)"
+              value={manualQuery}
+              onChange={(event) => void searchMembers(event.target.value)}
+              aria-label="수기 출석 회원 검색"
+            />
+            {manualResults.length ? (
+              <div className="grid gap-1.5">
+                {manualResults.map((member) => (
+                  <button
+                    className={`${cardFlat} flex items-center justify-between gap-3 p-3 text-left transition-colors hover:border-workroom-ink`}
+                    disabled={busy === "manual"}
+                    key={member.id}
+                    onClick={() => void addManualAttendance(member)}
+                    type="button"
+                  >
+                    <span className="font-bold">{member.full_name || "이름 미입력"}</span>
+                    <span className="text-xs font-medium text-workroom-muted">{member.phone || ""} · 지금 출석 처리</span>
+                  </button>
+                ))}
+              </div>
+            ) : manualQuery.trim().length >= 2 ? (
+              <p className="text-xs font-medium text-workroom-muted">검색 결과가 없습니다.</p>
+            ) : null}
+          </div>
+        </details>
 
         <p className={`mb-3 ${tintCard("yellow")} p-4 text-sm font-bold`}>오늘 출석 {todays.length}명 · 이용 중 {todays.filter((row) => !row.check_out_at).length}명</p>
         <div className="mb-8 grid gap-2">

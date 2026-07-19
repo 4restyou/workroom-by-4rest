@@ -118,6 +118,7 @@ export default function AdminSettings() {
 
   async function saveAll() {
     if (!supabase) return;
+    if (!window.confirm("좌석·이용권·운영시간 설정을 저장할까요?\n가격과 노출 여부 변경은 즉시 예약 화면에 반영됩니다.")) return;
     setIsSaving(true);
     setError("");
     setSuccess("");
@@ -617,6 +618,7 @@ export default function AdminSettings() {
 
   async function regenerateToken() {
     if (!supabase) return;
+    if (!window.confirm("QR 토큰을 재생성할까요?\n매장에 붙어 있는 기존 QR은 즉시 사용할 수 없게 되며, 새 QR로 교체해야 합니다.")) return;
     const token = crypto.randomUUID().replace(/-/g, "");
     const { error: tokenError } = await supabase.from("space_settings").upsert({ key: "attendance_qr_token", value: token }, { onConflict: "key" });
     if (tokenError) {

@@ -236,7 +236,7 @@ export default function Directory() {
           setIsLoading(false);
           return;
         }
-        setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
+        setError("서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
         setIsLoading(false);
         return;
       }
@@ -256,7 +256,11 @@ export default function Directory() {
       const loaded = (data ?? []) as MemberCard[];
       const list = shuffle(import.meta.env.DEV && !loaded.length ? DEMO_MEMBER_CARDS : loaded);
       setCards(list);
-      if (uid) setHasCard(list.some((c) => c.profile_id === uid));
+      if (uid) {
+        // 비공개 명함도 "내 명함 수정"으로 이어지도록 목록과 별개로 본인 명함을 확인.
+        const { data: own } = await supabase.from("member_cards").select("id").eq("profile_id", uid).maybeSingle();
+        setHasCard(Boolean(own) || list.some((c) => c.profile_id === uid));
+      }
       setIsLoading(false);
     }
     void load();

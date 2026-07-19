@@ -339,7 +339,7 @@ export default function Reserve() {
     setSuccess(false);
 
     if (!supabase) {
-      setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
+      setError("서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
 
@@ -833,8 +833,11 @@ export default function Reserve() {
               </div>
             ) : null}
 
-            <button className={buttonClass("primary", "lg", "mt-6 w-full")} onClick={() => setSuccess(false)} type="button">
-              확인했어요
+            <Link className={buttonClass("primary", "lg", "mt-6 w-full")} to="/account?tab=reservations">
+              예약현황에서 보기
+            </Link>
+            <button className={buttonClass("secondary", "md", "mt-2 w-full")} onClick={() => setSuccess(false)} type="button">
+              닫기
             </button>
           </div>
         </div>

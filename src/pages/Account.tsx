@@ -19,8 +19,14 @@ const tabLabels: Record<AccountTab, string> = {
 // Cancellation (and refund) is only allowed before the reservation start time.
 function canCancel(reservation: Reservation): boolean {
   const start = new Date(`${reservation.date}T${(reservation.start_time ?? "00:00").slice(0, 5)}:00+09:00`);
-  if (Number.isNaN(start.getTime())) return true;
+  if (Number.isNaN(start.getTime())) return false;
   return Date.now() < start.getTime();
+}
+
+// A canceled reservation that was already paid needs an operator refund; keep
+// that state visible to the member until payment_status flips to "refunded".
+function isRefundPending(reservation: Reservation): boolean {
+  return reservation.status === "canceled" && reservation.payment_status === "paid";
 }
 
 const reservationStatusCardClass: Record<ReservationStatus, string> = {
@@ -68,7 +74,7 @@ export default function Account() {
   useEffect(() => {
     async function loadAccount() {
       if (!supabase) {
-        setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
+        setError("서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
         setIsLoading(false);
         return;
       }
@@ -445,6 +451,13 @@ export default function Account() {
                           {reservation.payment_status === "refunded" ? (
                             <div className="mt-3">
                               <span className={badge("lilac")}>환불완료</span>
+                            </div>
+                          ) : isRefundPending(reservation) ? (
+                            <div className="mt-3">
+                              <span className={badge("yellow")}>환불 처리 대기</span>
+                              <p className="mt-1.5 text-xs font-medium leading-5 text-workroom-muted">
+                                결제된 예약이 취소되어 운영자가 환불을 확인 중입니다. 환불이 완료되면 이곳에 표시됩니다.
+                              </p>
                             </div>
                           ) : null}
 

@@ -36,6 +36,8 @@ type DashData = {
 
 export default function MemberDashboard() {
   const [data, setData] = useState<DashData | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -46,47 +48,52 @@ export default function MemberDashboard() {
       if (!user) return;
       const today = kstToday();
 
-      const [{ data: profile }, { data: resList }, { data: att }, { data: cps }, { data: sets }] = await Promise.all([
-        supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
-        supabase
-          .from("reservations")
-          .select("id,pass_name_snapshot,pass_type,date,start_time,end_time,status,people")
-          .eq("profile_id", user.id)
-          .in("status", ["pending", "confirmed"])
-          .is("deleted_at", null)
-          .gte("date", today)
-          .order("date", { ascending: true })
-          .order("start_time", { ascending: true })
-          .limit(1),
-        supabase.from("attendance").select("id,check_in_at,check_out_at").eq("profile_id", user.id),
-        supabase.from("coupons").select("id,status").eq("profile_id", user.id).eq("status", "issued"),
-        supabase.from("space_settings").select("key,value").in("key", ["attendance_stamp_goal", "attendance_reward_label"]),
-      ]);
+      try {
+        const [{ data: profile }, { data: resList }, { data: att }, { data: cps }, { data: sets }] = await Promise.all([
+          supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+          supabase
+            .from("reservations")
+            .select("id,pass_name_snapshot,pass_type,date,start_time,end_time,status,people")
+            .eq("profile_id", user.id)
+            .in("status", ["pending", "confirmed"])
+            .is("deleted_at", null)
+            .gte("date", today)
+            .order("date", { ascending: true })
+            .order("start_time", { ascending: true })
+            .limit(1),
+          supabase.from("attendance").select("id,check_in_at,check_out_at").eq("profile_id", user.id),
+          supabase.from("coupons").select("id,status").eq("profile_id", user.id).eq("status", "issued"),
+          supabase.from("space_settings").select("key,value").in("key", ["attendance_stamp_goal", "attendance_reward_label"]),
+        ]);
 
-      if (!active) return;
-      const setMap = Object.fromEntries(((sets ?? []) as { key: string; value: string }[]).map((s) => [s.key, s.value]));
-      const goal = Number(setMap.attendance_stamp_goal) || 10;
-      const total = (att ?? []).length;
-      const checkedInToday = (att ?? []).some(
-        (r: { check_in_at: string; check_out_at: string | null }) =>
-          new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(r.check_in_at)) === today,
-      );
+        if (!active) return;
+        const setMap = Object.fromEntries(((sets ?? []) as { key: string; value: string }[]).map((s) => [s.key, s.value]));
+        const goal = Number(setMap.attendance_stamp_goal) || 10;
+        const total = (att ?? []).length;
+        const checkedInToday = (att ?? []).some(
+          (r: { check_in_at: string; check_out_at: string | null }) =>
+            new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(r.check_in_at)) === today,
+        );
 
-      setData({
-        name: (profile?.full_name as string) || "회원",
-        nextRes: ((resList ?? [])[0] as Reservation) ?? null,
-        stamps: total,
-        goal,
-        reward: setMap.attendance_reward_label ?? "",
-        coupons: (cps ?? []).length,
-        checkedInToday,
-      });
+        setFailed(false);
+        setData({
+          name: (profile?.full_name as string) || "회원",
+          nextRes: ((resList ?? [])[0] as Reservation) ?? null,
+          stamps: total,
+          goal,
+          reward: setMap.attendance_reward_label ?? "",
+          coupons: (cps ?? []).length,
+          checkedInToday,
+        });
+      } catch {
+        if (active) setFailed(true);
+      }
     }
     void load();
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   // While loading (or if the session/profile isn't ready), render a light
   // placeholder so the dashboard area doesn't jump.
@@ -131,6 +138,17 @@ export default function MemberDashboard() {
                     </span>
                   ) : null}
                 </p>
+              </div>
+            ) : failed ? (
+              <div className="mt-2">
+                <p className="text-sm font-medium leading-6 text-workroom-muted">정보를 불러오지 못했어요.</p>
+                <button
+                  className="mt-1 text-sm font-bold underline underline-offset-4 hover:text-workroom-ink"
+                  onClick={() => setReloadKey((k) => k + 1)}
+                  type="button"
+                >
+                  다시 시도
+                </button>
               </div>
             ) : (
               <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">

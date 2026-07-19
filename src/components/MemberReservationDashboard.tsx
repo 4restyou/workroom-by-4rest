@@ -88,7 +88,7 @@ function CurrentReservation({ attendance, now, reservation, today }: { attendanc
           <p className="mt-1 text-sm font-bold text-workroom-muted">{timing}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {checkedIn ? <span className={badge("mint")}>입실 완료</span> : null}
+          {checkedIn ? <span className={badge("mint")}>출근 완료</span> : null}
           <StatusBadge status={reservation.status} />
         </div>
       </div>
@@ -108,7 +108,7 @@ function CurrentReservation({ attendance, now, reservation, today }: { attendanc
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-workroom-line pt-4">
         {reservation.status === "confirmed" && (using || (isLong && today >= periodStart && today <= periodEnd)) ? (
-          <Link className={buttonClass("primary", "sm")} to="/attendance">출석·퇴실 확인</Link>
+          <Link className={buttonClass("primary", "sm")} to="/attendance">출근부 확인</Link>
         ) : null}
         <span className={badge(reservation.payment_status === "paid" ? "mint" : reservation.payment_status === "refunded" ? "lilac" : "yellow")}>
           {reservation.payment_status === "paid" ? "결제완료" : reservation.payment_status === "refunded" ? "환불완료" : "미결제"}
@@ -158,7 +158,7 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className={`${tintCard("sky")} p-3`}><p className="text-xs font-bold text-workroom-muted">남은 이용기간</p><p className="mt-1 text-xl font-black">{today < start ? "이용 전" : `${remainingDays}일`}</p></div>
-        <div className={`${tintCard("yellow")} p-3`}><p className="text-xs font-bold text-workroom-muted">출석</p><p className="mt-1 text-xl font-black">{attendedCount}회</p></div>
+        <div className={`${tintCard("yellow")} p-3`}><p className="text-xs font-bold text-workroom-muted">출근</p><p className="mt-1 text-xl font-black">{attendedCount}회</p></div>
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs">
         {["일", "월", "화", "수", "목", "금", "토"].map((label) => <p className="py-1 font-black text-workroom-muted" key={label}>{label}</p>)}
@@ -169,7 +169,7 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
           const isToday = date === today;
           return (
             <div
-              aria-label={`${date}${isAvailable ? " 이용 가능" : " 이용 불가"}${isAttended ? " 출석 완료" : ""}`}
+              aria-label={`${date}${isAvailable ? " 이용 가능" : " 이용 불가"}${isAttended ? " 출근 완료" : ""}`}
               className={`relative grid aspect-square place-items-center rounded-[5px] border font-bold ${
                 isToday ? "border-workroom-ink bg-workroom-yellow" : isAvailable ? "border-workroom-line bg-workroom-surface" : "border-transparent bg-workroom-line/20 text-workroom-muted"
               }`}
@@ -182,7 +182,7 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
         })}
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-bold text-workroom-muted">
-        <span>● 오늘</span><span>검정 점 출석</span><span>흐린 날짜 휴무·이용불가</span>
+        <span>● 오늘</span><span>검정 점 출근</span><span>흐린 날짜 휴무·이용불가</span>
       </div>
       {reservation.access_paused_from && reservation.access_paused_until ? (
         <p className={`${cardFlat} mt-3 p-3 text-xs font-bold`}>일시정지 · {formatDate(reservation.access_paused_from)} – {formatDate(reservation.access_paused_until)}</p>

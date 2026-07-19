@@ -144,7 +144,7 @@ export default function AdminReservations() {
     setError("");
 
     const [{ data, error: loadError }, { data: passRows }] = await Promise.all([
-      supabase.from("reservations").select("*").order("date", { ascending: true }).order("created_at", { ascending: false }),
+      supabase.from("reservations").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
       supabase.from("passes").select("id,name,description,price,seat_type_id,is_active,sort_order").eq("is_active", true).order("sort_order"),
     ]);
 
@@ -348,6 +348,8 @@ export default function AdminReservations() {
   }
 
   async function markPaymentLinkSent(reservation: Reservation) {
+    const count = reservation.payment_link_send_count ?? 0;
+    if (count >= 1 && !window.confirm(`이미 결제 링크 발송 기록이 ${count}회 있습니다. 다시 기록할까요?`)) return;
     const sentAt = new Date();
     const dueAt = new Date(sentAt.getTime() + 2 * 60 * 60 * 1000);
     await patchReservation(reservation.id, {
@@ -957,6 +959,17 @@ function ReservationCard({
           {reservation.status === "confirmed" ? (
             <button className={buttonClass("secondary", "sm")} onClick={() => onPatch({ status: "completed" })} type="button">
               이용 완료
+            </button>
+          ) : null}
+          {reservation.status === "pending" || reservation.status === "confirmed" ? (
+            <button
+              className={buttonClass("secondary", "sm", "border-workroom-danger text-workroom-ink")}
+              onClick={() => {
+                if (window.confirm(`${reservation.name}님 예약을 노쇼로 처리할까요?`)) onPatch({ status: "no_show" });
+              }}
+              type="button"
+            >
+              노쇼 처리
             </button>
           ) : null}
         </div>
