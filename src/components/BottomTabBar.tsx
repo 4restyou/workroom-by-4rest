@@ -77,10 +77,11 @@ const guestTabs: Tab[] = [
 ];
 
 const adminTabs: Tab[] = [
-  { to: "/", label: "홈", icon: homeIcon, match: (p) => p === "/" },
+  { to: "/admin/dashboard", label: "홈", icon: homeIcon, match: (p) => p === "/admin/dashboard" },
   { to: "/admin/reservations", label: "예약", icon: reserveIcon, match: (p) => p.startsWith("/admin/reservations") },
+  { to: "/admin/attendance", label: "출석", icon: attendanceIcon, match: (p) => p.startsWith("/admin/attendance") },
   { to: "/admin/members", label: "회원", icon: userIcon, match: (p) => p.startsWith("/admin/members") },
-  { to: "/admin/stats", label: "통계", icon: infoIcon, match: (p) => p.startsWith("/admin/stats") },
+  { to: "/admin/settings", label: "설정", icon: infoIcon, match: (p) => p.startsWith("/admin/settings") || p.startsWith("/admin/stats") },
 ];
 
 export default function BottomTabBar() {
@@ -131,7 +132,7 @@ export default function BottomTabBar() {
       aria-label="주요 메뉴"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-4">
+      <ul className={`mx-auto grid max-w-md ${tabs.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
         {tabs.map((tab) => {
           const active = tab.match(location.pathname);
           return (

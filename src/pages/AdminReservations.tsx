@@ -72,8 +72,9 @@ export default function AdminReservations() {
   const [searchParams] = useSearchParams();
   const reservationParam = searchParams.get("reservation");
   const statusParam = searchParams.get("status");
+  const dateParam = searchParams.get("date");
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState(dateParam ?? "");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>(isReservationStatus(statusParam) ? statusParam : "pending");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
@@ -196,7 +197,8 @@ export default function AdminReservations() {
   useEffect(() => {
     if (reservationParam) return;
     if (isReservationStatus(statusParam)) setStatusFilter(statusParam);
-  }, [reservationParam, statusParam]);
+    if (dateParam) setDateFilter(dateParam);
+  }, [dateParam, reservationParam, statusParam]);
 
   useEffect(() => {
     async function loadInquiries() {

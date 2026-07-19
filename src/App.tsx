@@ -1,4 +1,4 @@
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BackToTop from "./components/BackToTop";
 import BottomTabBar from "./components/BottomTabBar";
@@ -7,6 +7,7 @@ import Header from "./components/Header";
 import PageLoading from "./components/PageLoading";
 import { getCurrentProfile } from "./lib/profiles";
 import { supabase } from "./lib/supabase";
+import type { Profile } from "./lib/types";
 
 // Pages a not-yet-onboarded member may visit (to finish the profile or read
 // the policies). Everything else redirects to profile completion.
@@ -15,11 +16,37 @@ const ONBOARDING_ALLOWED = ["/account", "/privacy", "/terms", "/login"];
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isAdmin = location.pathname.startsWith("/admin");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const isAdminRoute = location.pathname.startsWith("/admin");
+  const isAdminLogin = location.pathname === "/admin";
+  const isAdminUser = profile?.role === "admin";
+  const adminMode = Boolean(isAdminRoute && isAdminUser && !isAdminLogin);
   // Focused task flows hide the bottom tab bar so their own sticky actions own
   // the bottom edge.
   const isFocusedFlow = location.pathname === "/reserve" || location.pathname.startsWith("/checkin");
-  const showTabBar = !isAdmin && !isFocusedFlow;
+  const showTabBar = !isFocusedFlow && (!isAdminRoute || adminMode);
+
+  useEffect(() => {
+    let active = true;
+    async function loadProfile() {
+      if (!supabase) return;
+      const loadedProfile = await getCurrentProfile();
+      if (active) setProfile(loadedProfile);
+    }
+
+    void loadProfile();
+    const {
+      data: { subscription },
+    } =
+      supabase?.auth.onAuthStateChange(() => {
+        void loadProfile();
+      }) ?? { data: { subscription: null } };
+
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   // First login onboarding: if a signed-in member hasn't completed their
   // profile (name, phone, privacy consent), send them to 회원정보 first.
@@ -54,7 +81,7 @@ export default function App() {
       >
         본문 바로가기
       </a>
-      <Header isAdmin={isAdmin} />
+      <Header adminMode={adminMode} />
       {/* On mobile, the bottom tab bar overlays the bottom edge, so non-admin
           pages get extra bottom padding to keep content clear of it. */}
       <div id="main" className={`flex-1 ${showTabBar ? "pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:pb-0" : ""}`}>
@@ -62,7 +89,7 @@ export default function App() {
           <Outlet />
         </Suspense>
       </div>
-      {!isAdmin ? <Footer /> : null}
+      {!isAdminRoute ? <Footer /> : null}
       {showTabBar ? <BottomTabBar /> : null}
       <BackToTop />
     </div>

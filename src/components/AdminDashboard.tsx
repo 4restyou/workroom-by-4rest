@@ -25,18 +25,20 @@ export default function AdminDashboard() {
         .from("reservations")
         .select("*")
         .is("deleted_at", null)
-        .gte("date", today)
+        .or(`date.gte.${today},status.eq.pending`)
         .order("date", { ascending: true })
         .order("start_time", { ascending: true })
-        .limit(80);
+        .limit(120);
 
       if (!active) return;
       setData({ reservations: (reservations ?? []) as Reservation[] });
     }
 
     void load();
+    const timer = window.setInterval(() => void load(), 30000);
     return () => {
       active = false;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -44,12 +46,14 @@ export default function AdminDashboard() {
     const reservations = data?.reservations ?? [];
     const today = todayValue();
     const pending = reservations.filter((reservation) => reservation.status === "pending");
-    const todayReservations = reservations.filter((reservation) => reservation.date === today && isActiveReservation(reservation));
-    const upcoming = reservations.filter(isActiveReservation).slice(0, 4);
+    const overduePending = pending.filter((reservation) => reservation.date < today);
+    const todayConfirmed = reservations.filter((reservation) => reservation.date === today && reservation.status === "confirmed");
+    const upcoming = reservations.filter((reservation) => reservation.date >= today && isActiveReservation(reservation)).slice(0, 4);
 
     return {
       pending,
-      todayReservations,
+      overduePending,
+      todayConfirmed,
       upcoming,
       confirmed: reservations.filter((reservation) => reservation.status === "confirmed").length,
     };
@@ -69,14 +73,14 @@ export default function AdminDashboard() {
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <Link to="/admin/reservations?status=pending" className={`${tintCard("yellow")} ${pressable} p-5 hover:border-workroom-ink`}>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-ink/70">새 예약</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-ink/70">확인 대기</p>
           <p className="mt-2 text-4xl font-black">{data ? summary.pending.length : "…"}</p>
-          <p className="mt-1 text-sm font-bold">확인 대기</p>
+          <p className="mt-1 text-sm font-bold">처리가 필요한 예약</p>
         </Link>
-        <Link to="/admin/reservations" className={`${card} ${pressable} p-5 hover:border-workroom-ink`}>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">오늘 예약</p>
-          <p className="mt-2 text-4xl font-black">{data ? summary.todayReservations.length : "…"}</p>
-          <p className="mt-1 text-sm font-bold text-workroom-muted">진행 예정</p>
+        <Link to={`/admin/reservations?status=confirmed&date=${todayValue()}`} className={`${card} ${pressable} p-5 hover:border-workroom-ink`}>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">오늘 방문</p>
+          <p className="mt-2 text-4xl font-black">{data ? summary.todayConfirmed.length : "…"}</p>
+          <p className="mt-1 text-sm font-bold text-workroom-muted">확정 예약</p>
         </Link>
         <Link to="/admin/reservations?status=confirmed" className={`${tintCard("sky")} ${pressable} p-5 hover:border-workroom-ink`}>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-ink/70">확정 예약</p>
@@ -84,6 +88,12 @@ export default function AdminDashboard() {
           <p className="mt-1 text-sm font-bold">앞으로 방문 예정</p>
         </Link>
       </div>
+
+      {data && summary.overduePending.length ? (
+        <Link className={`${tintCard("danger")} ${pressable} mt-3 block p-4 text-sm font-bold`} to="/admin/reservations?status=pending">
+          날짜가 지난 미처리 예약이 {summary.overduePending.length}건 있습니다. 지금 확인해 주세요. →
+        </Link>
+      ) : null}
 
       <article className={`${card} mt-3 p-5`}>
         <div className="flex items-center justify-between gap-3">

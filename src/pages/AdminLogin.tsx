@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Section from "../components/Section";
-import { signInWithGoogle } from "../lib/profiles";
+import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { configuredAdminEmails, hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
 
@@ -18,7 +18,8 @@ export default function AdminLogin() {
       if (!supabase) return;
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        navigate("/admin/reservations", { replace: true });
+        const profile = await getCurrentProfile();
+        navigate(profile?.role === "admin" ? "/admin/dashboard" : "/account", { replace: true });
       }
     }
 
@@ -54,14 +55,21 @@ export default function AdminLogin() {
       return;
     }
 
-    navigate("/admin/reservations");
+    const profile = await getCurrentProfile();
+    if (profile?.role !== "admin") {
+      await supabase.auth.signOut();
+      setError("관리자 권한이 확인되지 않았습니다.");
+      return;
+    }
+
+    navigate("/admin/dashboard");
   }
 
   async function handleGoogleLogin() {
     setError("");
     setIsGoogleSubmitting(true);
     try {
-      await signInWithGoogle("/admin/reservations");
+      await signInWithGoogle("/admin/dashboard");
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "구글 로그인을 시작하지 못했습니다.");
       setIsGoogleSubmitting(false);

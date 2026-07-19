@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDate } from "../lib/format";
+import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { buttonClass, cardFlat, tintCard } from "../lib/ui";
 import type { ReservationNotification } from "../lib/types";
@@ -8,7 +9,10 @@ import type { ReservationNotification } from "../lib/types";
 const SEEN_KEY = "wr_notif_seen_at";
 
 // Where a notification should take you when tapped.
-function routeFor(item: ReservationNotification): string {
+function routeFor(item: ReservationNotification, isAdmin: boolean): string {
+  if (isAdmin) {
+    return item.reservation_id ? `/admin/reservations?reservation=${item.reservation_id}` : "/admin/dashboard";
+  }
   if (item.type === "inquiry") {
     return item.reservation_id ? `/admin/reservations?reservation=${item.reservation_id}` : "/admin/reservations";
   }
@@ -19,13 +23,14 @@ export default function NotificationBell() {
   const [items, setItems] = useState<ReservationNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ReservationNotification | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   function goTo(item: ReservationNotification) {
     setOpen(false);
     setToast(null);
-    navigate(routeFor(item));
+    navigate(routeFor(item, isAdmin));
   }
 
   // Pop a toast for the newest unread notification we haven't surfaced yet.
@@ -46,8 +51,11 @@ export default function NotificationBell() {
     const user = sessionData.session?.user;
     if (!user) {
       setItems([]);
+      setIsAdmin(false);
       return;
     }
+    const profile = await getCurrentProfile();
+    setIsAdmin(profile?.role === "admin");
     const { data } = await supabase
       .from("reservation_notifications")
       .select("*")

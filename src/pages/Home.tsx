@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import AdminDashboard from "../components/AdminDashboard";
+import { Link, Navigate } from "react-router-dom";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
 import { AlertIcon, BusIcon, CheckIcon, IdCardIcon, ParkingIcon, PinIcon, SubwayIcon } from "../components/icons";
 import MemberDashboard from "../components/MemberDashboard";
@@ -199,7 +198,7 @@ export default function Home() {
       {/* Signed-in members get a "today" dashboard in place of the marketing
           hero; visitors (and the initial unknown state) see the hero. */}
       {viewerRole === "admin" ? (
-        <AdminDashboard />
+        <Navigate replace to="/admin/dashboard" />
       ) : viewerRole === "user" ? (
         <MemberDashboard />
       ) : (

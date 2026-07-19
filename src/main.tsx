@@ -12,6 +12,7 @@ import "./styles/globals.css";
 // don't download the admin/booking pages up front.
 const Account = lazy(() => import("./pages/Account"));
 const AdminAttendance = lazy(() => import("./pages/AdminAttendance"));
+const AdminHome = lazy(() => import("./pages/AdminHome"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminMembers = lazy(() => import("./pages/AdminMembers"));
 const AdminReservations = lazy(() => import("./pages/AdminReservations"));
@@ -54,6 +55,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="payment/success" element={<PaymentSuccess />} />
           <Route path="payment/fail" element={<PaymentFail />} />
           <Route path="admin" element={<AdminLogin />} />
+          <Route path="admin/dashboard" element={<AdminHome />} />
           <Route path="admin/attendance" element={<AdminAttendance />} />
           <Route path="admin/members" element={<AdminMembers />} />
           <Route path="admin/reservations" element={<AdminReservations />} />
