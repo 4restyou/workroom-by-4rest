@@ -16,13 +16,13 @@ export const defaultPasses: Pass[] = [
   {
     id: "default-day",
     name: "종일권",
-    description: "09:00-22:00 / 커피 1일 3잔",
+    description: "08:00-다음 날 01:00 / 커피 1일 3잔",
     price: 40000,
   },
   {
     id: "default-week",
     name: "주간권",
-    description: "월-금 09:00-22:00 / 커피 1일 3잔",
+    description: "월-금 08:00-다음 날 01:00 / 커피 1일 3잔",
     price: 149000,
   },
   {

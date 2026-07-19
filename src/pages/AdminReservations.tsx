@@ -631,8 +631,8 @@ function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit:
     email: "",
     pass_type: "",
     date: todayValue(),
-    start_time: "09:00",
-    end_time: "12:00",
+    start_time: "08:00",
+    end_time: "11:00",
     people: 1,
     message: "",
     status: "confirmed" as "pending" | "confirmed",
@@ -810,8 +810,8 @@ function ReservationCard({
     email: reservation.email ?? "",
     pass_type: reservation.pass_name_snapshot || reservation.pass_type,
     date: reservation.date,
-    start_time: (reservation.start_time ?? "09:00").slice(0, 5),
-    end_time: (reservation.end_time ?? "12:00").slice(0, 5),
+    start_time: (reservation.start_time ?? "08:00").slice(0, 5),
+    end_time: (reservation.end_time ?? "11:00").slice(0, 5),
     people: reservation.people,
   });
   const [accessDraft, setAccessDraft] = useState({
@@ -835,8 +835,8 @@ function ReservationCard({
       email: reservation.email ?? "",
       pass_type: reservation.pass_name_snapshot || reservation.pass_type,
       date: reservation.date,
-      start_time: (reservation.start_time ?? "09:00").slice(0, 5),
-      end_time: (reservation.end_time ?? "12:00").slice(0, 5),
+      start_time: (reservation.start_time ?? "08:00").slice(0, 5),
+      end_time: (reservation.end_time ?? "11:00").slice(0, 5),
       people: reservation.people,
     });
     setAccessDraft({

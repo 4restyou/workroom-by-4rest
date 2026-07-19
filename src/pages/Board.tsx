@@ -14,7 +14,7 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     profile_id: null,
     author_name: "운영자",
     kind: "notice",
-    body: "WORKROOM은 09:00–22:00 예약제로 운영합니다. 서로의 집중을 위해 통화는 짧고 조용하게 부탁드려요.",
+    body: "WORKROOM은 08:00–다음 날 01:00 예약제로 운영합니다. 서로의 집중을 위해 통화는 짧고 조용하게 부탁드려요.",
     color: "yellow",
     is_pinned: true,
     is_hidden: false,

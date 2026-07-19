@@ -29,7 +29,7 @@ const features: { title: string; body: string; icon: FeatureIcon; accent: TintCo
   },
   {
     title: "호리존 촬영",
-    body: "상반신 증명사진, 간단한 프로필 촬영을 진행합니다.",
+    body: "상반신 증명사진과 간단한 프로필 촬영이 가능하며, 호리존 사용 시 관리자에게 문의해 주세요.",
     icon: "camera",
     accent: "yellow",
   },
@@ -46,14 +46,16 @@ const guideItems: [string, string][] = [
   ["취소", "3시간권과 종일권은 예약 시간 전까지 당일 취소가 가능합니다."],
   ["연장", "이용 종료 후 15분까지는 유예되며, 이후 1시간 추가 요금이 적용됩니다."],
   ["소리", "통화는 조용히, 음악과 영상은 반드시 이어폰이나 헤드폰으로 이용합니다."],
-  ["음식", "냄새가 적은 간단한 음식과 음료는 가능합니다."],
+  ["음식", "냄새가 적은 간단한 음식과 음료는 가능합니다. (샌드위치, 음료 등)"],
+  ["증명사진", "상반신 증명사진 촬영은 유료로 이용할 수 있습니다."],
+  ["릴렉스타임", "오후 5시 30분부터 7시까지는 릴렉스타임으로, 메인 음악 소리가 평소보다 커질 수 있습니다."],
   ["동반", "함께 이용하는 분은 별도 좌석 예약이 필요합니다."],
 ];
 
 const fitItems = [
   "노트북 작업, 공부, 글쓰기처럼 조용한 시간이 필요한 경우",
   "상반신 증명사진, 간단한 프로필 사진, 작은 제품 촬영",
-  "2-5명이 하는 짧은 회의나 가벼운 협업",
+  "2~4명이 하는 짧은 회의나 가벼운 협업",
 ];
 
 const cautionItems = [
@@ -282,7 +284,7 @@ export default function Home() {
             </div>
             <div className="px-3 sm:flex sm:items-baseline sm:gap-2">
               <dt className="text-[10px] font-bold uppercase tracking-widest text-workroom-muted">Location</dt>
-              <dd className="mt-1 text-xs font-bold sm:text-sm">충장로</dd>
+              <dd className="mt-1 text-xs font-bold leading-5 sm:text-sm">{SITE.address}</dd>
             </div>
             <div className="px-3 pr-0 sm:flex sm:items-baseline sm:gap-2">
               <dt className="text-[10px] font-bold uppercase tracking-widest text-workroom-muted">Booking</dt>
@@ -391,7 +393,7 @@ export default function Home() {
         </p>
       </Section>
 
-      <Section eyebrow="Location" title="충장로, 금남로5가역 근처" accent="mint">
+      <Section eyebrow="Location" title="충장로5가, 금남로5가역 근처" accent="mint">
         <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
           <div className={`${card} p-5`}>
             <p className="text-xl font-bold">WORKROOM by 4REST</p>

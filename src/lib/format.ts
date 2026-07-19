@@ -57,16 +57,14 @@ export function currentReservationWindow(durationHours = 3, now = new Date()) {
     start.setHours(start.getHours() + 1, 0, 0, 0);
   }
 
-  // The default operating window is 09:00–22:00. If three continuous hours
-  // no longer fit today, start from the next day's opening time instead of
-  // creating an invalid range such as 22:30–22:00.
-  if (start.getHours() < 9) start.setHours(9, 0, 0, 0);
+  // Fallback until the live 08:00-next-day 01:00 schedule is loaded.
+  if (start.getHours() < 8) start.setHours(8, 0, 0, 0);
 
   const end = new Date(start);
   end.setHours(end.getHours() + durationHours);
-  if (end.getDate() !== start.getDate() || end.getHours() > 22) {
+  if (start.getHours() * 60 + durationHours * 60 > 25 * 60) {
     start.setDate(start.getDate() + 1);
-    start.setHours(9, 0, 0, 0);
+    start.setHours(8, 0, 0, 0);
     end.setTime(start.getTime());
     end.setHours(end.getHours() + durationHours);
   }
@@ -112,8 +110,8 @@ export function reservationWindowForPass(passName: string) {
   if (passName.includes("종일권") || passName.includes("주간권") || passName.includes("월권")) {
     return {
       date: todayValue(),
-      start_time: "09:00",
-      end_time: "22:00",
+      start_time: "08:00",
+      end_time: "01:00",
     };
   }
 

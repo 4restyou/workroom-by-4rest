@@ -25,8 +25,8 @@ import type { BusinessDateException, BusinessHour, Pass, Profile, ReservationIns
 const emptyForm = {
   pass_type: "",
   date: todayValue(),
-  start_time: "09:00",
-  end_time: "12:00",
+  start_time: "08:00",
+  end_time: "11:00",
   people: "1",
   name: "",
   phone: "",
@@ -176,7 +176,7 @@ export default function Reserve() {
   const isClosedDay = selectedHours?.is_closed ?? false;
   const selectedDuration = passDurationHours(form.pass_type);
   const selectableStartTimes = useMemo(
-    () => selectedDuration ? startTimesForDate(form.date, openHHMM ?? "09:00", closeHHMM ?? "22:00", selectedDuration) : [],
+    () => selectedDuration ? startTimesForDate(form.date, openHHMM ?? "08:00", closeHHMM ?? "01:00", selectedDuration) : [],
     [closeHHMM, form.date, openHHMM, selectedDuration],
   );
   const reservationEnabled = settings.reservation_enabled !== "false";
@@ -186,6 +186,8 @@ export default function Reserve() {
       ["취소·환불", settings.cancellation_notice],
       ["연장", settings.extension_notice],
       ["음식·소리", settings.etiquette_notice],
+      ["촬영", settings.photo_notice],
+      ["릴렉스타임", settings.relax_notice],
       ["프린트", settings.print_notice],
     ] as [string, string | undefined][]
   ).filter((item): item is [string, string] => Boolean(item[1] && item[1].trim()));
@@ -230,8 +232,8 @@ export default function Reserve() {
     const hours = exception ?? hoursByWeekday[weekday];
     if (!exception && hours?.is_closed) return true;
     if (selectedDuration) {
-      const open = hours?.open_time?.slice(0, 5) ?? "09:00";
-      const close = hours?.close_time?.slice(0, 5) ?? "22:00";
+      const open = hours?.open_time?.slice(0, 5) ?? "08:00";
+      const close = hours?.close_time?.slice(0, 5) ?? "01:00";
       if (!startTimesForDate(date, open, close, selectedDuration).length) return true;
     }
     return fullDates.has(date);
@@ -270,8 +272,8 @@ export default function Reserve() {
     setForm((current) => {
       const weekday = new Date(`${date}T00:00:00`).getDay();
       const hours = dateExceptions[date] ?? hoursByWeekday[weekday];
-      const open = hours?.open_time?.slice(0, 5) ?? "09:00";
-      const close = hours?.close_time?.slice(0, 5) ?? "22:00";
+      const open = hours?.open_time?.slice(0, 5) ?? "08:00";
+      const close = hours?.close_time?.slice(0, 5) ?? "01:00";
       const duration = passDurationHours(current.pass_type);
       if (duration) {
         const start = startTimesForDate(date, open, close, duration)[0] ?? open;

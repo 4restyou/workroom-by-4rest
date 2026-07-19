@@ -15,6 +15,8 @@ const settingKeys = [
   "cancellation_notice",
   "extension_notice",
   "etiquette_notice",
+  "photo_notice",
+  "relax_notice",
   "print_notice",
   "location_notice",
   "reservation_enabled",
@@ -25,6 +27,8 @@ const settingLabels: Record<(typeof settingKeys)[number], string> = {
   cancellation_notice: "취소/환불 안내 문구",
   extension_notice: "연장 안내 문구",
   etiquette_notice: "음식/통화/소리 안내 문구",
+  photo_notice: "촬영 안내 문구",
+  relax_notice: "릴렉스타임 안내 문구",
   print_notice: "프린트 안내 문구",
   location_notice: "위치 안내 문구",
   reservation_enabled: "예약 받기",
@@ -42,8 +46,8 @@ export default function AdminSettings() {
   const [dateExceptions, setDateExceptions] = useState<BusinessDateException[]>([]);
   const [newException, setNewException] = useState<BusinessDateException>({
     date: todayValue(),
-    open_time: "09:00",
-    close_time: "22:00",
+    open_time: "08:00",
+    close_time: "01:00",
     is_closed: true,
     note: "",
   });

@@ -173,8 +173,8 @@ export default function Account() {
     setEditingId(reservation.id);
     setEditDraft({
       date: reservation.date,
-      start_time: (reservation.start_time ?? "09:00").slice(0, 5),
-      end_time: (reservation.end_time ?? "12:00").slice(0, 5),
+      start_time: (reservation.start_time ?? "08:00").slice(0, 5),
+      end_time: (reservation.end_time ?? "11:00").slice(0, 5),
     });
   }
 
