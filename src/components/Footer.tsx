@@ -11,7 +11,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:pb-8">
         <div className="grid gap-8 sm:grid-cols-[1.1fr_1fr_1fr]">
           <div>
-            <img className="h-5 w-auto max-w-[88px] object-contain" src={logoSig} alt="WORKROOM by 4REST" />
+            <img className="h-5 w-auto max-w-[88px] bg-transparent object-contain" src={logoSig} alt="WORKROOM by 4REST" />
             <p className="mt-3 max-w-xs text-sm font-medium leading-6 text-workroom-muted">
               필요한 시간만큼 머무는 조용한 작업 공간. 충장로에서 예약제로 운영합니다.
             </p>

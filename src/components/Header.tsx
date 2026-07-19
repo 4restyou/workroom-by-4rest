@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import AccountMenu from "./AccountMenu";
 import NotificationBell from "./NotificationBell";
 import type { Profile } from "../lib/types";
 import logoSig from "../../assets/logo/logo_sig.png";
@@ -20,6 +19,7 @@ function adminNavClass({ isActive }: { isActive: boolean }) {
 }
 
 export default function Header({ adminMode }: HeaderProps) {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -40,15 +40,24 @@ export default function Header({ adminMode }: HeaderProps) {
     return () => subscription?.unsubscribe();
   }, []);
 
+  async function signOut() {
+    if (supabase) await supabase.auth.signOut();
+    setProfile(null);
+    navigate("/", { replace: true });
+  }
+
+  const authButtonClass =
+    "shrink-0 rounded-[4px] border border-workroom-ink bg-workroom-surface px-2.5 py-1.5 text-xs font-bold text-workroom-ink transition-colors hover:bg-workroom-ink hover:text-white sm:px-3 sm:text-sm";
+
   return (
     <header className="sticky top-0 z-40 border-b border-workroom-ink bg-workroom-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <Link
-          className="flex min-w-0 shrink-0 items-center gap-2"
+          className="flex min-w-0 shrink-0 items-center gap-2 bg-workroom-background"
           to={adminMode ? "/admin/dashboard" : "/"}
           title={adminMode ? "관리자 홈으로" : "WORKROOM 사이트로"}
         >
-          <img className="h-5 w-auto max-w-[78px] object-contain sm:h-6 sm:max-w-[98px]" src={logoSig} alt="WORKROOM by 4REST" />
+          <img className="h-5 w-auto max-w-[78px] bg-transparent object-contain sm:h-6 sm:max-w-[98px]" src={logoSig} alt="WORKROOM by 4REST" />
         </Link>
 
         {adminMode ? (
@@ -62,6 +71,7 @@ export default function Header({ adminMode }: HeaderProps) {
               <NavLink className={adminNavClass} to="/admin/settings">설정</NavLink>
             </div>
             <NotificationBell />
+            <button className={authButtonClass} onClick={() => void signOut()} type="button">로그아웃</button>
           </nav>
         ) : (
           <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-6 sm:text-sm">
@@ -71,9 +81,14 @@ export default function Header({ adminMode }: HeaderProps) {
             <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/board">메모판</Link>
             <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/faq">이용안내</Link>
             {profile ? (
-              <AccountMenu isAdmin={profile.role === "admin"} />
+              <>
+                <Link className="transition-colors hover:text-workroom-ink" to={profile.role === "admin" ? "/admin/dashboard" : "/account"}>
+                  {profile.role === "admin" ? "관리자" : "내정보"}
+                </Link>
+                <button className={authButtonClass} onClick={() => void signOut()} type="button">로그아웃</button>
+              </>
             ) : (
-              <Link className="transition-colors hover:text-workroom-ink" to="/login">로그인</Link>
+              <Link className={authButtonClass} to="/login">로그인</Link>
             )}
             {profile ? <NotificationBell /> : null}
           </nav>
