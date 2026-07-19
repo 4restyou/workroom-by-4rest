@@ -11,6 +11,16 @@ import paperTexture from "../../assets/paper-texture.webp";
 const instaUrl = (handle: string) =>
   `https://instagram.com/${handle.replace(/^@/, "").trim()}`;
 
+function safePublicUrl(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 const DEMO_MEMBER_CARDS: MemberCard[] = [
   {
     id: "demo-card-1",
@@ -132,7 +142,8 @@ function CardView({ card }: { card: MemberCard }) {
   // Headline shows as a single line on the (fixed-height) front; longer ones
   // are read in full via the expander.
   const longHeadline = (card.headline?.trim().length ?? 0) > 20;
-  const hasDetails = Boolean(card.bio || card.link_url || card.contact || card.instagram || longHeadline);
+  const homepageUrl = safePublicUrl(card.link_url);
+  const hasDetails = Boolean(card.bio || homepageUrl || card.contact || card.instagram || longHeadline);
 
   return (
     <div className="flex flex-col">
@@ -179,8 +190,8 @@ function CardView({ card }: { card: MemberCard }) {
                   @{card.instagram.replace(/^@/, "")}
                 </a>
               ) : null}
-              {card.link_url ? (
-                <a className="rounded-[4px] border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={card.link_url} rel="noreferrer" target="_blank">
+              {homepageUrl ? (
+                <a className="rounded-[4px] border border-workroom-ink px-3 py-1 hover:bg-workroom-yellow" href={homepageUrl} rel="noreferrer" target="_blank">
                   홈페이지
                 </a>
               ) : null}

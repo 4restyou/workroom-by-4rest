@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
+import { downloadCsv } from "../lib/csv";
 import { formatDate, formatTimeRange } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
@@ -102,15 +103,38 @@ export default function AdminMembers() {
   const selectedAttendance = selectedMember ? attendance.filter((item) => item.profile_id === selectedMember.id) : [];
   const selectedCoupons = selectedMember ? coupons.filter((item) => item.profile_id === selectedMember.id) : [];
 
+  function exportMembers() {
+    downloadCsv(
+      `workroom-members-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["이름", "이메일", "연락처", "주소", "가입일", "예약수", "출석수", "사용가능쿠폰", "결제완료금액", "관리자메모"],
+      visibleMembers.filter((member) => member.role !== "admin").map((member) => {
+        const memberReservations = reservations.filter((item) => item.profile_id === member.id);
+        return [
+          member.full_name,
+          member.email,
+          member.phone,
+          member.address,
+          member.created_at.slice(0, 10),
+          memberReservations.length,
+          attendance.filter((item) => item.profile_id === member.id).length,
+          coupons.filter((item) => item.profile_id === member.id && item.status === "issued").length,
+          memberReservations.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + (item.price_at_booking ?? 0), 0),
+          member.admin_note,
+        ];
+      }),
+    );
+  }
+
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="회원 관리" accent="ink">
-        <div className={`mb-5 grid gap-3 ${card} p-4 sm:grid-cols-[1fr_auto_auto] sm:items-end`}>
+        <div className={`mb-5 grid gap-3 ${card} p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end`}>
           <label className="grid gap-2 text-sm font-bold">
             이름 · 이메일 · 전화 검색
             <input placeholder="이름, 이메일 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
           <button className={buttonClass("accent", "md")} onClick={() => void loadMembers()} type="button">새로고침</button>
+          <button className={buttonClass("secondary", "md")} disabled={!visibleMembers.length} onClick={exportMembers} type="button">회원 CSV</button>
           <Link className={buttonClass("secondary", "md")} to="/admin/reservations">예약관리</Link>
         </div>
 

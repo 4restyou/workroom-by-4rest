@@ -3,10 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import MoneyInput from "../components/MoneyInput";
 import Section from "../components/Section";
+import { todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import type { BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
+import type { BusinessDateException, BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
 
 const settingKeys = [
   "reservation_notice",
@@ -38,6 +39,14 @@ export default function AdminSettings() {
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
+  const [dateExceptions, setDateExceptions] = useState<BusinessDateException[]>([]);
+  const [newException, setNewException] = useState<BusinessDateException>({
+    date: todayValue(),
+    open_time: "09:00",
+    close_time: "22:00",
+    is_closed: true,
+    note: "",
+  });
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [newSeatName, setNewSeatName] = useState("");
   const [newSeatCapacity, setNewSeatCapacity] = useState("1");
@@ -80,16 +89,17 @@ export default function AdminSettings() {
     setIsLoading(true);
     setError("");
 
-    const [seatResult, passResult, hourResult, settingResult] = await Promise.all([
+    const [seatResult, passResult, hourResult, exceptionResult, settingResult] = await Promise.all([
       supabase.from("seat_types").select("*").order("sort_order", { ascending: true }),
       supabase.from("passes").select("id,name,description,price,seat_type_id,is_active,sort_order").order("sort_order", { ascending: true }),
       supabase.from("business_hours").select("*").order("weekday", { ascending: true }),
+      supabase.from("business_date_exceptions").select("*").gte("date", todayValue()).order("date", { ascending: true }).limit(100),
       supabase.from("space_settings").select("*"),
     ]);
 
     setIsLoading(false);
 
-    const firstError = seatResult.error ?? passResult.error ?? hourResult.error ?? settingResult.error;
+    const firstError = seatResult.error ?? passResult.error ?? hourResult.error ?? exceptionResult.error ?? settingResult.error;
     if (firstError) {
       setError(firstError.message);
       return;
@@ -98,6 +108,7 @@ export default function AdminSettings() {
     setSeatTypes((seatResult.data ?? []) as SeatType[]);
     setPasses((passResult.data ?? []) as Pass[]);
     setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
+    setDateExceptions((exceptionResult.data ?? []) as BusinessDateException[]);
     setSettings(Object.fromEntries(((settingResult.data ?? []) as SpaceSetting[]).map((setting) => [setting.key, setting.value])));
   }
 
@@ -224,6 +235,37 @@ export default function AdminSettings() {
       return;
     }
     await loadSettings();
+  }
+
+  async function saveDateException(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !newException.date) return;
+    setError("");
+    const { error: upsertError } = await supabase.from("business_date_exceptions").upsert({
+      date: newException.date,
+      open_time: newException.open_time,
+      close_time: newException.close_time,
+      is_closed: newException.is_closed,
+      note: newException.note?.trim() || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "date" });
+    if (upsertError) {
+      setError(upsertError.message);
+      return;
+    }
+    setSuccess(`${newException.date} 예외 일정을 저장했습니다.`);
+    await loadSettings();
+  }
+
+  async function deleteDateException(date: string) {
+    if (!supabase || !window.confirm(`${date} 예외 일정을 삭제하고 정기 운영시간을 적용할까요?`)) return;
+    const { error: deleteError } = await supabase.from("business_date_exceptions").delete().eq("date", date);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setDateExceptions((current) => current.filter((item) => item.date !== date));
+    setSuccess("예외 일정을 삭제했습니다.");
   }
 
   return (
@@ -376,6 +418,34 @@ export default function AdminSettings() {
                   </label>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className={`${card} p-5`}>
+            <h2 className="text-xl font-bold">특정일 휴무 · 단축영업</h2>
+            <p className="mt-1 text-sm font-medium text-workroom-muted">공휴일이나 임시 휴무처럼 정기 운영시간과 다른 날짜만 등록합니다. 등록 즉시 예약 달력과 서버 검증에 적용됩니다.</p>
+            <form className={`mt-4 grid gap-3 ${cardFlat} p-4 lg:grid-cols-[160px_120px_120px_100px_1fr_auto] lg:items-end`} onSubmit={saveDateException}>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">날짜<input required type="date" value={newException.date} onChange={(event) => setNewException((current) => ({ ...current, date: event.target.value }))} /></label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">시작<input disabled={newException.is_closed} required={!newException.is_closed} type="time" value={newException.open_time.slice(0, 5)} onChange={(event) => setNewException((current) => ({ ...current, open_time: event.target.value }))} /></label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">종료<input disabled={newException.is_closed} required={!newException.is_closed} type="time" value={newException.close_time.slice(0, 5)} onChange={(event) => setNewException((current) => ({ ...current, close_time: event.target.value }))} /></label>
+              <label className="flex h-12 items-center gap-2 text-sm font-bold"><input checked={newException.is_closed} className="h-5 w-5" type="checkbox" onChange={(event) => setNewException((current) => ({ ...current, is_closed: event.target.checked }))} />휴무</label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">메모<input placeholder="예: 공사, 공휴일" value={newException.note ?? ""} onChange={(event) => setNewException((current) => ({ ...current, note: event.target.value }))} /></label>
+              <button className={buttonClass("primary", "md", "lg:h-12")} type="submit">저장</button>
+            </form>
+            <div className="mt-3 grid gap-2">
+              {dateExceptions.map((exception) => (
+                <div className={`${cardFlat} flex flex-wrap items-center justify-between gap-3 p-4`} key={exception.date}>
+                  <div>
+                    <p className="font-black">{exception.date} · {exception.is_closed ? "휴무" : `${exception.open_time.slice(0, 5)}–${exception.close_time.slice(0, 5)}`}</p>
+                    {exception.note ? <p className="mt-1 text-xs font-medium text-workroom-muted">{exception.note}</p> : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <button className={buttonClass("secondary", "sm")} onClick={() => setNewException(exception)} type="button">수정</button>
+                    <button className={buttonClass("secondary", "sm")} onClick={() => void deleteDateException(exception.date)} type="button">삭제</button>
+                  </div>
+                </div>
+              ))}
+              {!dateExceptions.length ? <p className={`${cardFlat} p-4 text-sm text-workroom-muted`}>등록된 예정 예외 일정이 없습니다.</p> : null}
             </div>
           </section>
 

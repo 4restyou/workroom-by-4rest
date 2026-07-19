@@ -10,7 +10,7 @@ import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
-import type { BusinessHour, Pass, Profile, ReservationInsert } from "../lib/types";
+import type { BusinessDateException, BusinessHour, Pass, Profile, ReservationInsert } from "../lib/types";
 
 const emptyForm = {
   pass_type: "",
@@ -64,6 +64,7 @@ export default function Reserve() {
   const [submittedReservation, setSubmittedReservation] = useState<SubmittedReservation | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [hoursByWeekday, setHoursByWeekday] = useState<Record<number, BusinessHour>>({});
+  const [dateExceptions, setDateExceptions] = useState<Record<string, BusinessDateException>>({});
   const [trap, setTrap] = useState(""); // honeypot: real users never fill this
   const [authChecked, setAuthChecked] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
@@ -127,9 +128,10 @@ export default function Reserve() {
   useEffect(() => {
     async function loadOperatingInfo() {
       if (!hasSupabaseConfig || !supabase) return;
-      const [{ data: settingRows }, { data: hoursData }, { data: seatData }] = await Promise.all([
+      const [{ data: settingRows }, { data: hoursData }, { data: exceptionData }, { data: seatData }] = await Promise.all([
         supabase.from("space_settings").select("key,value"),
         supabase.from("business_hours").select("*"),
+        supabase.from("business_date_exceptions").select("date,open_time,close_time,is_closed,note"),
         supabase.from("seat_types").select("id,capacity"),
       ]);
       if (settingRows) {
@@ -137,6 +139,9 @@ export default function Reserve() {
       }
       if (hoursData) {
         setHoursByWeekday(Object.fromEntries((hoursData as BusinessHour[]).map((hour) => [hour.weekday, hour])));
+      }
+      if (exceptionData) {
+        setDateExceptions(Object.fromEntries((exceptionData as BusinessDateException[]).map((exception) => [exception.date, exception])));
       }
       if (seatData) {
         setSeatCapacities(Object.fromEntries((seatData as { id: string; capacity: number }[]).map((seat) => [seat.id, seat.capacity])));
@@ -148,9 +153,11 @@ export default function Reserve() {
 
   const selectedHours = useMemo(() => {
     if (!form.date) return undefined;
+    if (dateExceptions[form.date]) return dateExceptions[form.date];
     const weekday = new Date(`${form.date}T00:00:00`).getDay();
     return hoursByWeekday[weekday];
-  }, [form.date, hoursByWeekday]);
+  }, [dateExceptions, form.date, hoursByWeekday]);
+  const selectedDateException = form.date ? dateExceptions[form.date] : undefined;
 
   const openHHMM = selectedHours?.open_time.slice(0, 5);
   const closeHHMM = selectedHours?.close_time.slice(0, 5);
@@ -200,6 +207,7 @@ export default function Reserve() {
 
   function isDateDisabled(date: string) {
     if (date < today) return true;
+    if (dateExceptions[date]) return dateExceptions[date].is_closed || fullDates.has(date);
     const weekday = new Date(`${date}T00:00:00`).getDay();
     if (hoursByWeekday[weekday]?.is_closed) return true;
     return fullDates.has(date);
@@ -219,8 +227,9 @@ export default function Reserve() {
     setForm((current) => {
       if (date === today) return { ...current, date };
       const weekday = new Date(`${date}T00:00:00`).getDay();
-      const open = hoursByWeekday[weekday]?.open_time?.slice(0, 5) ?? "09:00";
-      const close = hoursByWeekday[weekday]?.close_time?.slice(0, 5) ?? "22:00";
+      const hours = dateExceptions[date] ?? hoursByWeekday[weekday];
+      const open = hours?.open_time?.slice(0, 5) ?? "09:00";
+      const close = hours?.close_time?.slice(0, 5) ?? "22:00";
       const toMin = (t: string) => {
         const [h, m] = t.split(":").map(Number);
         return h * 60 + m;
@@ -545,7 +554,7 @@ export default function Reserve() {
                 </p>
                 {selectedHours ? (
                   <p className={`text-xs font-bold ${isClosedDay ? "text-red-600" : "text-workroom-muted"}`}>
-                    {isClosedDay ? "이 날짜는 휴무일입니다." : `이 날짜 운영 시간 · ${openHHMM} – ${closeHHMM}`}
+                    {isClosedDay ? `이 날짜는 휴무일입니다.${selectedDateException?.note ? ` ${selectedDateException.note}` : ""}` : `이 날짜 운영 시간 · ${openHHMM} – ${closeHHMM}${selectedDateException?.note ? ` · ${selectedDateException.note}` : ""}`}
                   </p>
                 ) : null}
               </div>

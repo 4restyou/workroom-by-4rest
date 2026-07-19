@@ -107,6 +107,15 @@ export default function DirectoryEdit() {
       nameRef.current?.focus();
       return;
     }
+    if (form.link_url.trim()) {
+      try {
+        const url = new URL(form.link_url.trim());
+        if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("invalid protocol");
+      } catch {
+        setError("홈페이지 주소는 https:// 또는 http://로 시작하는 전체 주소로 입력해 주세요.");
+        return;
+      }
+    }
     setBusy(true);
     setError("");
     const payload = {

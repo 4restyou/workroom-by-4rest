@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
+import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
@@ -418,14 +419,39 @@ export default function AdminReservations() {
   const pendingCount = reservations.filter((reservation) => !reservation.deleted_at && reservation.status === "pending").length;
   const selectedReservation = visibleReservations.find((reservation) => reservation.id === selectedReservationId) ?? null;
 
+  function exportReservations() {
+    downloadCsv(
+      `workroom-reservations-${todayValue()}.csv`,
+      ["예약일", "시작", "종료", "이름", "연락처", "이용권", "인원", "예약상태", "결제선택", "결제상태", "예약금액", "요청사항", "관리자메모"],
+      visibleReservations.map((reservation) => [
+        reservation.date,
+        reservation.start_time,
+        reservation.end_time,
+        reservation.name,
+        reservation.phone,
+        reservation.pass_name_snapshot || reservation.pass_type,
+        reservation.people,
+        statusLabel[reservation.status],
+        reservation.payment_preference === "onsite" ? "방문 결제" : "온라인 결제",
+        paymentStatusLabels[reservation.payment_status ?? "unpaid"],
+        reservation.price_at_booking,
+        reservation.message,
+        reservation.admin_note,
+      ]),
+    );
+  }
+
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리" accent="ink">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-workroom-muted">전화·현장 예약도 같은 목록에서 관리할 수 있습니다.</p>
-          <button className={buttonClass("accent", "md")} onClick={() => setShowCreate((current) => !current)} type="button">
-            {showCreate ? "등록 닫기" : "+ 관리자 예약 등록"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className={buttonClass("secondary", "md")} disabled={!visibleReservations.length} onClick={exportReservations} type="button">현재 목록 CSV</button>
+            <button className={buttonClass("accent", "md")} onClick={() => setShowCreate((current) => !current)} type="button">
+              {showCreate ? "등록 닫기" : "+ 관리자 예약 등록"}
+            </button>
+          </div>
         </div>
         {showCreate ? <ManualReservationForm onSubmit={(payload) => void createManualReservation(payload)} passes={passes} /> : null}
         <div className={`${card} mb-5 grid gap-3 p-4`}>

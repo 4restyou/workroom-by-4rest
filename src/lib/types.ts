@@ -43,6 +43,14 @@ export type BusinessHour = {
   is_closed: boolean;
 };
 
+export type BusinessDateException = {
+  date: string;
+  open_time: string;
+  close_time: string;
+  is_closed: boolean;
+  note: string | null;
+};
+
 export type SpaceSetting = {
   key: string;
   value: string;
