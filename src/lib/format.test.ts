@@ -4,7 +4,10 @@ import {
   formatPhone,
   formatPrice,
   formatTimeRange,
+  currentReservationWindow,
+  passDurationHours,
   reservationWindowForPass,
+  shiftTime,
 } from "./format";
 
 describe("formatPhone", () => {
@@ -52,5 +55,41 @@ describe("reservationWindowForPass", () => {
   it("uses the full operating window for day/week/month passes", () => {
     expect(reservationWindowForPass("종일권")).toMatchObject({ start_time: "09:00", end_time: "22:00" });
     expect(reservationWindowForPass("월권 지정석")).toMatchObject({ start_time: "09:00", end_time: "22:00" });
+  });
+
+  it("starts a time pass at the next whole hour for three hours", () => {
+    expect(currentReservationWindow(3, new Date(2026, 6, 19, 13, 24))).toEqual({
+      date: "2026-07-19",
+      start_time: "14:00",
+      end_time: "17:00",
+    });
+  });
+
+  it("keeps the current hour when it is exactly on the hour", () => {
+    expect(currentReservationWindow(3, new Date(2026, 6, 19, 13, 0))).toMatchObject({
+      start_time: "13:00",
+      end_time: "16:00",
+    });
+  });
+
+  it("moves to the next opening time when three hours no longer fit", () => {
+    expect(currentReservationWindow(3, new Date(2026, 6, 19, 19, 1))).toEqual({
+      date: "2026-07-20",
+      start_time: "09:00",
+      end_time: "12:00",
+    });
+  });
+});
+
+describe("time pass helpers", () => {
+  it("recognizes the configured duration", () => {
+    expect(passDurationHours("3시간권")).toBe(3);
+    expect(passDurationHours("추가 1시간")).toBe(1);
+    expect(passDurationHours("종일권")).toBeNull();
+  });
+
+  it("moves an input time without crossing midnight", () => {
+    expect(shiftTime("14:00", 3)).toBe("17:00");
+    expect(shiftTime("22:00", 3)).toBeNull();
   });
 });

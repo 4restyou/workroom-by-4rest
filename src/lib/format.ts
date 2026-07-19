@@ -46,15 +46,27 @@ export function formatDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export function currentReservationWindow(durationHours = 3) {
-  const start = new Date();
-  start.setMinutes(start.getMinutes() <= 30 ? 30 : 60, 0, 0);
+export function currentReservationWindow(durationHours = 3, now = new Date()) {
+  const start = new Date(now);
+  const isAlreadyOnTheHour = start.getMinutes() === 0 && start.getSeconds() === 0 && start.getMilliseconds() === 0;
+  if (isAlreadyOnTheHour) {
+    start.setMinutes(0, 0, 0);
+  } else {
+    start.setHours(start.getHours() + 1, 0, 0, 0);
+  }
+
+  // The default operating window is 09:00–22:00. If three continuous hours
+  // no longer fit today, start from the next day's opening time instead of
+  // creating an invalid range such as 22:30–22:00.
+  if (start.getHours() < 9) start.setHours(9, 0, 0, 0);
 
   const end = new Date(start);
   end.setHours(end.getHours() + durationHours);
-  if (end.getDate() !== start.getDate()) {
+  if (end.getDate() !== start.getDate() || end.getHours() > 22) {
+    start.setDate(start.getDate() + 1);
+    start.setHours(9, 0, 0, 0);
     end.setTime(start.getTime());
-    end.setHours(22, 0, 0, 0);
+    end.setHours(end.getHours() + durationHours);
   }
 
   return {
@@ -62,6 +74,20 @@ export function currentReservationWindow(durationHours = 3) {
     start_time: formatTimeInputValue(start),
     end_time: formatTimeInputValue(end),
   };
+}
+
+export function passDurationHours(passName: string) {
+  if (passName.includes("추가 1시간")) return 1;
+  if (passName.includes("시간")) return 3;
+  return null;
+}
+
+export function shiftTime(value: string, hours: number) {
+  const [hour, minute] = value.split(":").map(Number);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  const total = hour * 60 + minute + hours * 60;
+  if (total < 0 || total >= 24 * 60) return null;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 export function reservationWindowForPass(passName: string) {

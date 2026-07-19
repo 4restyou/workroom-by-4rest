@@ -5,7 +5,17 @@ import Section from "../components/Section";
 import { trackEvent } from "../lib/analytics";
 import { defaultPasses } from "../lib/defaultPasses";
 import { computeFullDates, type IntervalInput } from "../lib/availability";
-import { formatDate, formatDateInputValue, formatPhone, formatPrice, reservationWindowForPass, todayValue } from "../lib/format";
+import {
+  currentReservationWindow,
+  formatDate,
+  formatDateInputValue,
+  formatPhone,
+  formatPrice,
+  passDurationHours,
+  reservationWindowForPass,
+  shiftTime,
+  todayValue,
+} from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { SITE } from "../lib/site";
@@ -75,7 +85,9 @@ export default function Reserve() {
   useEffect(() => {
     const selectedPass = new URLSearchParams(location.search).get("pass");
     if (!selectedPass) return;
-    setForm((current) => ({ ...current, ...reservationWindowForPass(selectedPass), pass_type: selectedPass }));
+    const window = reservationWindowForPass(selectedPass);
+    setForm((current) => ({ ...current, ...window, pass_type: selectedPass }));
+    setCalendarMonth(startOfMonth(new Date(`${window.date}T00:00:00`)));
   }, [location.search]);
 
   useEffect(() => {
@@ -162,6 +174,8 @@ export default function Reserve() {
   const openHHMM = selectedHours?.open_time.slice(0, 5);
   const closeHHMM = selectedHours?.close_time.slice(0, 5);
   const isClosedDay = selectedHours?.is_closed ?? false;
+  const selectedDuration = passDurationHours(form.pass_type);
+  const latestTimePassStart = selectedDuration && closeHHMM ? shiftTime(closeHHMM, -selectedDuration) : null;
   const reservationEnabled = settings.reservation_enabled !== "false";
   const noticeItems = (
     [
@@ -207,9 +221,21 @@ export default function Reserve() {
 
   function isDateDisabled(date: string) {
     if (date < today) return true;
-    if (dateExceptions[date]) return dateExceptions[date].is_closed || fullDates.has(date);
+    const exception = dateExceptions[date];
+    if (exception?.is_closed) return true;
     const weekday = new Date(`${date}T00:00:00`).getDay();
-    if (hoursByWeekday[weekday]?.is_closed) return true;
+    const hours = exception ?? hoursByWeekday[weekday];
+    if (!exception && hours?.is_closed) return true;
+    if (selectedDuration) {
+      const open = hours?.open_time?.slice(0, 5) ?? "09:00";
+      const close = hours?.close_time?.slice(0, 5) ?? "22:00";
+      const latestStart = shiftTime(close, -selectedDuration);
+      if (!latestStart || open > latestStart) return true;
+      if (date === today) {
+        const currentWindow = currentReservationWindow(selectedDuration);
+        if (currentWindow.date !== today || currentWindow.start_time > latestStart) return true;
+      }
+    }
     return fullDates.has(date);
   }
 
@@ -221,28 +247,38 @@ export default function Reserve() {
     setForm((current) => ({ ...current, [name]: value }));
   }
 
+  function updateStartTime(value: string) {
+    if (!selectedDuration) {
+      updateField("start_time", value);
+      return;
+    }
+    const end = shiftTime(value, selectedDuration);
+    setForm((current) => ({ ...current, start_time: value, end_time: end ?? "" }));
+    setError("");
+  }
+
   // Picking a future date: the "current time" default no longer makes sense, so
   // start at that day's opening time while keeping the same booking duration.
   function selectDate(date: string) {
     setForm((current) => {
-      if (date === today) return { ...current, date };
       const weekday = new Date(`${date}T00:00:00`).getDay();
       const hours = dateExceptions[date] ?? hoursByWeekday[weekday];
       const open = hours?.open_time?.slice(0, 5) ?? "09:00";
       const close = hours?.close_time?.slice(0, 5) ?? "22:00";
-      const toMin = (t: string) => {
-        const [h, m] = t.split(":").map(Number);
-        return h * 60 + m;
-      };
-      const toHHMM = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
-      const duration = Math.max(30, toMin(current.end_time) - toMin(current.start_time));
-      const endMin = Math.min(toMin(open) + duration, toMin(close));
-      return { ...current, date, start_time: open, end_time: toHHMM(endMin) };
+      const duration = passDurationHours(current.pass_type);
+      if (duration) {
+        const currentWindow = currentReservationWindow(duration);
+        const start = date === today && currentWindow.date === today && currentWindow.start_time > open ? currentWindow.start_time : open;
+        return { ...current, date, start_time: start, end_time: shiftTime(start, duration) ?? "" };
+      }
+      return { ...current, date, start_time: open, end_time: close };
     });
   }
 
   function selectPass(passName: string) {
-    setForm((current) => ({ ...current, ...reservationWindowForPass(passName), pass_type: passName }));
+    const window = reservationWindowForPass(passName);
+    setForm((current) => ({ ...current, ...window, pass_type: passName }));
+    setCalendarMonth(startOfMonth(new Date(`${window.date}T00:00:00`)));
     trackEvent("reserve_pass_selected", { pass_type: passName });
   }
 
@@ -254,6 +290,9 @@ export default function Reserve() {
     if (step === 2) {
       if (!form.date || form.date < todayValue()) return "오늘 이후 날짜를 선택해 주세요.";
       if (isClosedDay) return "선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.";
+      if (!form.start_time || !form.end_time) return "이용 시간을 확인해 주세요.";
+      if (selectedDuration && shiftTime(form.start_time, selectedDuration) !== form.end_time)
+        return `시간권은 시작 시간부터 ${selectedDuration}시간으로 예약됩니다.`;
       if (form.start_time >= form.end_time) return "종료 시간은 시작 시간보다 늦어야 해요.";
       if (openHHMM && closeHHMM && (form.start_time < openHHMM || form.end_time > closeHHMM))
         return `운영 시간(${openHHMM} - ${closeHHMM}) 안에서만 예약할 수 있어요.`;
@@ -309,6 +348,16 @@ export default function Reserve() {
 
     if (!form.pass_type || !form.name.trim() || !form.phone.trim()) {
       setError("이용권, 이름, 연락처를 입력해 주세요.");
+      return;
+    }
+
+    if (!form.start_time || !form.end_time) {
+      setError("이용 시간을 확인해 주세요.");
+      return;
+    }
+
+    if (selectedDuration && shiftTime(form.start_time, selectedDuration) !== form.end_time) {
+      setError(`시간권은 시작 시간부터 ${selectedDuration}시간으로 예약됩니다.`);
       return;
     }
 
@@ -386,7 +435,8 @@ export default function Reserve() {
     setIsSubmitting(false);
 
     if (submitError) {
-      setError("예약 신청 중 문제가 생겼습니다. 잠시 후 다시 시도하거나 연락처로 문의해 주세요.");
+      console.error("[reservation] insert failed", { code: submitError.code, message: submitError.message });
+      setError(readableReservationError(submitError));
       return;
     }
 
@@ -544,13 +594,31 @@ export default function Reserve() {
               </div>
               <div className="grid content-start gap-4">
                 <Field label="시작 시간">
-                  <input required type="time" min={openHHMM} max={closeHHMM} value={form.start_time} onChange={(event) => updateField("start_time", event.target.value)} />
+                  <input
+                    required
+                    type="time"
+                    step={3600}
+                    min={openHHMM}
+                    max={latestTimePassStart ?? closeHHMM}
+                    value={form.start_time}
+                    onChange={(event) => updateStartTime(event.target.value)}
+                  />
                 </Field>
                 <Field label="종료 시간">
-                  <input required type="time" min={openHHMM} max={closeHHMM} value={form.end_time} onChange={(event) => updateField("end_time", event.target.value)} />
+                  <input
+                    required
+                    type="time"
+                    min={openHHMM}
+                    max={closeHHMM}
+                    readOnly={Boolean(selectedDuration)}
+                    value={form.end_time}
+                    onChange={(event) => updateField("end_time", event.target.value)}
+                  />
                 </Field>
                 <p className="text-xs font-medium leading-5 text-workroom-muted">
-                  시간은 이용권에 맞게 자동으로 채워지며, 필요하면 직접 바꿀 수 있어요.
+                  {selectedDuration
+                    ? `시작 시간을 선택하면 종료 시간은 ${selectedDuration}시간 뒤로 자동 설정됩니다.`
+                    : "시간은 이용권과 운영 시간에 맞게 자동으로 채워집니다."}
                 </p>
                 {selectedHours ? (
                   <p className={`text-xs font-bold ${isClosedDay ? "text-red-600" : "text-workroom-muted"}`}>
@@ -785,4 +853,12 @@ function getPassGroup(passName: string): PassOption["group"] {
   if (passName.includes("종일")) return "종일권";
   if (passName.includes("주간") || passName.includes("월권")) return "주간 / 월권";
   return "문의";
+}
+
+function readableReservationError(error: { code?: string; message?: string }) {
+  const message = error.message?.trim() ?? "";
+  const customerFacingMessage = ["예약", "운영 시간", "휴무일", "좌석", "종료 시간"].some((word) => message.includes(word));
+  if (customerFacingMessage) return message;
+  if (error.code === "42501") return "로그인 정보가 만료되었습니다. 다시 로그인한 뒤 예약해 주세요.";
+  return "예약 신청 중 문제가 생겼습니다. 입력 내용을 다시 확인하거나 잠시 후 다시 시도해 주세요.";
 }
