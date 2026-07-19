@@ -45,7 +45,10 @@ export function computeFullDates(rows: IntervalInput[], capacity: number): Set<s
     if (row.status && !ACTIVE_STATUSES.has(row.status)) continue;
     if (!row.start_time || !row.end_time) continue;
     const list = byDate.get(row.date) ?? [];
-    list.push({ start: toMinutes(row.start_time), end: toMinutes(row.end_time), people: row.people ?? 1 });
+    const start = toMinutes(row.start_time);
+    let end = toMinutes(row.end_time);
+    if (end <= start) end += 24 * 60;
+    list.push({ start, end, people: row.people ?? 1 });
     byDate.set(row.date, list);
   }
 

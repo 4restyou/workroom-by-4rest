@@ -14,5 +14,9 @@ export function reservationStartTime(reservation: Reservation, date = reservatio
 }
 
 export function reservationEndTime(reservation: Reservation, date = reservation.date) {
-  return new Date(`${date}T${(reservation.end_time ?? "23:59").slice(0, 5)}:00+09:00`).getTime();
+  const start = (reservation.start_time ?? "00:00").slice(0, 5);
+  const end = (reservation.end_time ?? "23:59").slice(0, 5);
+  const timestamp = new Date(`${date}T${end}:00+09:00`);
+  if (end <= start) timestamp.setDate(timestamp.getDate() + 1);
+  return timestamp.getTime();
 }

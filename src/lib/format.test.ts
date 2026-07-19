@@ -5,6 +5,7 @@ import {
   formatPrice,
   formatTimeRange,
   currentReservationWindow,
+  operatingTimeSlots,
   passDurationHours,
   reservationWindowForPass,
   shiftTime,
@@ -49,6 +50,9 @@ describe("formatTimeRange", () => {
   it("falls back when no times are given", () => {
     expect(formatTimeRange(null, null)).toBe("시간 협의");
   });
+  it("marks an overnight end time as the next day", () => {
+    expect(formatTimeRange("22:00", "01:00")).toBe("22:00 - 01:00 (다음 날)");
+  });
 });
 
 describe("reservationWindowForPass", () => {
@@ -90,6 +94,13 @@ describe("time pass helpers", () => {
 
   it("moves an input time without crossing midnight", () => {
     expect(shiftTime("14:00", 3)).toBe("17:00");
-    expect(shiftTime("22:00", 3)).toBeNull();
+    expect(shiftTime("22:00", 3)).toBe("01:00");
+  });
+
+  it("offers whole-hour starts through the overnight closing time", () => {
+    const slots = operatingTimeSlots("08:00", "01:00", 3);
+    expect(slots[0]).toBe("08:00");
+    expect(slots[slots.length - 1]).toBe("22:00");
+    expect(slots).not.toContain("23:00");
   });
 });

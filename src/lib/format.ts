@@ -32,7 +32,9 @@ export function formatDate(value: string) {
 
 export function formatTimeRange(start?: string | null, end?: string | null) {
   if (!start && !end) return "시간 협의";
-  return `${(start ?? "").slice(0, 5)} - ${(end ?? "").slice(0, 5)}`;
+  const startValue = (start ?? "").slice(0, 5);
+  const endValue = (end ?? "").slice(0, 5);
+  return `${startValue} - ${endValue}${startValue && endValue && endValue <= startValue ? " (다음 날)" : ""}`;
 }
 
 export function todayValue() {
@@ -86,8 +88,24 @@ export function shiftTime(value: string, hours: number) {
   const [hour, minute] = value.split(":").map(Number);
   if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
   const total = hour * 60 + minute + hours * 60;
-  if (total < 0 || total >= 24 * 60) return null;
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  const wrapped = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+}
+
+export function operatingTimeSlots(open: string, close: string, durationHours: number, earliestMinute?: number) {
+  const openMinute = timeMinutes(open);
+  let closeMinute = timeMinutes(close);
+  if (closeMinute <= openMinute) closeMinute += 24 * 60;
+  const firstWholeHour = Math.ceil(openMinute / 60) * 60;
+  const minimum = Math.max(firstWholeHour, earliestMinute ?? firstWholeHour);
+  const first = Math.ceil(minimum / 60) * 60;
+  const duration = durationHours * 60;
+  const slots: string[] = [];
+  for (let minute = first; minute + duration <= closeMinute; minute += 60) {
+    const wrapped = minute % (24 * 60);
+    slots.push(`${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`);
+  }
+  return slots;
 }
 
 export function reservationWindowForPass(passName: string) {
@@ -105,4 +123,9 @@ export function reservationWindowForPass(passName: string) {
 
 function formatTimeInputValue(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function timeMinutes(value: string) {
+  const [hour, minute] = value.slice(0, 5).split(":").map(Number);
+  return hour * 60 + minute;
 }

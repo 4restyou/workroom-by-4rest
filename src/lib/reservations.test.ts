@@ -32,4 +32,9 @@ describe("reservation helpers", () => {
     expect(new Date(reservationStartTime(item)).toISOString()).toBe("2026-07-19T00:00:00.000Z");
     expect(new Date(reservationEndTime(item)).toISOString()).toBe("2026-07-19T03:00:00.000Z");
   });
+
+  it("moves an overnight end time to the next calendar day", () => {
+    const item = reservation({ start_time: "22:00:00", end_time: "01:00:00" });
+    expect(new Date(reservationEndTime(item)).toISOString()).toBe("2026-07-19T16:00:00.000Z");
+  });
 });

@@ -88,4 +88,11 @@ describe("computeFullDates", () => {
     ];
     expect(computeFullDates(rows, 2).has(day)).toBe(true);
   });
+
+  it("counts a reservation that ends after midnight on its starting date", () => {
+    const rows: IntervalInput[] = [
+      { date: day, start_time: "22:00", end_time: "01:00", people: 2, status: "confirmed" },
+    ];
+    expect(computeFullDates(rows, 2).has(day)).toBe(true);
+  });
 });
