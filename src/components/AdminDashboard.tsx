@@ -7,6 +7,7 @@ import type { Reservation } from "../lib/types";
 
 type AdminDashData = {
   reservations: Reservation[];
+  attendance: Array<{ reservation_id: string | null; check_in_at: string; check_out_at: string | null }>;
 };
 
 function isActiveReservation(reservation: Reservation) {
@@ -21,17 +22,23 @@ export default function AdminDashboard() {
     async function load() {
       if (!supabase) return;
       const today = todayValue();
-      const { data: reservations } = await supabase
-        .from("reservations")
-        .select("*")
-        .is("deleted_at", null)
-        .or(`date.gte.${today},status.eq.pending`)
-        .order("date", { ascending: true })
-        .order("start_time", { ascending: true })
-        .limit(120);
+      const [{ data: reservations }, { data: attendance }] = await Promise.all([
+        supabase
+          .from("reservations")
+          .select("*")
+          .is("deleted_at", null)
+          .or(`date.gte.${today},status.eq.pending`)
+          .order("date", { ascending: true })
+          .order("start_time", { ascending: true })
+          .limit(120),
+        supabase.from("attendance").select("reservation_id,check_in_at,check_out_at").order("check_in_at", { ascending: false }).limit(100),
+      ]);
 
       if (!active) return;
-      setData({ reservations: (reservations ?? []) as Reservation[] });
+      setData({
+        reservations: (reservations ?? []) as Reservation[],
+        attendance: (attendance ?? []) as Array<{ reservation_id: string | null; check_in_at: string; check_out_at: string | null }>,
+      });
     }
 
     void load();
@@ -48,12 +55,16 @@ export default function AdminDashboard() {
     const pending = reservations.filter((reservation) => reservation.status === "pending");
     const overduePending = pending.filter((reservation) => reservation.date < today);
     const todayConfirmed = reservations.filter((reservation) => reservation.date === today && reservation.status === "confirmed");
+    const todaySchedule = reservations.filter(
+      (reservation) => reservation.date === today && (reservation.status === "pending" || reservation.status === "confirmed"),
+    );
     const upcoming = reservations.filter((reservation) => reservation.date >= today && isActiveReservation(reservation)).slice(0, 4);
 
     return {
       pending,
       overduePending,
       todayConfirmed,
+      todaySchedule,
       upcoming,
       confirmed: reservations.filter((reservation) => reservation.status === "confirmed").length,
     };
@@ -94,6 +105,39 @@ export default function AdminDashboard() {
           날짜가 지난 미처리 예약이 {summary.overduePending.length}건 있습니다. 지금 확인해 주세요. →
         </Link>
       ) : null}
+
+      <article className={`${card} mt-3 p-5`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-bold">오늘 시간표</p>
+            <p className="mt-1 text-xs font-medium text-workroom-muted">예약·결제·입실 상태를 함께 확인합니다.</p>
+          </div>
+          <Link className="text-sm font-bold underline underline-offset-2" to={`/admin/reservations?date=${todayValue()}&status=all`}>오늘 전체</Link>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {data && summary.todaySchedule.length ? summary.todaySchedule.map((reservation) => {
+            const attendance = data.attendance.find((item) => item.reservation_id === reservation.id);
+            const visitLabel = reservation.status === "pending" ? "확인 필요" : attendance?.check_out_at ? "퇴실" : attendance ? "이용 중" : "입실 전";
+            const visitTone = reservation.status === "pending" ? "yellow" : attendance && !attendance.check_out_at ? "mint" : "sky";
+            return (
+              <Link
+                className="grid gap-2 rounded-[8px] border border-workroom-line bg-workroom-background px-4 py-3 hover:border-workroom-ink sm:grid-cols-[110px_1fr_auto] sm:items-center"
+                key={reservation.id}
+                to={`/admin/reservations?reservation=${reservation.id}`}
+              >
+                <p className="font-black">{formatTimeRange(reservation.start_time, reservation.end_time)}</p>
+                <div>
+                  <p className="font-bold">{reservation.name} · {reservation.people}명</p>
+                  <p className="mt-0.5 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type} · {reservation.payment_status === "paid" ? "결제완료" : reservation.payment_preference === "onsite" ? "방문결제" : "미결제"}</p>
+                </div>
+                <span className={badge(visitTone)}>{visitLabel}</span>
+              </Link>
+            );
+          }) : (
+            <p className="rounded-[8px] border border-workroom-line bg-workroom-background px-4 py-3 text-sm font-medium text-workroom-muted">오늘 예정된 예약이 없습니다.</p>
+          )}
+        </div>
+      </article>
 
       <article className={`${card} mt-3 p-5`}>
         <div className="flex items-center justify-between gap-3">

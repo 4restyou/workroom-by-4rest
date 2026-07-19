@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
@@ -7,12 +7,14 @@ import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import type {
   PaymentStatus,
+  Pass,
   Reservation,
   ReservationAuditLog,
   ReservationInquiry,
   ReservationPaymentLog,
   ReservationSmsLog,
   ReservationStatus,
+  ReservationInsert,
 } from "../lib/types";
 import { badge, buttonClass, card, tintCard, type TintColor } from "../lib/ui";
 
@@ -31,6 +33,18 @@ type ReservationEdit = {
   payment_status: PaymentStatus;
   payment_preference: "online" | "onsite";
   admin_note: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  pass_type: string;
+  pass_id: string | null;
+  pass_name_snapshot: string;
+  price_at_booking: number | null;
+  seat_type_id: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  people: number;
 };
 
 const statusHelp: Record<ReservationStatus, string> = {
@@ -76,6 +90,8 @@ export default function AdminReservations() {
   const statusParam = searchParams.get("status");
   const dateParam = searchParams.get("date");
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [passes, setPasses] = useState<Pass[]>([]);
+  const [showCreate, setShowCreate] = useState(false);
   const [dateFilter, setDateFilter] = useState(dateParam ?? "");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>(isReservationStatus(statusParam) ? statusParam : "pending");
@@ -87,6 +103,7 @@ export default function AdminReservations() {
   const [smsLogs, setSmsLogs] = useState<ReservationSmsLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     async function checkSessionAndLoad() {
@@ -119,11 +136,10 @@ export default function AdminReservations() {
     setIsLoading(true);
     setError("");
 
-    const { data, error: loadError } = await supabase
-      .from("reservations")
-      .select("*")
-      .order("date", { ascending: true })
-      .order("created_at", { ascending: false });
+    const [{ data, error: loadError }, { data: passRows }] = await Promise.all([
+      supabase.from("reservations").select("*").order("date", { ascending: true }).order("created_at", { ascending: false }),
+      supabase.from("passes").select("id,name,description,price,seat_type_id,is_active,sort_order").eq("is_active", true).order("sort_order"),
+    ]);
 
     setIsLoading(false);
 
@@ -133,6 +149,25 @@ export default function AdminReservations() {
     }
 
     setReservations(data ?? []);
+    setPasses((passRows ?? []) as Pass[]);
+  }
+
+  async function createManualReservation(payload: ReservationInsert) {
+    if (!supabase) return;
+    const { data, error: insertError } = await supabase.from("reservations").insert(payload).select("*").single();
+    if (insertError || !data) {
+      setError(insertError?.message ?? "예약을 등록하지 못했습니다.");
+      return;
+    }
+    const created = data as Reservation;
+    setReservations((current) => [...current, created]);
+    setDateFilter("");
+    setStatusFilter(created.status);
+    setArchiveFilter("active");
+    setSelectedReservationId(created.id);
+    setShowCreate(false);
+    setError("");
+    setSuccess("예약을 등록했습니다.");
   }
 
   const statusBaseReservations = useMemo(() => {
@@ -281,6 +316,8 @@ export default function AdminReservations() {
       setError(updateError.message);
       return;
     }
+    setError("");
+    setSuccess("예약 변경사항을 저장했습니다.");
     setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
     const { data } = await supabase
       .from("reservation_audit_logs")
@@ -298,6 +335,8 @@ export default function AdminReservations() {
       setError(updateError.message);
       return;
     }
+    setError("");
+    setSuccess("처리 상태를 변경했습니다.");
     setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
   }
 
@@ -329,6 +368,8 @@ export default function AdminReservations() {
       .order("created_at", { ascending: false })
       .limit(30);
     setSmsLogs((data ?? []) as ReservationSmsLog[]);
+    setError("");
+    setSuccess("문자를 재전송했습니다.");
   }
 
   async function archiveReservation(id: string) {
@@ -380,6 +421,13 @@ export default function AdminReservations() {
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리" accent="ink">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-workroom-muted">전화·현장 예약도 같은 목록에서 관리할 수 있습니다.</p>
+          <button className={buttonClass("accent", "md")} onClick={() => setShowCreate((current) => !current)} type="button">
+            {showCreate ? "등록 닫기" : "+ 관리자 예약 등록"}
+          </button>
+        </div>
+        {showCreate ? <ManualReservationForm onSubmit={(payload) => void createManualReservation(payload)} passes={passes} /> : null}
         <div className={`${card} mb-5 grid gap-3 p-4`}>
           <div className="flex flex-wrap gap-2">
             <button
@@ -449,6 +497,7 @@ export default function AdminReservations() {
 
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>예약을 불러오는 중입니다.</p> : null}
         {error ? <p className={`${tintCard("danger")} mb-4 p-4 text-sm font-bold`}>{error}</p> : null}
+        {success ? <p className={`${tintCard("mint")} mb-4 p-4 text-sm font-bold`}>{success}</p> : null}
         {!isLoading && !visibleReservations.length ? (
           <p className={`${card} mb-4 p-6 text-center font-bold`}>조건에 맞는 예약이 없습니다.</p>
         ) : null}
@@ -477,6 +526,7 @@ export default function AdminReservations() {
               auditLogs={auditLogs}
               paymentLogs={paymentLogs}
               smsLogs={smsLogs}
+              passes={passes}
               isArchived={Boolean(selectedReservation.deleted_at)}
               key={selectedReservation.id}
               reservation={selectedReservation}
@@ -542,6 +592,110 @@ function ReservationListItem({
   );
 }
 
+function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit: (payload: ReservationInsert) => void }) {
+  const [draft, setDraft] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    pass_type: "",
+    date: todayValue(),
+    start_time: "09:00",
+    end_time: "12:00",
+    people: 1,
+    message: "",
+    status: "confirmed" as "pending" | "confirmed",
+    payment_preference: "onsite" as "online" | "onsite",
+    payment_status: "unpaid" as PaymentStatus,
+  });
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.name.trim() || !draft.phone.trim() || !draft.pass_type) return;
+    const pass = passes.find((item) => item.name === draft.pass_type);
+    onSubmit({
+      profile_id: null,
+      pass_id: pass?.id ?? null,
+      pass_name_snapshot: pass?.name ?? draft.pass_type,
+      price_at_booking: pass?.price ?? null,
+      seat_type_id: pass?.seat_type_id ?? null,
+      payment_preference: draft.payment_preference,
+      payment_method: draft.payment_preference === "onsite" ? "현장결제" : null,
+      payment_status: draft.payment_status,
+      name: draft.name.trim(),
+      phone: draft.phone.trim(),
+      email: draft.email.trim() || null,
+      pass_type: draft.pass_type,
+      date: draft.date,
+      start_time: draft.start_time,
+      end_time: draft.end_time,
+      people: Number(draft.people),
+      message: draft.message.trim(),
+      status: draft.status,
+    });
+  }
+
+  return (
+    <form className={`${tintCard("sky")} mb-5 grid gap-4 p-5`} onSubmit={submit}>
+      <div>
+        <h2 className="text-lg font-black">관리자 예약 등록</h2>
+        <p className="mt-1 text-xs font-medium text-workroom-muted">전화 예약이나 현장 방문 예약을 등록합니다.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">이름
+          <input required value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">연락처
+          <input required value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">이메일
+          <input type="email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용권
+          <select required value={draft.pass_type} onChange={(event) => setDraft((current) => ({ ...current, pass_type: event.target.value }))}>
+            <option value="">선택</option>
+            {passes.map((pass) => <option key={pass.id} value={pass.name}>{pass.name}</option>)}
+            <option value="기타 문의">기타 문의</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">날짜
+          <input required type="date" value={draft.date} onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">시작
+          <input required type="time" value={draft.start_time} onChange={(event) => setDraft((current) => ({ ...current, start_time: event.target.value }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">종료
+          <input required type="time" value={draft.end_time} onChange={(event) => setDraft((current) => ({ ...current, end_time: event.target.value }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">인원
+          <input min={1} max={12} required type="number" value={draft.people} onChange={(event) => setDraft((current) => ({ ...current, people: Number(event.target.value) }))} />
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">예약 상태
+          <select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as "pending" | "confirmed" }))}>
+            <option value="confirmed">확정</option>
+            <option value="pending">확인 대기</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">결제 선택
+          <select value={draft.payment_preference} onChange={(event) => setDraft((current) => ({ ...current, payment_preference: event.target.value as "online" | "onsite" }))}>
+            <option value="onsite">방문 결제</option>
+            <option value="online">온라인 결제</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-workroom-muted">결제 상태
+          <select value={draft.payment_status} onChange={(event) => setDraft((current) => ({ ...current, payment_status: event.target.value as PaymentStatus }))}>
+            <option value="unpaid">미결제</option>
+            <option value="paid">결제완료</option>
+          </select>
+        </label>
+      </div>
+      <label className="grid gap-1 text-xs font-bold text-workroom-muted">고객 요청사항
+        <textarea rows={2} value={draft.message} onChange={(event) => setDraft((current) => ({ ...current, message: event.target.value }))} />
+      </label>
+      <button className={buttonClass("primary", "md", "w-full sm:w-auto sm:justify-self-start")} type="submit">예약 등록</button>
+    </form>
+  );
+}
+
 function StatusTab({
   count,
   isActive,
@@ -586,6 +740,7 @@ function ReservationCard({
   auditLogs,
   paymentLogs,
   smsLogs,
+  passes,
   isArchived,
   reservation,
   inquiries,
@@ -600,6 +755,7 @@ function ReservationCard({
   auditLogs: ReservationAuditLog[];
   paymentLogs: ReservationPaymentLog[];
   smsLogs: ReservationSmsLog[];
+  passes: Pass[];
   isArchived: boolean;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
@@ -616,6 +772,16 @@ function ReservationCard({
   const [paymentMethod, setPaymentMethod] = useState(reservation.payment_method ?? "");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(reservation.payment_status ?? "unpaid");
   const [paymentPreference, setPaymentPreference] = useState<"online" | "onsite">(reservation.payment_preference ?? "online");
+  const [bookingDraft, setBookingDraft] = useState({
+    name: reservation.name,
+    phone: reservation.phone,
+    email: reservation.email ?? "",
+    pass_type: reservation.pass_name_snapshot || reservation.pass_type,
+    date: reservation.date,
+    start_time: (reservation.start_time ?? "09:00").slice(0, 5),
+    end_time: (reservation.end_time ?? "12:00").slice(0, 5),
+    people: reservation.people,
+  });
   const [copiedMessage, setCopiedMessage] = useState<"confirmed" | "canceled" | null>(null);
 
   useEffect(() => {
@@ -624,10 +790,39 @@ function ReservationCard({
     setPaymentMethod(reservation.payment_method ?? "");
     setPaymentStatus(reservation.payment_status ?? "unpaid");
     setPaymentPreference(reservation.payment_preference ?? "online");
-  }, [reservation.status, reservation.admin_note, reservation.payment_method, reservation.payment_status, reservation.payment_preference]);
+    setBookingDraft({
+      name: reservation.name,
+      phone: reservation.phone,
+      email: reservation.email ?? "",
+      pass_type: reservation.pass_name_snapshot || reservation.pass_type,
+      date: reservation.date,
+      start_time: (reservation.start_time ?? "09:00").slice(0, 5),
+      end_time: (reservation.end_time ?? "12:00").slice(0, 5),
+      people: reservation.people,
+    });
+  }, [reservation]);
 
   function save() {
-    onSave({ status, payment_method: paymentMethod || null, payment_status: paymentStatus, payment_preference: paymentPreference, admin_note: note });
+    const selectedPass = passes.find((pass) => pass.name === bookingDraft.pass_type);
+    onSave({
+      status,
+      payment_method: paymentMethod || null,
+      payment_status: paymentStatus,
+      payment_preference: paymentPreference,
+      admin_note: note,
+      name: bookingDraft.name.trim(),
+      phone: bookingDraft.phone.trim(),
+      email: bookingDraft.email.trim() || null,
+      pass_type: bookingDraft.pass_type,
+      pass_id: selectedPass?.id ?? null,
+      pass_name_snapshot: selectedPass?.name ?? bookingDraft.pass_type,
+      price_at_booking: selectedPass?.price ?? reservation.price_at_booking,
+      seat_type_id: selectedPass?.seat_type_id ?? null,
+      date: bookingDraft.date,
+      start_time: bookingDraft.start_time,
+      end_time: bookingDraft.end_time,
+      people: Number(bookingDraft.people),
+    });
   }
 
   async function copyMessage(kind: "confirmed" | "canceled") {
@@ -736,6 +931,40 @@ function ReservationCard({
         <dt className="font-bold text-workroom-muted">요청사항</dt>
         <dd className="whitespace-pre-wrap font-medium">{reservation.message || "-"}</dd>
       </dl>
+
+      <details className="mt-5 rounded-card border border-workroom-line bg-white p-4">
+        <summary className="cursor-pointer text-sm font-black">예약자·일정 수정</summary>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">이름
+            <input value={bookingDraft.name} onChange={(event) => setBookingDraft((current) => ({ ...current, name: event.target.value }))} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">연락처
+            <input value={bookingDraft.phone} onChange={(event) => setBookingDraft((current) => ({ ...current, phone: event.target.value }))} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">이메일
+            <input type="email" value={bookingDraft.email} onChange={(event) => setBookingDraft((current) => ({ ...current, email: event.target.value }))} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용권
+            <select value={bookingDraft.pass_type} onChange={(event) => setBookingDraft((current) => ({ ...current, pass_type: event.target.value }))}>
+              {passes.map((pass) => <option key={pass.id} value={pass.name}>{pass.name}</option>)}
+              <option value="기타 문의">기타 문의</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">날짜
+            <input type="date" value={bookingDraft.date} onChange={(event) => setBookingDraft((current) => ({ ...current, date: event.target.value }))} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">인원
+            <input min={1} max={12} type="number" value={bookingDraft.people} onChange={(event) => setBookingDraft((current) => ({ ...current, people: Number(event.target.value) }))} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">시작
+            <input type="time" value={bookingDraft.start_time} onChange={(event) => setBookingDraft((current) => ({ ...current, start_time: event.target.value }))} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-workroom-muted">종료
+            <input type="time" value={bookingDraft.end_time} onChange={(event) => setBookingDraft((current) => ({ ...current, end_time: event.target.value }))} />
+          </label>
+        </div>
+        <p className="mt-3 text-xs font-medium text-workroom-muted">수정한 내용은 아래 ‘변경사항 저장’을 눌러야 반영됩니다.</p>
+      </details>
 
       {inquiries.length ? (
         <div className="mt-5">
