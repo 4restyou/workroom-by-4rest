@@ -2,11 +2,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
-import { formatDate, formatPhone, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
+import { formatDate, formatPhone, formatPrice, formatTimeRange, todayValue } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
-import type { Profile, Reservation, ReservationInquiry } from "../lib/types";
+import type { Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
 
 type AccountTab = "reservations" | "profile";
 
@@ -21,6 +21,22 @@ function canCancel(reservation: Reservation): boolean {
   if (Number.isNaN(start.getTime())) return true;
   return Date.now() < start.getTime();
 }
+
+const reservationStatusCardClass: Record<ReservationStatus, string> = {
+  pending: "border-workroom-ink bg-workroom-yellow/25",
+  confirmed: "border-workroom-ink bg-workroom-sky",
+  canceled: "border-workroom-line bg-workroom-surface opacity-75",
+  completed: "border-workroom-ink bg-workroom-surface",
+  no_show: "border-workroom-ink bg-workroom-danger/70",
+};
+
+const reservationStatusMessage: Record<ReservationStatus, string> = {
+  pending: "운영자 확인을 기다리고 있습니다.",
+  confirmed: "예약이 확정되었습니다.",
+  canceled: "취소된 예약입니다.",
+  completed: "이용이 완료되었습니다.",
+  no_show: "방문하지 않은 예약입니다.",
+};
 
 export default function Account() {
   const navigate = useNavigate();
@@ -373,7 +389,7 @@ export default function Account() {
                     reservations.map((reservation) => {
                       const active = reservation.status === "pending" || reservation.status === "confirmed";
                       return (
-                        <article className={`${cardFlat} p-4`} key={reservation.id}>
+                        <article className={`${cardFlat} ${reservationStatusCardClass[reservation.status]} border p-4`} key={reservation.id}>
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-bold">{reservation.pass_name_snapshot || reservation.pass_type}</p>
@@ -383,7 +399,7 @@ export default function Account() {
                             </div>
                             <StatusBadge status={reservation.status} />
                           </div>
-                          <p className="mt-3 text-sm font-medium text-workroom-muted">{statusLabel[reservation.status]}</p>
+                          <p className="mt-3 text-sm font-bold text-workroom-muted">{reservationStatusMessage[reservation.status]}</p>
 
                           {reservation.payment_status === "refunded" ? (
                             <div className="mt-3">

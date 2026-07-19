@@ -16,6 +16,7 @@ import type {
 import { buttonClass, card, tintCard } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
+const statusTabs: ("all" | ReservationStatus)[] = ["all", ...statusOptions];
 const paymentStatusLabels: Record<PaymentStatus, string> = {
   unpaid: "미결제",
   paid: "결제완료",
@@ -28,6 +29,38 @@ type ReservationEdit = {
   payment_method: string | null;
   payment_status: PaymentStatus;
   admin_note: string;
+};
+
+const statusHelp: Record<ReservationStatus, string> = {
+  pending: "확인·문자 발송 필요",
+  confirmed: "방문 예정",
+  canceled: "취소됨",
+  completed: "이용 완료",
+  no_show: "미방문",
+};
+
+const statusListClass: Record<ReservationStatus, string> = {
+  pending: "border-workroom-ink bg-workroom-yellow/45",
+  confirmed: "border-workroom-ink bg-workroom-sky",
+  canceled: "border-workroom-line bg-workroom-surface opacity-70",
+  completed: "border-workroom-ink bg-workroom-ink text-white",
+  no_show: "border-workroom-ink bg-workroom-danger",
+};
+
+const statusAccentClass: Record<ReservationStatus, string> = {
+  pending: "bg-workroom-yellow",
+  confirmed: "bg-workroom-sky",
+  canceled: "bg-workroom-line",
+  completed: "bg-workroom-ink",
+  no_show: "bg-workroom-danger",
+};
+
+const statusPanelClass: Record<ReservationStatus, string> = {
+  pending: "border-workroom-ink bg-workroom-yellow/20",
+  confirmed: "border-workroom-ink bg-workroom-sky/80",
+  canceled: "border-workroom-line bg-workroom-surface opacity-85",
+  completed: "border-workroom-ink bg-workroom-surface",
+  no_show: "border-workroom-ink bg-workroom-danger/70",
 };
 
 export default function AdminReservations() {
@@ -93,20 +126,32 @@ export default function AdminReservations() {
     setReservations(data ?? []);
   }
 
-  const visibleReservations = useMemo(() => {
-    const today = todayValue();
+  const statusBaseReservations = useMemo(() => {
     const q = query.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, "");
     return reservations
       .filter((reservation) => (archiveFilter === "archived" ? Boolean(reservation.deleted_at) : !reservation.deleted_at))
       .filter((reservation) => (dateFilter ? reservation.date === dateFilter : true))
-      .filter((reservation) => (statusFilter === "all" ? true : reservation.status === statusFilter))
       .filter((reservation) => {
         if (!q) return true;
         const nameMatch = reservation.name.toLowerCase().includes(q);
         const phoneMatch = qDigits.length > 0 && reservation.phone.replace(/\D/g, "").includes(qDigits);
         return nameMatch || phoneMatch;
-      })
+      });
+  }, [archiveFilter, dateFilter, query, reservations]);
+
+  const statusCounts = useMemo(() => {
+    const counts = Object.fromEntries(statusOptions.map((status) => [status, 0])) as Record<ReservationStatus, number>;
+    statusBaseReservations.forEach((reservation) => {
+      counts[reservation.status] += 1;
+    });
+    return counts;
+  }, [statusBaseReservations]);
+
+  const visibleReservations = useMemo(() => {
+    const today = todayValue();
+    return statusBaseReservations
+      .filter((reservation) => (statusFilter === "all" ? true : reservation.status === statusFilter))
       .sort((a, b) => {
         const aPending = a.status === "pending" ? 0 : 1;
         const bPending = b.status === "pending" ? 0 : 1;
@@ -116,7 +161,7 @@ export default function AdminReservations() {
         if (aFuture !== bFuture) return aFuture - bFuture;
         return `${a.date} ${a.start_time ?? ""}`.localeCompare(`${b.date} ${b.start_time ?? ""}`);
       });
-  }, [archiveFilter, dateFilter, query, reservations, statusFilter]);
+  }, [statusBaseReservations, statusFilter]);
 
   useEffect(() => {
     if (!visibleReservations.length) {
@@ -283,21 +328,10 @@ export default function AdminReservations() {
             이름 · 전화 검색
             <input placeholder="이름 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto_auto_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end">
             <label className="grid gap-2 text-sm font-bold">
               날짜별 필터
               <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
-            </label>
-            <label className="grid gap-2 text-sm font-bold">
-              상태별 필터
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | ReservationStatus)}>
-                <option value="all">전체</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabel[status]}
-                  </option>
-                ))}
-              </select>
             </label>
             <button className={buttonClass("accent", "md")} onClick={loadReservations} type="button">
               새로고침
@@ -311,6 +345,20 @@ export default function AdminReservations() {
             <button className={buttonClass("secondary", "md")} onClick={signOut} type="button">
               로그아웃
             </button>
+          </div>
+          <div className="grid gap-2 border-t border-workroom-line pt-3">
+            <p className="text-sm font-bold">상태별 보기</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              {statusTabs.map((status) => (
+                <StatusTab
+                  count={status === "all" ? statusBaseReservations.length : statusCounts[status]}
+                  isActive={statusFilter === status}
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  status={status}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -383,29 +431,71 @@ function ReservationListItem({
   onSelect: () => void;
   reservation: Reservation;
 }) {
+  const selectedClass = isSelected
+    ? "border-workroom-ink bg-workroom-yellow"
+    : `${statusListClass[reservation.status]} transition-colors hover:border-workroom-ink`;
+  const mutedText = !isSelected && reservation.status === "completed" ? "text-white/70" : "text-workroom-muted";
+
   return (
     <button
-      className={`rounded-card px-4 py-3 text-left ${
-        isSelected
-          ? "border border-workroom-ink bg-workroom-yellow"
-          : "border border-workroom-line bg-white transition-colors hover:border-workroom-ink"
-      }`}
+      className={`relative overflow-hidden rounded-card border px-4 py-3 text-left ${selectedClass}`}
       onClick={onSelect}
       type="button"
     >
+      <span className={`absolute inset-y-0 left-0 w-2 ${statusAccentClass[reservation.status]}`} aria-hidden />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold">{reservation.name}</p>
-          <p className="mt-1 text-xs font-medium text-workroom-muted">
+          <p className={`mt-1 text-xs font-medium ${mutedText}`}>
             {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
           </p>
-          <p className="mt-1 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}</p>
+          <p className={`mt-1 text-xs font-medium ${mutedText}`}>{reservation.pass_name_snapshot || reservation.pass_type}</p>
+          <p className={`mt-2 text-[11px] font-bold ${mutedText}`}>{statusHelp[reservation.status]}</p>
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
-          {reservation.deleted_at ? <span className="text-[11px] font-bold text-workroom-muted">보관됨</span> : null}
+          {reservation.deleted_at ? <span className={`text-[11px] font-bold ${mutedText}`}>보관됨</span> : null}
         </div>
       </div>
+    </button>
+  );
+}
+
+function StatusTab({
+  count,
+  isActive,
+  onClick,
+  status,
+}: {
+  count: number;
+  isActive: boolean;
+  onClick: () => void;
+  status: "all" | ReservationStatus;
+}) {
+  const label = status === "all" ? "전체" : statusLabel[status];
+  const helper = status === "all" ? "모든 예약" : statusHelp[status];
+  const activeClass =
+    status === "all"
+      ? "border-workroom-ink bg-workroom-ink text-white"
+      : statusListClass[status].replace("opacity-70", "").replace("opacity-85", "");
+
+  return (
+    <button
+      className={`rounded-card border p-3 text-left transition-colors hover:border-workroom-ink ${
+        isActive ? activeClass : "border-workroom-line bg-workroom-surface"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      <span className="block text-sm font-black">{label}</span>
+      <span className="mt-1 block text-2xl font-black">{count}건</span>
+      <span
+        className={`mt-1 block text-[11px] font-bold ${
+          isActive && (status === "all" || status === "completed") ? "text-white/70" : "text-workroom-muted"
+        }`}
+      >
+        {helper}
+      </span>
     </button>
   );
 }
@@ -457,7 +547,7 @@ function ReservationCard({
   }
 
   return (
-    <article className={`${card} p-5`}>
+    <article className={`${statusPanelClass[reservation.status]} rounded-card border p-5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-2xl font-bold">{reservation.name}</h3>
