@@ -39,6 +39,8 @@ const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
 const ADMIN_PHONE = (Deno.env.get("ADMIN_PHONE") ?? "").replace(/\D/g, "");
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
 const PAYMENT_NOTICE =
@@ -71,12 +73,50 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "unknown error";
 }
 
-async function sendSms(to: string, text: string): Promise<void> {
+type SmsLogContext = {
+  reservationId: string;
+  recipientKind: "member" | "admin";
+  event: string;
+};
+
+async function writeSmsLog(
+  context: SmsLogContext,
+  phone: string,
+  status: "succeeded" | "failed" | "skipped",
+  providerMessageId?: string,
+  error?: string,
+) {
+  if (!SUPABASE_URL || !SERVICE_ROLE) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/reservation_sms_logs`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_ROLE,
+        authorization: `Bearer ${SERVICE_ROLE}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reservation_id: context.reservationId,
+        recipient_kind: context.recipientKind,
+        phone,
+        event: context.event,
+        status,
+        provider_message_id: providerMessageId ?? null,
+        error_message: error ?? null,
+      }),
+    });
+  } catch (error) {
+    console.error("[reservation-sms] log write error", { message: errorMessage(error) });
+  }
+}
+
+async function sendSms(to: string, text: string, context: SmsLogContext): Promise<void> {
   const phone = to.replace(/\D/g, "");
   if (!phone) return;
 
   if (!SOLAPI_API_KEY || !SOLAPI_API_SECRET || !SMS_SENDER) {
     console.log("[reservation-sms] solapi secrets missing — skipping send");
+    await writeSmsLog(context, phone, "skipped", undefined, "문자 발송 설정이 완료되지 않았습니다.");
     return;
   }
 
@@ -100,9 +140,16 @@ async function sendSms(to: string, text: string): Promise<void> {
     body: JSON.stringify({ message: { to: phone, from: SMS_SENDER, text } }),
   });
 
+  const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+  const providerMessageId = typeof result.groupId === "string" ? result.groupId : undefined;
+
   if (!response.ok) {
     console.error("[reservation-sms] solapi error", { status: response.status });
+    const providerError = typeof result.errorMessage === "string" ? result.errorMessage : `Solapi 응답 ${response.status}`;
+    await writeSmsLog(context, phone, "failed", providerMessageId, providerError);
+    return;
   }
+  await writeSmsLog(context, phone, "succeeded", providerMessageId);
 }
 
 Deno.serve(async (request) => {
@@ -127,11 +174,16 @@ Deno.serve(async (request) => {
         await sendSms(
           row.phone,
           `[WORKROOM] 예약 신청이 접수되었습니다.\n${reservationLine(row)}\n${PAYMENT_NOTICE}\n문의: 010-4931-3298\n${SITE_URL}`,
+          { reservationId: row.id, recipientKind: "member", event: "reservation_received" },
         );
       }
       // Operator-facing: new reservation alert.
       if (ADMIN_PHONE) {
-        await sendSms(ADMIN_PHONE, `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`);
+        await sendSms(
+          ADMIN_PHONE,
+          `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`,
+          { reservationId: row.id, recipientKind: "admin", event: "admin_new_reservation" },
+        );
       }
       return new Response("ok", { status: 200 });
     }
@@ -146,18 +198,34 @@ Deno.serve(async (request) => {
       const message = STATUS_MESSAGE[row.status];
       if (statusChanged && message && row.phone) {
         const policyLine = row.status === "confirmed" ? `\n${REFUND_NOTICE}` : "";
-        await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`);
+        await sendSms(
+          row.phone,
+          `[WORKROOM] ${message}\n${reservationLine(row)}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`,
+          {
+            reservationId: row.id,
+            recipientKind: "member",
+            event: row.status === "confirmed" ? "reservation_confirmed" : row.status === "canceled" ? "reservation_canceled" : "reservation_no_show",
+          },
+        );
       }
 
       // Operator-facing: every cancellation should be visible even when the
       // member cancels from their own reservation page.
       if (ADMIN_PHONE && statusChanged && row.status === "canceled") {
-        await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 취소\n${row.name} / ${reservationLine(row)}\n예약관리에서 확인해 주세요.\n${SITE_URL}`);
+        await sendSms(
+          ADMIN_PHONE,
+          `[WORKROOM] 예약 취소\n${row.name} / ${reservationLine(row)}\n예약관리에서 확인해 주세요.\n${SITE_URL}`,
+          { reservationId: row.id, recipientKind: "admin", event: "admin_cancellation" },
+        );
       }
 
       // Operator-facing: the member edited the date/time (re-request).
       if (ADMIN_PHONE && timeChanged) {
-        await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 변경 요청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`);
+        await sendSms(
+          ADMIN_PHONE,
+          `[WORKROOM] 예약 변경 요청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`,
+          { reservationId: row.id, recipientKind: "admin", event: "admin_schedule_changed" },
+        );
       }
 
       return new Response("ok", { status: 200 });

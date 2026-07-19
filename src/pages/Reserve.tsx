@@ -21,6 +21,7 @@ const emptyForm = {
   name: "",
   phone: "",
   email: "",
+  payment_preference: "online" as "online" | "onsite",
   message: "",
 };
 
@@ -41,6 +42,7 @@ type SubmittedReservation = {
   name: string;
   phone: string;
   price: number | null;
+  paymentPreference: "online" | "onsite";
 };
 
 const customInquiryPass: PassOption = {
@@ -357,6 +359,7 @@ export default function Reserve() {
       seat_type_id: selectedPass?.seat_type_id ?? null,
       payment_method: null,
       payment_status: "unpaid",
+      payment_preference: form.payment_preference,
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim() || null,
@@ -387,6 +390,7 @@ export default function Reserve() {
       name: form.name.trim(),
       phone: form.phone.trim(),
       price: selectedPass?.price ?? null,
+      paymentPreference: form.payment_preference,
     });
     trackEvent("reservation_submitted", {
       pass_type: selectedPass?.name ?? form.pass_type,
@@ -571,6 +575,45 @@ export default function Reserve() {
                   <input min={1} required type="number" value={form.people} onChange={(event) => updateField("people", event.target.value)} />
                 </Field>
               </div>
+              <fieldset className="grid gap-2">
+                <legend className="mb-1 text-sm font-bold">결제 방법</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 ${
+                      form.payment_preference === "online" ? "border-workroom-ink bg-workroom-yellow" : "border-workroom-line bg-white"
+                    }`}
+                  >
+                    <input
+                      checked={form.payment_preference === "online"}
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-black"
+                      name="payment_preference"
+                      onChange={() => updateField("payment_preference", "online")}
+                      type="radio"
+                    />
+                    <span>
+                      <span className="block font-bold">온라인 결제</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">예약 확인 후 문자로 결제 링크를 보내드립니다.</span>
+                    </span>
+                  </label>
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 ${
+                      form.payment_preference === "onsite" ? "border-workroom-ink bg-workroom-yellow" : "border-workroom-line bg-white"
+                    }`}
+                  >
+                    <input
+                      checked={form.payment_preference === "onsite"}
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-black"
+                      name="payment_preference"
+                      onChange={() => updateField("payment_preference", "onsite")}
+                      type="radio"
+                    />
+                    <span>
+                      <span className="block font-bold">방문 결제</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">방문할 때 현장에서 바로 결제합니다.</span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
               <Field label="요청사항 (선택)">
                 <textarea
                   placeholder="방문 목적, 필요한 장비, 궁금한 점 (선택 입력)"
@@ -597,6 +640,8 @@ export default function Reserve() {
                 </dd>
                 <dt className="font-bold text-workroom-muted">금액</dt>
                 <dd className="font-bold">{selectedPassInfo?.price ? formatPrice(selectedPassInfo.price) : "확인 후 안내"}</dd>
+                <dt className="font-bold text-workroom-muted">결제</dt>
+                <dd className="font-bold">{form.payment_preference === "online" ? "온라인 결제 링크" : "방문 결제"}</dd>
               </dl>
             </div>
           ) : null}
@@ -661,6 +706,8 @@ export default function Reserve() {
                   </dd>
                   <dt className="font-bold text-workroom-muted">금액</dt>
                   <dd className="font-bold">{submittedReservation.price ? formatPrice(submittedReservation.price) : "확인 후 안내"}</dd>
+                  <dt className="font-bold text-workroom-muted">결제</dt>
+                  <dd className="font-bold">{submittedReservation.paymentPreference === "online" ? "온라인 결제 링크" : "방문 결제"}</dd>
                 </dl>
               </div>
             ) : null}

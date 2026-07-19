@@ -11,9 +11,10 @@ import type {
   ReservationAuditLog,
   ReservationInquiry,
   ReservationPaymentLog,
+  ReservationSmsLog,
   ReservationStatus,
 } from "../lib/types";
-import { buttonClass, card, tintCard } from "../lib/ui";
+import { badge, buttonClass, card, tintCard, type TintColor } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
 const statusTabs: ("all" | ReservationStatus)[] = ["pending", "confirmed", "all", "canceled", "completed", "no_show"];
@@ -28,6 +29,7 @@ type ReservationEdit = {
   status: ReservationStatus;
   payment_method: string | null;
   payment_status: PaymentStatus;
+  payment_preference: "online" | "onsite";
   admin_note: string;
 };
 
@@ -82,6 +84,7 @@ export default function AdminReservations() {
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [auditLogs, setAuditLogs] = useState<ReservationAuditLog[]>([]);
   const [paymentLogs, setPaymentLogs] = useState<ReservationPaymentLog[]>([]);
+  const [smsLogs, setSmsLogs] = useState<ReservationSmsLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -218,6 +221,24 @@ export default function AdminReservations() {
   }, [selectedReservationId]);
 
   useEffect(() => {
+    async function loadSmsLogs() {
+      if (!supabase || !selectedReservationId) {
+        setSmsLogs([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("reservation_sms_logs")
+        .select("*")
+        .eq("reservation_id", selectedReservationId)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      setSmsLogs((data ?? []) as ReservationSmsLog[]);
+    }
+
+    void loadSmsLogs();
+  }, [selectedReservationId]);
+
+  useEffect(() => {
     async function loadAuditLogs() {
       if (!supabase || !selectedReservationId) {
         setAuditLogs([]);
@@ -268,6 +289,46 @@ export default function AdminReservations() {
       .order("created_at", { ascending: false })
       .limit(20);
     setAuditLogs((data ?? []) as ReservationAuditLog[]);
+  }
+
+  async function patchReservation(id: string, payload: Partial<Reservation>) {
+    if (!supabase) return;
+    const { error: updateError } = await supabase.from("reservations").update(payload).eq("id", id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
+  }
+
+  async function markPaymentLinkSent(reservation: Reservation) {
+    const sentAt = new Date();
+    const dueAt = new Date(sentAt.getTime() + 2 * 60 * 60 * 1000);
+    await patchReservation(reservation.id, {
+      payment_preference: "online",
+      payment_method: "온라인 카드",
+      payment_link_sent_at: sentAt.toISOString(),
+      payment_due_at: dueAt.toISOString(),
+      payment_link_send_count: (reservation.payment_link_send_count ?? 0) + 1,
+    });
+  }
+
+  async function resendStatusSms(reservation: Reservation, kind: "confirmed" | "canceled") {
+    if (!supabase) return;
+    const { error: invokeError } = await supabase.functions.invoke("admin-reservation-sms", {
+      body: { reservationId: reservation.id, kind },
+    });
+    if (invokeError) {
+      setError("문자 재전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    const { data } = await supabase
+      .from("reservation_sms_logs")
+      .select("*")
+      .eq("reservation_id", reservation.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    setSmsLogs((data ?? []) as ReservationSmsLog[]);
   }
 
   async function archiveReservation(id: string) {
@@ -415,6 +476,7 @@ export default function AdminReservations() {
               conflictCount={getConflictCount(selectedReservation, reservations)}
               auditLogs={auditLogs}
               paymentLogs={paymentLogs}
+              smsLogs={smsLogs}
               isArchived={Boolean(selectedReservation.deleted_at)}
               key={selectedReservation.id}
               reservation={selectedReservation}
@@ -422,6 +484,9 @@ export default function AdminReservations() {
               onArchive={() => void archiveReservation(selectedReservation.id)}
               onReply={(inquiryId, reply) => void replyInquiry(inquiryId, reply)}
               onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
+              onPatch={(payload) => void patchReservation(selectedReservation.id, payload)}
+              onPaymentLinkSent={() => void markPaymentLinkSent(selectedReservation)}
+              onResendSms={(kind) => void resendStatusSms(selectedReservation, kind)}
             />
           ) : (
             <p className={`${card} p-6 text-center font-bold`}>
@@ -470,6 +535,7 @@ function ReservationListItem({
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
+          <span className="text-[11px] font-bold text-workroom-muted">{paymentWorkflowLabel(reservation)}</span>
         </div>
       </div>
     </button>
@@ -519,28 +585,37 @@ function ReservationCard({
   conflictCount,
   auditLogs,
   paymentLogs,
+  smsLogs,
   isArchived,
   reservation,
   inquiries,
   onArchive,
   onReply,
   onSave,
+  onPatch,
+  onPaymentLinkSent,
+  onResendSms,
 }: {
   conflictCount: number;
   auditLogs: ReservationAuditLog[];
   paymentLogs: ReservationPaymentLog[];
+  smsLogs: ReservationSmsLog[];
   isArchived: boolean;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
   onArchive: () => void;
   onReply: (inquiryId: string, reply: string) => void;
   onSave: (payload: ReservationEdit) => void;
+  onPatch: (payload: Partial<Reservation>) => void;
+  onPaymentLinkSent: () => void;
+  onResendSms: (kind: "confirmed" | "canceled") => void;
 }) {
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<ReservationStatus>(reservation.status);
   const [note, setNote] = useState(reservation.admin_note ?? "");
   const [paymentMethod, setPaymentMethod] = useState(reservation.payment_method ?? "");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(reservation.payment_status ?? "unpaid");
+  const [paymentPreference, setPaymentPreference] = useState<"online" | "onsite">(reservation.payment_preference ?? "online");
   const [copiedMessage, setCopiedMessage] = useState<"confirmed" | "canceled" | null>(null);
 
   useEffect(() => {
@@ -548,10 +623,11 @@ function ReservationCard({
     setNote(reservation.admin_note ?? "");
     setPaymentMethod(reservation.payment_method ?? "");
     setPaymentStatus(reservation.payment_status ?? "unpaid");
-  }, [reservation.status, reservation.admin_note, reservation.payment_method, reservation.payment_status]);
+    setPaymentPreference(reservation.payment_preference ?? "online");
+  }, [reservation.status, reservation.admin_note, reservation.payment_method, reservation.payment_status, reservation.payment_preference]);
 
   function save() {
-    onSave({ status, payment_method: paymentMethod || null, payment_status: paymentStatus, admin_note: note });
+    onSave({ status, payment_method: paymentMethod || null, payment_status: paymentStatus, payment_preference: paymentPreference, admin_note: note });
   }
 
   async function copyMessage(kind: "confirmed" | "canceled") {
@@ -601,6 +677,44 @@ function ReservationCard({
         </p>
       ) : null}
 
+      <div className={`${tintCard(paymentWorkflowTone(reservation))} mt-4 p-4`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-black">결제 진행 · {paymentWorkflowLabel(reservation)}</p>
+            <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">{paymentWorkflowDescription(reservation)}</p>
+          </div>
+          {reservation.payment_link_send_count ? (
+            <span className={badge("sky")}>링크 기록 {reservation.payment_link_send_count}회</span>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {reservation.payment_preference === "online" && reservation.payment_status !== "paid" ? (
+            <button className={buttonClass("accent", "sm")} onClick={onPaymentLinkSent} type="button">
+              {reservation.payment_link_sent_at ? "결제 링크 재발송 기록" : "결제 링크 발송 완료"}
+            </button>
+          ) : null}
+          {reservation.payment_status !== "paid" && reservation.status !== "canceled" ? (
+            <button
+              className={buttonClass("primary", "sm")}
+              onClick={() => onPatch({ payment_status: "paid", payment_method: reservation.payment_preference === "onsite" ? "현장결제" : "온라인 카드" })}
+              type="button"
+            >
+              결제 완료 처리
+            </button>
+          ) : null}
+          {reservation.status === "pending" ? (
+            <button className={buttonClass("secondary", "sm")} onClick={() => onPatch({ status: "confirmed" })} type="button">
+              예약 확정
+            </button>
+          ) : null}
+          {reservation.status === "confirmed" ? (
+            <button className={buttonClass("secondary", "sm")} onClick={() => onPatch({ status: "completed" })} type="button">
+              이용 완료
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       <dl className="mt-5 grid grid-cols-[86px_1fr] gap-x-3 gap-y-2 text-sm">
         <dt className="font-bold text-workroom-muted">이용권</dt>
         <dd className="font-bold">{reservation.pass_name_snapshot || reservation.pass_type}</dd>
@@ -615,6 +729,8 @@ function ReservationCard({
           {paymentStatusLabels[reservation.payment_status ?? "unpaid"]}
           {reservation.payment_method ? ` / ${reservation.payment_method}` : ""}
         </dd>
+        <dt className="font-bold text-workroom-muted">결제 선택</dt>
+        <dd className="font-bold">{reservation.payment_preference === "onsite" ? "방문 결제" : "온라인 결제"}</dd>
         <dt className="font-bold text-workroom-muted">인원</dt>
         <dd className="font-bold">{reservation.people}명</dd>
         <dt className="font-bold text-workroom-muted">요청사항</dt>
@@ -670,6 +786,13 @@ function ReservationCard({
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2 text-sm font-bold">
+            고객 선택
+            <select value={paymentPreference} onChange={(event) => setPaymentPreference(event.target.value as "online" | "onsite")}>
+              <option value="online">온라인 결제</option>
+              <option value="onsite">방문 결제</option>
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-bold">
             결제 방식
             <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
               <option value="">미정</option>
@@ -702,6 +825,35 @@ function ReservationCard({
           <button className={buttonClass("secondary", "md")} onClick={onArchive} type="button">
             보관 처리
           </button>
+        )}
+      </div>
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-bold">문자 발송 이력</p>
+          <div className="flex flex-wrap gap-2">
+            {reservation.status === "confirmed" ? (
+              <button className={buttonClass("secondary", "sm")} onClick={() => onResendSms("confirmed")} type="button">확정 문자 재전송</button>
+            ) : null}
+            {reservation.status === "canceled" ? (
+              <button className={buttonClass("secondary", "sm")} onClick={() => onResendSms("canceled")} type="button">취소 문자 재전송</button>
+            ) : null}
+          </div>
+        </div>
+        {smsLogs.length ? (
+          <div className="mt-2 grid gap-2">
+            {smsLogs.map((log) => (
+              <div className={`${smsLogTint(log.status)} p-3 text-sm`} key={log.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-bold">{smsEventLabel(log.event)} · {smsStatusLabel(log.status)}</p>
+                  <span className="text-xs font-bold text-workroom-muted">{formatAuditTime(log.created_at)}</span>
+                </div>
+                {log.error_message ? <p className="mt-1 text-xs font-medium text-workroom-muted">{log.error_message}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={`${tintCard("yellow")} mt-2 p-3 text-sm font-bold`}>아직 기록된 문자 발송 이력이 없습니다.</p>
         )}
       </div>
 
@@ -810,6 +962,58 @@ function paymentLogTint(status: ReservationPaymentLog["status"]) {
   if (status === "failed") return tintCard("danger");
   if (status === "skipped") return tintCard("yellow");
   return tintCard("lilac");
+}
+
+function paymentWorkflowLabel(reservation: Reservation) {
+  if (reservation.payment_status === "refunded") return "환불 완료";
+  if (reservation.payment_status === "paid") return "결제 완료";
+  if (reservation.status === "canceled") return "취소 · 환불 확인";
+  if (reservation.payment_preference === "onsite") return "방문 결제 예정";
+  if (!reservation.payment_link_sent_at) return "결제 링크 발송 전";
+  if (reservation.payment_due_at && new Date(reservation.payment_due_at).getTime() < Date.now()) return "결제 기한 초과";
+  return "온라인 결제 대기";
+}
+
+function paymentWorkflowDescription(reservation: Reservation) {
+  if (reservation.payment_status === "paid") return `${reservation.payment_method || "결제"}로 완료 처리되었습니다.`;
+  if (reservation.payment_status === "refunded") return "환불 완료로 기록된 예약입니다.";
+  if (reservation.status === "canceled") return reservation.payment_status === "unpaid" ? "미결제 취소입니다." : "환불 처리가 필요한지 확인해 주세요.";
+  if (reservation.payment_preference === "onsite") return "방문 시 현장에서 결제할 예약입니다.";
+  if (!reservation.payment_link_sent_at) return "포스기에서 링크를 만든 뒤 고객에게 보내고 ‘발송 완료’를 눌러주세요.";
+  if (reservation.payment_due_at) return `결제 기한 · ${formatAuditTime(reservation.payment_due_at)}`;
+  return "결제 완료 여부를 확인해 주세요.";
+}
+
+function paymentWorkflowTone(reservation: Reservation): TintColor {
+  if (reservation.payment_status === "paid" || reservation.payment_status === "refunded") return "mint";
+  if (reservation.status === "canceled") return "danger";
+  if (reservation.payment_due_at && new Date(reservation.payment_due_at).getTime() < Date.now()) return "danger";
+  return reservation.payment_preference === "onsite" ? "sky" : "yellow";
+}
+
+function smsEventLabel(event: string) {
+  const labels: Record<string, string> = {
+    reservation_received: "예약 접수 문자",
+    admin_new_reservation: "관리자 새 예약 알림",
+    reservation_confirmed: "예약 확정 문자",
+    reservation_canceled: "예약 취소 문자",
+    reservation_no_show: "노쇼 안내 문자",
+    admin_cancellation: "관리자 취소 알림",
+    admin_schedule_changed: "관리자 변경 알림",
+    manual_confirmed: "확정 문자 재전송",
+    manual_canceled: "취소 문자 재전송",
+  };
+  return labels[event] ?? event;
+}
+
+function smsStatusLabel(status: ReservationSmsLog["status"]) {
+  return status === "succeeded" ? "발송 성공" : status === "failed" ? "발송 실패" : "발송 안 됨";
+}
+
+function smsLogTint(status: ReservationSmsLog["status"]) {
+  if (status === "succeeded") return tintCard("mint");
+  if (status === "failed") return tintCard("danger");
+  return tintCard("yellow");
 }
 
 function labelStatus(status: ReservationStatus | null) {

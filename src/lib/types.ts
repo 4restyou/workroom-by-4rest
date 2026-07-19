@@ -1,5 +1,6 @@
 export type ReservationStatus = "pending" | "confirmed" | "canceled" | "completed" | "no_show";
 export type PaymentStatus = "unpaid" | "paid" | "refunded";
+export type PaymentPreference = "online" | "onsite";
 export type MemberStatus = "pending" | "approved" | "rejected";
 
 export type Profile = {
@@ -97,6 +98,18 @@ export type ReservationPaymentLog = {
   created_at: string;
 };
 
+export type ReservationSmsLog = {
+  id: string;
+  reservation_id: string;
+  recipient_kind: "member" | "admin";
+  phone: string;
+  event: string;
+  status: "succeeded" | "failed" | "skipped";
+  provider_message_id: string | null;
+  error_message: string | null;
+  created_at: string;
+};
+
 export type Reservation = {
   id: string;
   profile_id: string | null;
@@ -106,6 +119,10 @@ export type Reservation = {
   seat_type_id: string | null;
   payment_method: string | null;
   payment_status: PaymentStatus | null;
+  payment_preference: PaymentPreference;
+  payment_link_sent_at: string | null;
+  payment_due_at: string | null;
+  payment_link_send_count: number;
   payment_key?: string | null;
   name: string;
   phone: string;
@@ -130,6 +147,7 @@ export type ReservationInsert = {
   seat_type_id?: string | null;
   payment_method?: string | null;
   payment_status?: PaymentStatus | null;
+  payment_preference?: PaymentPreference;
   name: string;
   phone: string;
   email?: string | null;
