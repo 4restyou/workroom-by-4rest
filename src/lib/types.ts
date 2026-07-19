@@ -132,6 +132,13 @@ export type Reservation = {
   payment_link_sent_at: string | null;
   payment_due_at: string | null;
   payment_link_send_count: number;
+  access_start_date: string | null;
+  access_end_date: string | null;
+  access_weekdays: number[] | null;
+  access_paused_from: string | null;
+  access_paused_until: string | null;
+  end_reminder_attempted_at: string | null;
+  end_reminder_sent_at: string | null;
   payment_key?: string | null;
   name: string;
   phone: string;

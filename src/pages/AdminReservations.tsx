@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
+import { isLongTermReservation } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import type {
   PaymentStatus,
@@ -42,6 +43,11 @@ type ReservationEdit = {
   pass_name_snapshot: string;
   price_at_booking: number | null;
   seat_type_id: string | null;
+  access_start_date: string | null;
+  access_end_date: string | null;
+  access_weekdays: number[] | null;
+  access_paused_from: string | null;
+  access_paused_until: string | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -808,6 +814,13 @@ function ReservationCard({
     end_time: (reservation.end_time ?? "12:00").slice(0, 5),
     people: reservation.people,
   });
+  const [accessDraft, setAccessDraft] = useState({
+    start: reservation.access_start_date ?? reservation.date,
+    end: reservation.access_end_date ?? reservation.date,
+    weekdays: reservation.access_weekdays ?? [0, 1, 2, 3, 4, 5, 6],
+    pausedFrom: reservation.access_paused_from ?? "",
+    pausedUntil: reservation.access_paused_until ?? "",
+  });
   const [copiedMessage, setCopiedMessage] = useState<"confirmed" | "canceled" | null>(null);
 
   useEffect(() => {
@@ -826,10 +839,18 @@ function ReservationCard({
       end_time: (reservation.end_time ?? "12:00").slice(0, 5),
       people: reservation.people,
     });
+    setAccessDraft({
+      start: reservation.access_start_date ?? reservation.date,
+      end: reservation.access_end_date ?? reservation.date,
+      weekdays: reservation.access_weekdays ?? [0, 1, 2, 3, 4, 5, 6],
+      pausedFrom: reservation.access_paused_from ?? "",
+      pausedUntil: reservation.access_paused_until ?? "",
+    });
   }, [reservation]);
 
   function save() {
     const selectedPass = passes.find((pass) => pass.name === bookingDraft.pass_type);
+    const longTerm = bookingDraft.pass_type.includes("주간권") || bookingDraft.pass_type.includes("월권");
     onSave({
       status,
       payment_method: paymentMethod || null,
@@ -844,6 +865,11 @@ function ReservationCard({
       pass_name_snapshot: selectedPass?.name ?? bookingDraft.pass_type,
       price_at_booking: selectedPass?.price ?? reservation.price_at_booking,
       seat_type_id: selectedPass?.seat_type_id ?? null,
+      access_start_date: longTerm ? accessDraft.start : null,
+      access_end_date: longTerm ? accessDraft.end : null,
+      access_weekdays: longTerm ? accessDraft.weekdays : null,
+      access_paused_from: longTerm && accessDraft.pausedFrom && accessDraft.pausedUntil ? accessDraft.pausedFrom : null,
+      access_paused_until: longTerm && accessDraft.pausedFrom && accessDraft.pausedUntil ? accessDraft.pausedUntil : null,
       date: bookingDraft.date,
       start_time: bookingDraft.start_time,
       end_time: bookingDraft.end_time,
@@ -991,6 +1017,52 @@ function ReservationCard({
         </div>
         <p className="mt-3 text-xs font-medium text-workroom-muted">수정한 내용은 아래 ‘변경사항 저장’을 눌러야 반영됩니다.</p>
       </details>
+
+      {isLongTermReservation(reservation) ? (
+        <details className="mt-3 rounded-card border border-workroom-line bg-white p-4" open>
+          <summary className="cursor-pointer text-sm font-black">주간권·월권 이용기간</summary>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용 시작일
+              <input type="date" value={accessDraft.start} onChange={(event) => setAccessDraft((current) => ({ ...current, start: event.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용 종료일
+              <input min={accessDraft.start} type="date" value={accessDraft.end} onChange={(event) => setAccessDraft((current) => ({ ...current, end: event.target.value }))} />
+            </label>
+          </div>
+          <fieldset className="mt-3">
+            <legend className="text-xs font-bold text-workroom-muted">이용 가능 요일</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {["일", "월", "화", "수", "목", "금", "토"].map((label, day) => (
+                <label className={`flex cursor-pointer items-center gap-1 rounded-[5px] border px-2.5 py-2 text-xs font-bold ${accessDraft.weekdays.includes(day) ? "border-workroom-ink bg-workroom-yellow" : "border-workroom-line bg-workroom-surface"}`} key={label}>
+                  <input
+                    checked={accessDraft.weekdays.includes(day)}
+                    className="h-4 w-4"
+                    onChange={(event) => setAccessDraft((current) => ({
+                      ...current,
+                      weekdays: event.target.checked
+                        ? [...current.weekdays, day].sort()
+                        : current.weekdays.length > 1
+                          ? current.weekdays.filter((item) => item !== day)
+                          : current.weekdays,
+                    }))}
+                    type="checkbox"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-xs font-bold text-workroom-muted">일시정지 시작
+              <input max={accessDraft.pausedUntil || undefined} type="date" value={accessDraft.pausedFrom} onChange={(event) => setAccessDraft((current) => ({ ...current, pausedFrom: event.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-xs font-bold text-workroom-muted">일시정지 종료
+              <input min={accessDraft.pausedFrom || undefined} type="date" value={accessDraft.pausedUntil} onChange={(event) => setAccessDraft((current) => ({ ...current, pausedUntil: event.target.value }))} />
+            </label>
+          </div>
+          <p className="mt-3 text-xs font-medium text-workroom-muted">휴무일과 일시정지 날짜는 회원 달력에서 이용 불가로 표시됩니다.</p>
+        </details>
+      ) : null}
 
       {inquiries.length ? (
         <div className="mt-5">
@@ -1255,6 +1327,7 @@ function smsEventLabel(event: string) {
     reservation_no_show: "노쇼 안내 문자",
     admin_cancellation: "관리자 취소 알림",
     admin_schedule_changed: "관리자 변경 알림",
+    reservation_end_reminder: "종료 20분 전 안내",
     manual_confirmed: "확정 문자 재전송",
     manual_canceled: "취소 문자 재전송",
   };

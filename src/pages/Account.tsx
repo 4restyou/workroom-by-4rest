@@ -1,12 +1,13 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
+import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import { formatDate, formatPhone, formatPrice, formatTimeRange, todayValue } from "../lib/format";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
-import type { Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
+import type { Attendance, BusinessDateException, BusinessHour, Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
 
 type AccountTab = "reservations" | "profile";
 
@@ -45,6 +46,10 @@ export default function Account() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
+  const [dateExceptions, setDateExceptions] = useState<BusinessDateException[]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const [inquiryDrafts, setInquiryDrafts] = useState<Record<string, string>>({});
   const [inquiryBusy, setInquiryBusy] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -90,22 +95,20 @@ export default function Account() {
           setReservations([]);
           setInquiries([]);
         } else {
-          const { data, error: reservationsError } = await supabase
-            .from("reservations")
-            .select("*")
-            .eq("profile_id", user.id)
-            .order("date", { ascending: false })
-            .order("created_at", { ascending: false });
+          const [reservationResult, inquiryResult, attendanceResult, hourResult, exceptionResult] = await Promise.all([
+            supabase.from("reservations").select("*").eq("profile_id", user.id).order("date", { ascending: false }).order("created_at", { ascending: false }),
+            supabase.from("reservation_inquiries").select("*").eq("profile_id", user.id).order("created_at", { ascending: true }),
+            supabase.from("attendance").select("*").eq("profile_id", user.id).order("check_in_at", { ascending: false }),
+            supabase.from("business_hours").select("*").order("weekday"),
+            supabase.from("business_date_exceptions").select("*").order("date"),
+          ]);
 
-          if (reservationsError) throw reservationsError;
-          setReservations((data ?? []) as Reservation[]);
-
-          const { data: inquiryData } = await supabase
-            .from("reservation_inquiries")
-            .select("*")
-            .eq("profile_id", user.id)
-            .order("created_at", { ascending: true });
-          setInquiries((inquiryData ?? []) as ReservationInquiry[]);
+          if (reservationResult.error) throw reservationResult.error;
+          setReservations((reservationResult.data ?? []) as Reservation[]);
+          setInquiries((inquiryResult.data ?? []) as ReservationInquiry[]);
+          setAttendance((attendanceResult.data ?? []) as Attendance[]);
+          setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
+          setDateExceptions((exceptionResult.data ?? []) as BusinessDateException[]);
         }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "내정보를 불러오지 못했습니다.");
@@ -118,12 +121,26 @@ export default function Account() {
   }, [navigate]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if (tabParam === "profile" || tabParam === "reservations") setActiveTab(tabParam);
   }, [tabParam]);
 
   useEffect(() => {
     if (profile?.role === "admin" && activeTab !== "profile") setActiveTab("profile");
   }, [activeTab, profile?.role]);
+
+  const orderedReservations = useMemo(() => {
+    const active = (reservation: Reservation) => reservation.status === "pending" || reservation.status === "confirmed";
+    return [...reservations].sort((a, b) => {
+      if (active(a) !== active(b)) return active(a) ? -1 : 1;
+      if (active(a)) return `${a.access_start_date ?? a.date} ${a.start_time ?? ""}`.localeCompare(`${b.access_start_date ?? b.date} ${b.start_time ?? ""}`);
+      return `${b.date} ${b.start_time ?? ""}`.localeCompare(`${a.date} ${a.start_time ?? ""}`);
+    });
+  }, [reservations]);
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -399,16 +416,18 @@ export default function Account() {
             ) : null}
 
             {activeTab === "reservations" && profile.role !== "admin" ? (
+              <>
+              <MemberReservationDashboard attendance={attendance} businessHours={businessHours} dateExceptions={dateExceptions} now={now} reservations={reservations} />
               <section className={`${card} p-5`}>
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-xl font-bold">내 예약</h2>
+                  <h2 className="text-xl font-bold">전체 예약 내역</h2>
                   <Link className={buttonClass("accent", "sm")} to="/reserve">
                     예약하기
                   </Link>
                 </div>
                 <div className="mt-4 grid gap-3">
                   {reservations.length ? (
-                    reservations.map((reservation) => {
+                    orderedReservations.map((reservation) => {
                       const active = reservation.status === "pending" || reservation.status === "confirmed";
                       return (
                         <article className={`${cardFlat} ${reservationStatusCardClass[reservation.status]} border p-4`} key={reservation.id}>
@@ -588,6 +607,7 @@ export default function Account() {
                   )}
                 </div>
               </section>
+              </>
             ) : null}
           </div>
         ) : null}

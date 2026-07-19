@@ -77,6 +77,22 @@ Supabase 대시보드 → **Database → Webhooks → Create a new hook**
 Solapi에 등록한 뒤, `sendSms` 의 Solapi 호출을 `kakaoOptions`(pfId/templateId)를 포함한
 알림톡 발송으로 바꾸면 됩니다(같은 `/messages/v4/send` 엔드포인트).
 
+## 이용 종료 20분 전 문자
+
+- 대상: 확정 상태이며 실제 입실 기록이 있고 아직 퇴실하지 않은 시간제·종일권
+- 제외: 주간권·월권, 취소·완료·노쇼, 미입실 예약
+- 중복 방지: DB에서 대상 예약을 먼저 1회 선점한 뒤 문자 발송
+- 실행 주기: Netlify Scheduled Function이 5분마다 `reservation-end-reminder`를 호출
+
+함수 배포:
+
+```bash
+supabase functions deploy reservation-end-reminder --no-verify-jwt
+```
+
+Netlify 환경 변수에는 프론트와 동일한 `VITE_SUPABASE_URL`이 있어야 합니다. 문자 발송 결과는
+관리자 예약 상세의 문자 발송 이력에 `reservation_end_reminder` 이벤트로 기록됩니다.
+
 ---
 
 # 결제 운영 — 결제 링크 / 현장 결제
