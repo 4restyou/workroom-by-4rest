@@ -22,6 +22,8 @@ export default function AdminStats() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [period, setPeriod] = useState<Period>("day");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -77,27 +79,40 @@ export default function AdminStats() {
 
   const priceByPassName = useMemo(() => new Map(passes.map((pass) => [pass.name, pass.price])), [passes]);
 
+  const visibleReservations = useMemo(
+    () => reservations.filter((reservation) => (!startDate || reservation.date >= startDate) && (!endDate || reservation.date <= endDate)),
+    [endDate, reservations, startDate],
+  );
+
   const summary = useMemo(() => {
-    const activeReservations = reservations.filter((reservation) => reservation.status !== "canceled" && reservation.status !== "no_show");
-    const paidReservations = reservations.filter((reservation) => reservation.status === "confirmed" || reservation.status === "completed");
-    const estimatedRevenue = paidReservations.reduce((total, reservation) => total + reservationRevenue(reservation, priceByPassName), 0);
+    const activeReservations = visibleReservations.filter((reservation) => reservation.status !== "canceled" && reservation.status !== "no_show");
+    const actualRevenue = visibleReservations
+      .filter((reservation) => reservation.payment_status === "paid")
+      .reduce((total, reservation) => total + reservationRevenue(reservation, priceByPassName), 0);
+    const receivable = activeReservations
+      .filter((reservation) => reservation.payment_status === "unpaid")
+      .reduce((total, reservation) => total + reservationRevenue(reservation, priceByPassName), 0);
+    const refunded = visibleReservations
+      .filter((reservation) => reservation.payment_status === "refunded")
+      .reduce((total, reservation) => total + reservationRevenue(reservation, priceByPassName), 0);
 
     return {
-      total: reservations.length,
-      pending: reservations.filter((reservation) => reservation.status === "pending").length,
-      confirmed: reservations.filter((reservation) => reservation.status === "confirmed").length,
-      completed: reservations.filter((reservation) => reservation.status === "completed").length,
-      canceled: reservations.filter((reservation) => reservation.status === "canceled").length,
-      noShow: reservations.filter((reservation) => reservation.status === "no_show").length,
+      total: visibleReservations.length,
+      pending: visibleReservations.filter((reservation) => reservation.status === "pending").length,
+      confirmed: visibleReservations.filter((reservation) => reservation.status === "confirmed").length,
+      completed: visibleReservations.filter((reservation) => reservation.status === "completed").length,
+      noShow: visibleReservations.filter((reservation) => reservation.status === "no_show").length,
       active: activeReservations.length,
-      estimatedRevenue,
+      actualRevenue,
+      receivable,
+      refunded,
     };
-  }, [priceByPassName, reservations]);
+  }, [priceByPassName, visibleReservations]);
 
   const groupedStats = useMemo(() => {
     const groups = new Map<string, { key: string; count: number; confirmed: number; completed: number; canceled: number; noShow: number; revenue: number }>();
 
-    reservations.forEach((reservation) => {
+    visibleReservations.forEach((reservation) => {
       const key = periodKey(reservation.date, period);
       const current = groups.get(key) ?? { key, count: 0, confirmed: 0, completed: 0, canceled: 0, noShow: 0, revenue: 0 };
       current.count += 1;
@@ -105,33 +120,42 @@ export default function AdminStats() {
       if (reservation.status === "completed") current.completed += 1;
       if (reservation.status === "canceled") current.canceled += 1;
       if (reservation.status === "no_show") current.noShow += 1;
-      if (reservation.status === "confirmed" || reservation.status === "completed") {
+      if (reservation.payment_status === "paid") {
         current.revenue += reservationRevenue(reservation, priceByPassName);
       }
       groups.set(key, current);
     });
 
     return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 14);
-  }, [period, priceByPassName, reservations]);
+  }, [period, priceByPassName, visibleReservations]);
 
   const passStats = useMemo(() => {
     const groups = new Map<string, { name: string; count: number; revenue: number }>();
-    reservations.forEach((reservation) => {
+    visibleReservations.forEach((reservation) => {
       const name = reservation.pass_name_snapshot || reservation.pass_type;
       const current = groups.get(name) ?? { name, count: 0, revenue: 0 };
       current.count += 1;
-      if (reservation.status === "confirmed" || reservation.status === "completed") {
+      if (reservation.payment_status === "paid") {
         current.revenue += reservationRevenue(reservation, priceByPassName);
       }
       groups.set(name, current);
     });
     return Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
-  }, [priceByPassName, reservations]);
+  }, [priceByPassName, visibleReservations]);
+
+  function setThisMonth() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+    setStartDate(`${year}-${month}-01`);
+    setEndDate(`${year}-${month}-${String(lastDay).padStart(2, "0")}`);
+  }
 
   return (
     <main className="pb-12">
       <Section eyebrow="Admin" title="운영 통계" accent="ink">
-        <div className={`mb-5 grid gap-3 ${card} p-4 sm:grid-cols-[1fr_auto_auto] sm:items-end`}>
+        <div className={`mb-5 grid gap-3 ${card} p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto_auto] lg:items-end`}>
           <label className="grid gap-2 text-sm font-bold">
             집계 기준
             <select value={period} onChange={(event) => setPeriod(event.target.value as Period)}>
@@ -142,12 +166,25 @@ export default function AdminStats() {
               ))}
             </select>
           </label>
+          <label className="grid gap-2 text-sm font-bold">
+            시작일
+            <input max={endDate || undefined} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </label>
+          <label className="grid gap-2 text-sm font-bold">
+            종료일
+            <input min={startDate || undefined} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </label>
           <button className={buttonClass("accent", "md")} onClick={loadStats} type="button">
             새로고침
           </button>
           <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
             예약관리
           </Link>
+          <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-5">
+            <button className={buttonClass("secondary", "sm")} onClick={setThisMonth} type="button">이번 달</button>
+            <button className={buttonClass("secondary", "sm")} onClick={() => { setStartDate(""); setEndDate(""); }} type="button">전체 기간</button>
+            <span className="self-center text-xs font-bold text-workroom-muted">선택 기간 {visibleReservations.length}건</span>
+          </div>
         </div>
 
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>통계를 불러오는 중입니다.</p> : null}
@@ -159,7 +196,9 @@ export default function AdminStats() {
           <StatCard label="확정/이용완료" value={`${summary.confirmed + summary.completed}건`} />
           <StatCard label="노쇼" value={`${summary.noShow}건`} />
           <StatCard label="노쇼율" value={`${summary.total ? Math.round((summary.noShow / summary.total) * 100) : 0}%`} />
-          <StatCard label="예상 매출" value={formatPrice(summary.estimatedRevenue)} />
+          <StatCard label="실결제 매출" value={formatPrice(summary.actualRevenue)} />
+          <StatCard label="미수금" value={formatPrice(summary.receivable)} />
+          <StatCard label="환불 처리 금액" value={formatPrice(summary.refunded)} />
         </div>
 
         <section className={`mt-5 ${card} p-5`}>
@@ -177,7 +216,7 @@ export default function AdminStats() {
                   <th className="px-3 py-2">이용완료</th>
                   <th className="px-3 py-2">취소</th>
                   <th className="px-3 py-2">노쇼</th>
-                  <th className="px-3 py-2">예상 매출</th>
+                  <th className="px-3 py-2">실결제 매출</th>
                 </tr>
               </thead>
               <tbody>

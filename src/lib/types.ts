@@ -11,6 +11,7 @@ export type Profile = {
   address: string | null;
   role: "admin" | "user";
   membership_status: MemberStatus;
+  admin_note: string | null;
   consented_at: string | null;
   created_at: string;
 };

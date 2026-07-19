@@ -7,6 +7,8 @@ import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 
 type AttendanceRow = {
   id: string;
+  profile_id: string;
+  reservation_id: string | null;
   check_in_at: string;
   check_out_at: string | null;
   profile: { full_name: string | null; phone: string | null } | null;
@@ -18,6 +20,7 @@ type CouponRow = {
   label: string;
   status: "issued" | "used";
   issued_at: string;
+  used_at: string | null;
   profile: { full_name: string | null } | null;
 };
 
@@ -25,8 +28,8 @@ function kstDate(value: string | Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
 }
 
-function hhmm(value: string): string {
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+function dateTime(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 export default function AdminAttendance() {
@@ -35,26 +38,32 @@ export default function AdminAttendance() {
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
   async function load() {
     if (!supabase) return;
     setIsLoading(true);
-    const [{ data: att }, { data: cps }] = await Promise.all([
+    setError("");
+    const [attendanceResult, couponResult] = await Promise.all([
       supabase
         .from("attendance")
-        .select("id,check_in_at,check_out_at,profile:profiles(full_name,phone)")
+        .select("id,profile_id,reservation_id,check_in_at,check_out_at,profile:profiles(full_name,phone)")
         .order("check_in_at", { ascending: false })
-        .limit(200),
+        .limit(500),
       supabase
         .from("coupons")
-        .select("id,code,label,status,issued_at,profile:profiles(full_name)")
+        .select("id,code,label,status,issued_at,used_at,profile:profiles(full_name)")
         .order("issued_at", { ascending: false })
-        .limit(100),
+        .limit(500),
     ]);
-    setRows((att ?? []) as unknown as AttendanceRow[]);
-    setCoupons((cps ?? []) as unknown as CouponRow[]);
     setIsLoading(false);
+    if (attendanceResult.error || couponResult.error) {
+      setError(attendanceResult.error?.message ?? couponResult.error?.message ?? "데이터를 불러오지 못했습니다.");
+      return;
+    }
+    setRows((attendanceResult.data ?? []) as unknown as AttendanceRow[]);
+    setCoupons((couponResult.data ?? []) as unknown as CouponRow[]);
   }
 
   useEffect(() => {
@@ -79,88 +88,159 @@ export default function AdminAttendance() {
     void checkAndLoad();
   }, [navigate]);
 
-  async function redeemCoupon(id: string) {
+  async function updateAttendance(id: string, payload: { check_in_at?: string; check_out_at?: string | null }, message: string) {
     if (!supabase) return;
-    if (!window.confirm("이 쿠폰을 사용 처리할까요?")) return;
     setBusy(id);
-    const { error: updateError } = await supabase
-      .from("coupons")
-      .update({ status: "used", used_at: new Date().toISOString() })
-      .eq("id", id);
+    const { error: updateError } = await supabase.from("attendance").update(payload).eq("id", id);
     setBusy(null);
     if (updateError) {
       setError(updateError.message);
       return;
     }
-    setCoupons((current) => current.map((c) => (c.id === id ? { ...c, status: "used" } : c)));
+    setRows((current) => current.map((row) => (row.id === id ? { ...row, ...payload } : row)));
+    setError("");
+    setSuccess(message);
+  }
+
+  async function deleteAttendance(id: string) {
+    if (!supabase || !window.confirm("잘못 등록된 출석 기록을 삭제할까요? 삭제 이력은 관리자 감사 기록에 남습니다.")) return;
+    setBusy(id);
+    const { error: deleteError } = await supabase.from("attendance").delete().eq("id", id);
+    setBusy(null);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setRows((current) => current.filter((row) => row.id !== id));
+    setError("");
+    setSuccess("출석 기록을 삭제했습니다.");
+  }
+
+  async function changeCoupon(coupon: CouponRow, nextStatus: "issued" | "used") {
+    if (!supabase) return;
+    const action = nextStatus === "used" ? "사용" : "사용 취소";
+    if (!window.confirm(`이 쿠폰을 ${action} 처리할까요?`)) return;
+    setBusy(coupon.id);
+    const usedAt = nextStatus === "used" ? new Date().toISOString() : null;
+    const { error: updateError } = await supabase.from("coupons").update({ status: nextStatus, used_at: usedAt }).eq("id", coupon.id);
+    setBusy(null);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setCoupons((current) => current.map((item) => (item.id === coupon.id ? { ...item, status: nextStatus, used_at: usedAt } : item)));
+    setError("");
+    setSuccess(`쿠폰을 ${action} 처리했습니다.`);
   }
 
   const today = kstDate(new Date());
-  const todays = rows.filter((r) => kstDate(r.check_in_at) === today);
-  const pendingCoupons = coupons.filter((c) => c.status === "issued");
+  const todays = rows.filter((row) => kstDate(row.check_in_at) === today);
+  const recent = rows.filter((row) => kstDate(row.check_in_at) !== today).slice(0, 50);
+  const pendingCoupons = coupons.filter((coupon) => coupon.status === "issued");
+  const usedCoupons = coupons.filter((coupon) => coupon.status === "used");
 
   return (
     <main className="pb-12">
-      <Section eyebrow="Admin" title="출근 현황" accent="ink">
+      <Section eyebrow="Admin" title="출석 관리" accent="ink">
         <div className="mb-5 flex flex-wrap gap-2">
-          <button className={buttonClass("accent", "md")} onClick={() => void load()} type="button">
-            새로고침
-          </button>
-          <Link className={buttonClass("secondary", "md")} to="/admin/settings">
-            QR · 설정
-          </Link>
-          <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
-            예약관리
-          </Link>
+          <button className={buttonClass("accent", "md")} onClick={() => void load()} type="button">새로고침</button>
+          <Link className={buttonClass("secondary", "md")} to="/admin/settings">QR · 설정</Link>
+          <Link className={buttonClass("secondary", "md")} to="/admin/reservations">예약관리</Link>
         </div>
 
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
+        {success ? <p className={`mb-4 ${tintCard("mint")} p-4 text-sm font-bold`}>{success}</p> : null}
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>불러오는 중입니다…</p> : null}
 
-        <p className={`mb-3 ${tintCard("yellow")} p-4 text-sm font-bold`}>오늘 출근 {todays.length}명</p>
+        <p className={`mb-3 ${tintCard("yellow")} p-4 text-sm font-bold`}>오늘 출석 {todays.length}명 · 이용 중 {todays.filter((row) => !row.check_out_at).length}명</p>
         <div className="mb-8 grid gap-2">
-          {todays.length ? (
-            todays.map((r) => (
-              <div className={`${card} flex items-center justify-between gap-3 p-4`} key={r.id}>
-                <div>
-                  <p className="font-bold">{r.profile?.full_name || "이름 미입력"}</p>
-                  {r.profile?.phone ? <p className="text-xs font-medium text-workroom-muted">{r.profile.phone}</p> : null}
-                </div>
-                <div className="text-right text-sm">
-                  <p className="font-bold">{hhmm(r.check_in_at)} 출근</p>
-                  <p className="font-medium text-workroom-muted">{r.check_out_at ? `${hhmm(r.check_out_at)} 퇴근` : "근무 중"}</p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className={`${cardFlat} p-4 text-sm font-medium text-workroom-muted`}>오늘 출근한 회원이 없습니다.</p>
-          )}
+          {todays.length ? todays.map((row) => (
+            <AttendanceCard busy={busy === row.id} key={row.id} onDelete={() => void deleteAttendance(row.id)} onSave={(payload) => void updateAttendance(row.id, payload, "출석 시간을 정정했습니다.")} onCheckout={() => void updateAttendance(row.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} row={row} />
+          )) : <p className={`${cardFlat} p-4 text-sm font-medium text-workroom-muted`}>오늘 출석한 회원이 없습니다.</p>}
+        </div>
+
+        <h2 className="mb-3 text-lg font-black">최근 출석 기록</h2>
+        <div className="mb-8 grid gap-2">
+          {recent.length ? recent.map((row) => (
+            <AttendanceCard busy={busy === row.id} key={row.id} onDelete={() => void deleteAttendance(row.id)} onSave={(payload) => void updateAttendance(row.id, payload, "출석 시간을 정정했습니다.")} onCheckout={() => void updateAttendance(row.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} row={row} />
+          )) : <p className={`${cardFlat} p-4 text-sm font-medium text-workroom-muted`}>지난 출석 기록이 없습니다.</p>}
         </div>
 
         <h2 className="mb-3 text-lg font-black">사용 가능한 쿠폰 ({pendingCoupons.length})</h2>
         <div className="grid gap-2">
-          {pendingCoupons.length ? (
-            pendingCoupons.map((c) => (
-              <div className={`${card} flex flex-wrap items-center justify-between gap-3 p-4`} key={c.id}>
-                <div>
-                  <p className="font-bold">
-                    {c.profile?.full_name || "회원"} · {c.label}
-                  </p>
-                  <p className="text-xs font-bold text-workroom-muted">코드 {c.code}</p>
-                </div>
-                <button className={buttonClass("primary", "sm")} disabled={busy === c.id} onClick={() => void redeemCoupon(c.id)} type="button">
-                  {busy === c.id ? "처리 중…" : "사용 처리"}
-                </button>
-              </div>
-            ))
-          ) : (
-            <p className={`${cardFlat} p-4 text-sm font-medium text-workroom-muted`}>사용 대기 중인 쿠폰이 없습니다.</p>
-          )}
-          {coupons.some((c) => c.status === "used") ? (
-            <span className={`${badge("lilac")} mt-1`}>사용완료 {coupons.filter((c) => c.status === "used").length}장</span>
-          ) : null}
+          {pendingCoupons.length ? pendingCoupons.map((coupon) => (
+            <CouponCard busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "used")} />
+          )) : <p className={`${cardFlat} p-4 text-sm font-medium text-workroom-muted`}>사용 대기 중인 쿠폰이 없습니다.</p>}
         </div>
+
+        <details className={`${card} mt-5 p-4`}>
+          <summary className="cursor-pointer font-black">사용 완료 쿠폰 ({usedCoupons.length})</summary>
+          <div className="mt-3 grid gap-2">
+            {usedCoupons.map((coupon) => <CouponCard busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "issued")} />)}
+            {!usedCoupons.length ? <p className={`${cardFlat} p-4 text-sm text-workroom-muted`}>사용 완료된 쿠폰이 없습니다.</p> : null}
+          </div>
+        </details>
       </Section>
     </main>
   );
+}
+
+function AttendanceCard({ busy, onCheckout, onDelete, onSave, row }: {
+  busy: boolean;
+  onCheckout: () => void;
+  onDelete: () => void;
+  onSave: (payload: { check_in_at: string; check_out_at: string | null }) => void;
+  row: AttendanceRow;
+}) {
+  const [checkIn, setCheckIn] = useState(toKstInput(row.check_in_at));
+  const [checkOut, setCheckOut] = useState(row.check_out_at ? toKstInput(row.check_out_at) : "");
+  return (
+    <article className={`${card} p-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-black">{row.profile?.full_name || "이름 미입력"}</p>
+          {row.profile?.phone ? <a className="text-xs font-bold text-workroom-muted underline" href={`tel:${row.profile.phone}`}>{row.profile.phone}</a> : null}
+          <p className="mt-1 text-xs font-medium text-workroom-muted">{dateTime(row.check_in_at)} 입실{row.check_out_at ? ` · ${dateTime(row.check_out_at)} 퇴실` : ""}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className={badge(row.check_out_at ? "sky" : "mint")}>{row.check_out_at ? "퇴실" : "이용 중"}</span>
+          {!row.check_out_at ? <button className={buttonClass("primary", "sm")} disabled={busy} onClick={onCheckout} type="button">퇴실 처리</button> : null}
+        </div>
+      </div>
+      <details className="mt-3 border-t border-workroom-line pt-3">
+        <summary className="cursor-pointer text-xs font-bold text-workroom-muted">시간 정정 · 기록 삭제</summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs font-bold">입실 시간<input type="datetime-local" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
+          <label className="grid gap-1 text-xs font-bold">퇴실 시간<input type="datetime-local" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className={buttonClass("secondary", "sm")} disabled={busy || !checkIn} onClick={() => onSave({ check_in_at: fromKstInput(checkIn), check_out_at: checkOut ? fromKstInput(checkOut) : null })} type="button">시간 저장</button>
+          <button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onDelete} type="button">잘못된 기록 삭제</button>
+        </div>
+      </details>
+    </article>
+  );
+}
+
+function CouponCard({ busy, coupon, onClick }: { busy: boolean; coupon: CouponRow; onClick: () => void }) {
+  const isUsed = coupon.status === "used";
+  return (
+    <div className={`${card} flex flex-wrap items-center justify-between gap-3 p-4`}>
+      <div>
+        <p className="font-bold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p>
+        <p className="text-xs font-bold text-workroom-muted">코드 {coupon.code}{coupon.used_at ? ` · ${dateTime(coupon.used_at)} 사용` : ""}</p>
+      </div>
+      <button className={buttonClass(isUsed ? "secondary" : "primary", "sm")} disabled={busy} onClick={onClick} type="button">{busy ? "처리 중…" : isUsed ? "사용 취소" : "사용 처리"}</button>
+    </div>
+  );
+}
+
+function toKstInput(value: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+function fromKstInput(value: string) {
+  return new Date(`${value}:00+09:00`).toISOString();
 }
