@@ -85,22 +85,28 @@ export default function Account() {
         });
         setConsent(Boolean(loadedProfile?.consented_at));
 
-        const { data, error: reservationsError } = await supabase
-          .from("reservations")
-          .select("*")
-          .eq("profile_id", user.id)
-          .order("date", { ascending: false })
-          .order("created_at", { ascending: false });
+        if (loadedProfile?.role === "admin") {
+          setActiveTab("profile");
+          setReservations([]);
+          setInquiries([]);
+        } else {
+          const { data, error: reservationsError } = await supabase
+            .from("reservations")
+            .select("*")
+            .eq("profile_id", user.id)
+            .order("date", { ascending: false })
+            .order("created_at", { ascending: false });
 
-        if (reservationsError) throw reservationsError;
-        setReservations((data ?? []) as Reservation[]);
+          if (reservationsError) throw reservationsError;
+          setReservations((data ?? []) as Reservation[]);
 
-        const { data: inquiryData } = await supabase
-          .from("reservation_inquiries")
-          .select("*")
-          .eq("profile_id", user.id)
-          .order("created_at", { ascending: true });
-        setInquiries((inquiryData ?? []) as ReservationInquiry[]);
+          const { data: inquiryData } = await supabase
+            .from("reservation_inquiries")
+            .select("*")
+            .eq("profile_id", user.id)
+            .order("created_at", { ascending: true });
+          setInquiries((inquiryData ?? []) as ReservationInquiry[]);
+        }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "내정보를 불러오지 못했습니다.");
       } finally {
@@ -114,6 +120,10 @@ export default function Account() {
   useEffect(() => {
     if (tabParam === "profile" || tabParam === "reservations") setActiveTab(tabParam);
   }, [tabParam]);
+
+  useEffect(() => {
+    if (profile?.role === "admin" && activeTab !== "profile") setActiveTab("profile");
+  }, [activeTab, profile?.role]);
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -267,14 +277,14 @@ export default function Account() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="My Page" title="내정보" accent="mint">
+      <Section eyebrow={profile?.role === "admin" ? "Admin Account" : "My Page"} title={profile?.role === "admin" ? "관리자 계정" : "내정보"} accent="mint">
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>내정보를 불러오는 중입니다.</p> : null}
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
 
         {!isLoading && profile ? (
           <div>
             <div className={`mb-5 flex flex-wrap gap-2 ${cardFlat} p-2`}>
-              {(Object.keys(tabLabels) as AccountTab[]).map((tab) => (
+              {((profile.role === "admin" ? ["profile"] : Object.keys(tabLabels)) as AccountTab[]).map((tab) => (
                 <button
                   className={`rounded-[5px] border px-5 py-2.5 text-sm font-bold transition-colors ${
                     activeTab === tab
@@ -298,13 +308,21 @@ export default function Account() {
                   </p>
                 ) : null}
                 <div>
-                  <p className="text-sm font-bold text-workroom-muted">회원</p>
-                  <p className="mt-1 text-2xl font-bold">{profile.full_name || "내 정보"}</p>
+                  <p className="text-sm font-bold text-workroom-muted">{profile.role === "admin" ? "관리자" : "회원"}</p>
+                  <p className="mt-1 text-2xl font-bold">{profile.full_name || (profile.role === "admin" ? "관리자 계정" : "내 정보")}</p>
                 </div>
                 {profile.role === "admin" ? (
-                  <Link className={buttonClass("accent", "md")} to="/admin/reservations">
-                    관리자 페이지로 이동
-                  </Link>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Link className={buttonClass("accent", "md")} to="/admin/reservations">
+                      예약관리
+                    </Link>
+                    <Link className={buttonClass("secondary", "md")} to="/admin/members">
+                      회원관리
+                    </Link>
+                    <Link className={buttonClass("secondary", "md")} to="/admin/stats">
+                      통계
+                    </Link>
+                  </div>
                 ) : null}
 
                 <label className="grid gap-2 text-sm font-bold">
@@ -320,7 +338,9 @@ export default function Account() {
                     <span className="ml-1 align-middle text-xs font-bold text-red-600">필수</span>
                   </span>
                   <input required value={form.full_name} onChange={(event) => updateField("full_name", event.target.value)} />
-                  <span className="text-xs font-medium text-workroom-muted">예약자 확인을 위해 알아볼 수 있는 본명으로 적어 주세요.</span>
+                  <span className="text-xs font-medium text-workroom-muted">
+                    {profile.role === "admin" ? "관리 화면에서 표시될 이름입니다." : "예약자 확인을 위해 알아볼 수 있는 본명으로 적어 주세요."}
+                  </span>
                 </label>
                 <label className="grid gap-2 text-sm font-bold">
                   <span>
@@ -359,6 +379,7 @@ export default function Account() {
                   {isSaving ? "저장 중…" : "내정보 저장"}
                 </button>
 
+                {profile.role !== "admin" ? (
                 <div className="mt-2 border-t-2 border-workroom-line pt-4">
                   <p className="text-sm font-bold">회원 탈퇴</p>
                   <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">
@@ -373,10 +394,11 @@ export default function Account() {
                     {actionBusy === "withdraw" ? "처리 중…" : "회원 탈퇴"}
                   </button>
                 </div>
+                ) : null}
               </form>
             ) : null}
 
-            {activeTab === "reservations" ? (
+            {activeTab === "reservations" && profile.role !== "admin" ? (
               <section className={`${card} p-5`}>
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-bold">내 예약</h2>

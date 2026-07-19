@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 
 type Tab = {
@@ -75,25 +76,55 @@ const guestTabs: Tab[] = [
   { to: "/login", label: "로그인", icon: loginIcon, match: (p) => p.startsWith("/login") },
 ];
 
+const adminTabs: Tab[] = [
+  { to: "/", label: "홈", icon: homeIcon, match: (p) => p === "/" },
+  { to: "/admin/reservations", label: "예약", icon: reserveIcon, match: (p) => p.startsWith("/admin/reservations") },
+  { to: "/admin/members", label: "회원", icon: userIcon, match: (p) => p.startsWith("/admin/members") },
+  { to: "/admin/stats", label: "통계", icon: infoIcon, match: (p) => p.startsWith("/admin/stats") },
+];
+
 export default function BottomTabBar() {
   const location = useLocation();
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [role, setRole] = useState<"guest" | "user" | "admin" | null>(null);
 
   useEffect(() => {
-    if (!supabase) {
-      setSignedIn(false);
-      return;
+    let active = true;
+    async function loadRole() {
+      if (!supabase) {
+        setRole("guest");
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      if (!data.session) {
+        setRole("guest");
+        return;
+      }
+      const profile = await getCurrentProfile();
+      if (!active) return;
+      setRole(profile?.role === "admin" ? "admin" : "user");
     }
-    void supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+
+    void loadRole();
+    if (!supabase) {
+      return () => {
+        active = false;
+      };
+    }
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
-    return () => subscription.unsubscribe();
+    } = supabase.auth.onAuthStateChange(() => {
+      void loadRole();
+    });
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Until we know, assume guest tabs (they overlap on 홈/예약 so there's no flicker
   // on the most common landing paths).
-  const tabs = signedIn ? memberTabs : guestTabs;
+  const tabs = role === "admin" ? adminTabs : role === "user" ? memberTabs : guestTabs;
 
   return (
     <nav

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import AdminDashboard from "../components/AdminDashboard";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
 import { AlertIcon, BusIcon, CheckIcon, IdCardIcon, ParkingIcon, PinIcon, SubwayIcon } from "../components/icons";
 import MemberDashboard from "../components/MemberDashboard";
 import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
+import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { badge, buttonClass, card, pressable, tintCard, type TintColor } from "../lib/ui";
 import type { Pass } from "../lib/types";
@@ -96,20 +98,43 @@ const heroPhotos = [
 
 export default function Home() {
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [viewerRole, setViewerRole] = useState<"guest" | "user" | "admin" | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
   const photoScrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!supabase) {
-      setSignedIn(false);
-      return;
+    let active = true;
+    async function loadViewerRole() {
+      if (!supabase) {
+        setViewerRole("guest");
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      if (!data.session) {
+        setViewerRole("guest");
+        return;
+      }
+      const profile = await getCurrentProfile();
+      if (!active) return;
+      setViewerRole(profile?.role === "admin" ? "admin" : "user");
     }
-    void supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+
+    void loadViewerRole();
+    if (!supabase) {
+      return () => {
+        active = false;
+      };
+    }
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
-    return () => subscription.unsubscribe();
+    } = supabase.auth.onAuthStateChange(() => {
+      void loadViewerRole();
+    });
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -173,7 +198,9 @@ export default function Home() {
     <main className="pb-28 sm:pb-0">
       {/* Signed-in members get a "today" dashboard in place of the marketing
           hero; visitors (and the initial unknown state) see the hero. */}
-      {signedIn ? (
+      {viewerRole === "admin" ? (
+        <AdminDashboard />
+      ) : viewerRole === "user" ? (
         <MemberDashboard />
       ) : (
         <section className="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:px-6 sm:pb-16 sm:pt-16">

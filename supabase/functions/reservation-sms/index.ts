@@ -149,6 +149,12 @@ Deno.serve(async (request) => {
         await sendSms(row.phone, `[WORKROOM] ${message}\n${reservationLine(row)}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`);
       }
 
+      // Operator-facing: every cancellation should be visible even when the
+      // member cancels from their own reservation page.
+      if (ADMIN_PHONE && statusChanged && row.status === "canceled") {
+        await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 취소\n${row.name} / ${reservationLine(row)}\n예약관리에서 확인해 주세요.\n${SITE_URL}`);
+      }
+
       // Operator-facing: the member edited the date/time (re-request).
       if (ADMIN_PHONE && timeChanged) {
         await sendSms(ADMIN_PHONE, `[WORKROOM] 예약 변경 요청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`);

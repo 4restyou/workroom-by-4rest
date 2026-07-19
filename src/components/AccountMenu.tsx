@@ -39,7 +39,7 @@ export default function AccountMenu({ isAdmin = false }: { isAdmin?: boolean }) 
         aria-expanded={open}
         className="flex items-center gap-1 transition-colors hover:text-workroom-ink"
       >
-        내정보
+        {isAdmin ? "관리자" : "내정보"}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <polyline points="6 9 12 15 18 9" />
         </svg>
@@ -62,7 +62,7 @@ export default function AccountMenu({ isAdmin = false }: { isAdmin?: boolean }) 
             </Link>
           ) : null}
           <Link className={itemClass} to="/account?tab=profile" onClick={() => setOpen(false)}>
-            회원정보
+            {isAdmin ? "관리자 계정" : "회원정보"}
           </Link>
           <button className={itemClass} onClick={() => void signOut()} type="button">
             로그아웃

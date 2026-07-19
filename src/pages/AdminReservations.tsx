@@ -16,7 +16,7 @@ import type {
 import { buttonClass, card, tintCard } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
-const statusTabs: ("all" | ReservationStatus)[] = ["all", ...statusOptions];
+const statusTabs: ("all" | ReservationStatus)[] = ["pending", "confirmed", "all", "canceled", "completed", "no_show"];
 const paymentStatusLabels: Record<PaymentStatus, string> = {
   unpaid: "미결제",
   paid: "결제완료",
@@ -40,19 +40,19 @@ const statusHelp: Record<ReservationStatus, string> = {
 };
 
 const statusListClass: Record<ReservationStatus, string> = {
-  pending: "border-workroom-ink bg-workroom-yellow/45",
-  confirmed: "border-workroom-ink bg-workroom-sky",
+  pending: "border-workroom-ink bg-workroom-yellow/20",
+  confirmed: "border-workroom-line bg-workroom-sky/35",
   canceled: "border-workroom-line bg-workroom-surface opacity-70",
-  completed: "border-workroom-ink bg-workroom-ink text-white",
-  no_show: "border-workroom-ink bg-workroom-danger",
+  completed: "border-workroom-line bg-workroom-surface",
+  no_show: "border-workroom-line bg-workroom-danger/20",
 };
 
-const statusAccentClass: Record<ReservationStatus, string> = {
-  pending: "bg-workroom-yellow",
-  confirmed: "bg-workroom-sky",
-  canceled: "bg-workroom-line",
-  completed: "bg-workroom-ink",
-  no_show: "bg-workroom-danger",
+const statusMetaClass: Record<ReservationStatus, string> = {
+  pending: "bg-workroom-yellow text-workroom-ink",
+  confirmed: "bg-workroom-sky text-workroom-ink",
+  canceled: "bg-workroom-surface text-workroom-muted",
+  completed: "bg-workroom-ink text-white",
+  no_show: "bg-workroom-danger text-workroom-ink",
 };
 
 const statusPanelClass: Record<ReservationStatus, string> = {
@@ -63,14 +63,19 @@ const statusPanelClass: Record<ReservationStatus, string> = {
   no_show: "border-workroom-ink bg-workroom-danger/70",
 };
 
+function isReservationStatus(value: string | null): value is ReservationStatus {
+  return Boolean(value && statusOptions.includes(value as ReservationStatus));
+}
+
 export default function AdminReservations() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const reservationParam = searchParams.get("reservation");
+  const statusParam = searchParams.get("status");
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [dateFilter, setDateFilter] = useState("");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>(isReservationStatus(statusParam) ? statusParam : "pending");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
@@ -187,6 +192,11 @@ export default function AdminReservations() {
       setSelectedReservationId(reservationParam);
     }
   }, [reservationParam, reservations]);
+
+  useEffect(() => {
+    if (reservationParam) return;
+    if (isReservationStatus(statusParam)) setStatusFilter(statusParam);
+  }, [reservationParam, statusParam]);
 
   useEffect(() => {
     async function loadInquiries() {
@@ -434,15 +444,20 @@ function ReservationListItem({
   const selectedClass = isSelected
     ? "border-workroom-ink bg-workroom-yellow"
     : `${statusListClass[reservation.status]} transition-colors hover:border-workroom-ink`;
-  const mutedText = !isSelected && reservation.status === "completed" ? "text-white/70" : "text-workroom-muted";
+  const mutedText = "text-workroom-muted";
 
   return (
     <button
-      className={`relative overflow-hidden rounded-card border px-4 py-3 text-left ${selectedClass}`}
+      className={`rounded-card border px-4 py-3 text-left ${selectedClass}`}
       onClick={onSelect}
       type="button"
     >
-      <span className={`absolute inset-y-0 left-0 w-2 ${statusAccentClass[reservation.status]}`} aria-hidden />
+      <div className="mb-3 flex items-center justify-between gap-2 border-b border-workroom-line pb-2">
+        <span className={`rounded-[4px] border border-workroom-ink px-2 py-1 text-[11px] font-black ${statusMetaClass[reservation.status]}`}>
+          {statusHelp[reservation.status]}
+        </span>
+        {reservation.deleted_at ? <span className="text-[11px] font-bold text-workroom-muted">보관됨</span> : null}
+      </div>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold">{reservation.name}</p>
@@ -450,11 +465,9 @@ function ReservationListItem({
             {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
           </p>
           <p className={`mt-1 text-xs font-medium ${mutedText}`}>{reservation.pass_name_snapshot || reservation.pass_type}</p>
-          <p className={`mt-2 text-[11px] font-bold ${mutedText}`}>{statusHelp[reservation.status]}</p>
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
-          {reservation.deleted_at ? <span className={`text-[11px] font-bold ${mutedText}`}>보관됨</span> : null}
         </div>
       </div>
     </button>
@@ -477,7 +490,7 @@ function StatusTab({
   const activeClass =
     status === "all"
       ? "border-workroom-ink bg-workroom-ink text-white"
-      : statusListClass[status].replace("opacity-70", "").replace("opacity-85", "");
+      : statusMetaClass[status];
 
   return (
     <button
