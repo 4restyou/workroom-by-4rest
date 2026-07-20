@@ -102,6 +102,12 @@ export default function Home() {
   const [viewerRole, setViewerRole] = useState<"guest" | "user" | "admin" | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
   const photoScrollerRef = useRef<HTMLDivElement>(null);
+  // Carousel coordination: while we drive a smooth scroll ourselves, onScroll
+  // must not "correct" the index mid-flight (that fight made auto-advance snap
+  // back and flicker). User interaction also pauses the autoplay timer.
+  const programmaticUntil = useRef(0);
+  const scrollIdleTimer = useRef<number | null>(null);
+  const autoplayPaused = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -155,27 +161,45 @@ export default function Home() {
     void loadPasses();
   }, []);
 
+  // Autoplay. Keyed on activePhoto so any change (auto, dot, arrow, swipe)
+  // restarts the 4.5s countdown — no jarring jump right after a manual move.
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const interval = window.setInterval(() => {
+      if (autoplayPaused.current) return;
       setActivePhoto((current) => (current + 1) % heroPhotos.length);
     }, 4500);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [activePhoto]);
 
   useEffect(() => {
     const scroller = photoScrollerRef.current;
     if (!scroller) return;
+    const target = activePhoto * scroller.clientWidth;
+    if (Math.abs(scroller.scrollLeft - target) < 2) return;
+    programmaticUntil.current = Date.now() + 800;
     scroller.scrollTo({
-      left: activePhoto * scroller.clientWidth,
+      left: target,
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     });
   }, [activePhoto]);
 
   function handlePhotoScroll() {
-    const scroller = photoScrollerRef.current;
-    if (!scroller) return;
-    const nextIndex = Math.round(scroller.scrollLeft / scroller.clientWidth);
-    if (nextIndex !== activePhoto) setActivePhoto(nextIndex);
+    // Ignore the scroll events produced by our own smooth scroll.
+    if (Date.now() < programmaticUntil.current) return;
+    // Manual swipe: update the index only once scrolling has settled, so the
+    // snap animation isn't interrupted halfway.
+    if (scrollIdleTimer.current) window.clearTimeout(scrollIdleTimer.current);
+    scrollIdleTimer.current = window.setTimeout(() => {
+      const scroller = photoScrollerRef.current;
+      if (!scroller) return;
+      const nextIndex = Math.round(scroller.scrollLeft / scroller.clientWidth);
+      setActivePhoto((current) => (nextIndex !== current ? nextIndex : current));
+    }, 90);
+  }
+
+  function stepPhoto(delta: number) {
+    setActivePhoto((current) => (current + delta + heroPhotos.length) % heroPhotos.length);
   }
 
   async function shareLocation() {
@@ -230,10 +254,24 @@ export default function Home() {
 
             <div className="sm:col-span-6">
               <div className="overflow-hidden border border-workroom-ink bg-workroom-surface">
-                <div className="relative">
+                <div
+                  className="group relative"
+                  onMouseEnter={() => {
+                    autoplayPaused.current = true;
+                  }}
+                  onMouseLeave={() => {
+                    autoplayPaused.current = false;
+                  }}
+                  onTouchStart={() => {
+                    autoplayPaused.current = true;
+                  }}
+                  onTouchEnd={() => {
+                    autoplayPaused.current = false;
+                  }}
+                >
                   <div
                     aria-label="WORKROOM 공간 사진"
-                    className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto scroll-smooth"
+                    className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
                     onScroll={handlePhotoScroll}
                     ref={photoScrollerRef}
                   >
@@ -247,6 +285,28 @@ export default function Home() {
                       />
                     ))}
                   </div>
+
+                  <button
+                    aria-label="이전 사진"
+                    className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-workroom-ink bg-workroom-surface/90 text-workroom-ink transition-[transform,opacity] duration-150 ease-out hover:scale-105 active:scale-95 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                    onClick={() => stepPhoto(-1)}
+                    type="button"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <button
+                    aria-label="다음 사진"
+                    className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-workroom-ink bg-workroom-surface/90 text-workroom-ink transition-[transform,opacity] duration-150 ease-out hover:scale-105 active:scale-95 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                    onClick={() => stepPhoto(1)}
+                    type="button"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+
                   <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-pill border border-workroom-ink bg-workroom-surface/90 px-2 py-1">
                     {heroPhotos.map((photo, index) => (
                       <button
