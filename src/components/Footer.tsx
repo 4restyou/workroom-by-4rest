@@ -41,7 +41,20 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-workroom-line pt-5">
+        {/* 전자상거래법 표시 의무: 상호·대표자·주소·연락처·사업자번호·통신판매업 신고번호 */}
+        <div className="mt-8 border-t border-workroom-line pt-5">
+          <p className="text-xs font-medium leading-6 text-workroom-muted">
+            {SITE.name}
+            {SITE.business.representative ? ` · 대표 ${SITE.business.representative}` : ""}
+            {" · "}사업자등록번호 {SITE.business.registrationNumber}
+            {" · "}통신판매업신고 {SITE.business.mailOrderNumber}
+          </p>
+          <p className="mt-0.5 text-xs font-medium leading-6 text-workroom-muted">
+            {SITE.address} · {SITE.phone}
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-workroom-line pt-5">
           <div className="flex flex-wrap gap-4 text-xs font-bold">
             <Link className="transition-colors hover:text-workroom-muted" to="/directory">
               명함첩
