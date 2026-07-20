@@ -116,3 +116,24 @@ Netlify 환경 변수에는 프론트와 동일한 `VITE_SUPABASE_URL`이 있어
 
 기존 `confirm-payment`, `refund-reservation` Edge Function은 Toss 연동 후보로 남겨둘 수 있습니다.
 다시 사용하려면 프론트 결제 버튼, Toss SDK 의존성, `TOSS_SECRET_KEY`, 성공/실패 라우트의 승인 호출을 함께 복구해야 합니다.
+
+## 포트원 결제 (portone-payment)
+
+회원이 확정된 예약을 사이트에서 카드로 바로 결제합니다. 결제 검증·환불·웹훅을 한 함수가 처리합니다.
+
+1. 포트원 콘솔에서 V2 API Secret 발급 후 시크릿 등록:
+
+```bash
+supabase secrets set PORTONE_API_SECRET=<V2 API Secret>
+supabase functions deploy portone-payment --no-verify-jwt
+```
+
+2. Netlify 환경 변수에 `VITE_PORTONE_STORE_ID`, `VITE_PORTONE_CHANNEL_KEY` 추가 (포트원 콘솔 > 결제 연동 정보). 두 값이 없으면 결제 버튼은 표시되지 않습니다.
+
+3. (권장) 포트원 콘솔 > 웹훅에 함수 URL 등록 — 브라우저가 닫혀도 결제가 반영됩니다:
+   `https://<프로젝트>.supabase.co/functions/v1/portone-payment`
+
+검증 원칙: 함수는 클라이언트 값을 믿지 않고 포트원 API로 결제를 다시 조회해
+금액이 예약(price_at_booking)과 일치할 때만 결제완료로 반영합니다.
+환불은 관리자 JWT 검증 후 카드 승인 취소를 실행하고 payment_status를 refunded로 바꿉니다.
+모든 시도는 reservation_payment_logs(provider='portone')에 기록됩니다.

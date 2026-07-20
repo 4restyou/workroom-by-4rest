@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@portone/browser-sdk": "^0.1.9",
     "@supabase/supabase-js": "^2.45.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",

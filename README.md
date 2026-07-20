@@ -17,6 +17,9 @@ npm run dev
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_ADMIN_EMAILS=colorfg@gmail.com
+# 포트원 온라인 결제 (없으면 결제 버튼이 숨겨지고 수동 안내 흐름 유지)
+VITE_PORTONE_STORE_ID=
+VITE_PORTONE_CHANNEL_KEY=
 ```
 
 `VITE_ADMIN_EMAILS`는 프론트엔드 UX용 보조 체크입니다. 실제 관리자 권한은 Supabase

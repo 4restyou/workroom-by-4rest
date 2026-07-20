@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
+import { refundReservationPayment } from "../lib/portone";
 import { isLongTermReservation } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import type {
@@ -347,6 +348,21 @@ export default function AdminReservations() {
     setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
   }
 
+  // 포트원으로 결제된 예약의 실제 PG 환불. 성공하면 payment_status가 refunded로 바뀐다.
+  async function refundViaPortone(reservation: Reservation) {
+    const reason = window.prompt("환불 사유를 입력해 주세요. (고객 안내에 사용)", "예약 취소에 따른 환불");
+    if (reason === null) return;
+    if (!window.confirm(`${reservation.name}님의 결제 ${formatPrice(reservation.price_at_booking ?? 0)}을 환불할까요?\n카드 승인 취소가 즉시 실행됩니다.`)) return;
+    const result = await refundReservationPayment(reservation.id, reason);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setError("");
+    setSuccess(result.message);
+    setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "refunded" as const } : item)));
+  }
+
   async function markPaymentLinkSent(reservation: Reservation) {
     const count = reservation.payment_link_send_count ?? 0;
     if (count >= 1 && !window.confirm(`이미 결제 링크 발송 기록이 ${count}회 있습니다. 다시 기록할까요?`)) return;
@@ -570,6 +586,7 @@ export default function AdminReservations() {
               onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
               onPatch={(payload) => void patchReservation(selectedReservation.id, payload)}
               onPaymentLinkSent={() => void markPaymentLinkSent(selectedReservation)}
+              onPortoneRefund={() => void refundViaPortone(selectedReservation)}
               onResendSms={(kind) => void resendStatusSms(selectedReservation, kind)}
             />
           ) : (
@@ -783,6 +800,7 @@ function ReservationCard({
   onSave,
   onPatch,
   onPaymentLinkSent,
+  onPortoneRefund,
   onResendSms,
 }: {
   conflictCount: number;
@@ -798,6 +816,7 @@ function ReservationCard({
   onSave: (payload: ReservationEdit) => void;
   onPatch: (payload: Partial<Reservation>) => void;
   onPaymentLinkSent: () => void;
+  onPortoneRefund: () => void;
   onResendSms: (kind: "confirmed" | "canceled") => void;
 }) {
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
@@ -949,6 +968,11 @@ function ReservationCard({
               type="button"
             >
               결제 완료 처리
+            </button>
+          ) : null}
+          {reservation.payment_status === "paid" && reservation.payment_key && (reservation.payment_method ?? "").includes("포트원") ? (
+            <button className={buttonClass("secondary", "sm", "border-workroom-danger")} onClick={onPortoneRefund} type="button">
+              PG 환불 실행
             </button>
           ) : null}
           {reservation.status === "pending" ? (

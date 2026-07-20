@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import { formatDate, formatPhone, formatPrice, formatTimeRange, todayValue } from "../lib/format";
+import { canPayOnline, payReservation } from "../lib/portone";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
@@ -199,6 +200,24 @@ export default function Account() {
     setEditingId(null);
   }
 
+  async function payNow(reservation: Reservation) {
+    setError("");
+    setActionBusy(`pay-${reservation.id}`);
+    try {
+      const result = await payReservation(reservation);
+      if (result.ok) {
+        setReservations((current) =>
+          current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "paid" as const } : item)),
+        );
+        setSuccess(result.message);
+      } else {
+        setError(result.message);
+      }
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function cancelReservation(reservation: Reservation) {
     if (!supabase) return;
     if (!canCancel(reservation)) {
@@ -303,6 +322,7 @@ export default function Account() {
       <Section eyebrow={profile?.role === "admin" ? "Admin Account" : "My Page"} title={profile?.role === "admin" ? "관리자 계정" : "내정보"} accent="mint">
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>내정보를 불러오는 중입니다.</p> : null}
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
+        {success && activeTab === "reservations" ? <p className={`mb-4 ${tintCard("sky")} p-4 text-sm font-bold`}>{success}</p> : null}
 
         {!isLoading && profile ? (
           <div>
@@ -465,6 +485,20 @@ export default function Account() {
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
+                              ) : canPayOnline(reservation) ? (
+                                <div className="grid gap-2">
+                                  <button
+                                    className={buttonClass("accent", "md", "w-full sm:w-auto")}
+                                    disabled={actionBusy === `pay-${reservation.id}`}
+                                    onClick={() => void payNow(reservation)}
+                                    type="button"
+                                  >
+                                    {actionBusy === `pay-${reservation.id}` ? "결제 진행 중…" : `카드로 결제하기 · ${formatPrice(reservation.price_at_booking ?? 0)}`}
+                                  </button>
+                                  <p className="text-xs font-medium text-workroom-muted">
+                                    카드·간편결제로 바로 결제할 수 있어요. 현장 결제를 원하시면 방문 시 결제하셔도 됩니다.
+                                  </p>
+                                </div>
                               ) : (
                                 <p className="text-xs font-medium text-workroom-muted">
                                   결제 안내는 확정 후 문자로 보내드립니다.
