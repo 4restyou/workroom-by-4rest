@@ -13,7 +13,7 @@ export const SITE = {
   },
   business: {
     // 전자상거래법 표시 의무 항목. 대표자명은 확인 후 채운다.
-    representative: "",
+    representative: "박순렬",
     registrationNumber: "412-04-60970",
     mailOrderNumber: "2023-광주북구-0416호",
   },
