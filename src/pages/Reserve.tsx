@@ -173,6 +173,9 @@ export default function Reserve() {
 
   const openHHMM = selectedHours?.open_time.slice(0, 5);
   const closeHHMM = selectedHours?.close_time.slice(0, 5);
+  // 자정을 넘겨 마감하는 날(예: 08:00–다음 날 01:00)은 종료가 시작보다 이른
+  // 표기(01:00 < 08:00)가 정상이다. 단순 비교 검증은 이 경우를 건너뛴다.
+  const isOvernightWindow = Boolean(openHHMM && closeHHMM && closeHHMM <= openHHMM);
   const isClosedDay = selectedHours?.is_closed ?? false;
   const selectedDuration = passDurationHours(form.pass_type);
   const selectableStartTimes = useMemo(
@@ -301,7 +304,8 @@ export default function Reserve() {
       if (!form.start_time || !form.end_time) return "이용 시간을 확인해 주세요.";
       if (selectedDuration && shiftTime(form.start_time, selectedDuration) !== form.end_time)
         return `시간권은 시작 시간부터 ${selectedDuration}시간으로 예약됩니다.`;
-      if (form.start_time >= form.end_time) return "종료 시간은 시작 시간보다 늦어야 해요.";
+      if (form.start_time === form.end_time) return "종료 시간은 시작 시간과 다르게 선택해 주세요.";
+      if (!isOvernightWindow && form.start_time > form.end_time) return "종료 시간은 시작 시간보다 늦어야 해요.";
       if (selectedDuration && !selectableStartTimes.includes(form.start_time))
         return "선택한 날짜에 이용 가능한 시작 시간이 없습니다.";
       if (!selectedDuration && openHHMM && closeHHMM && !isWithinOperatingHours(form.start_time, form.end_time, openHHMM, closeHHMM))
@@ -371,7 +375,7 @@ export default function Reserve() {
       return;
     }
 
-    if (form.start_time >= form.end_time) {
+    if (form.start_time === form.end_time || (!isOvernightWindow && form.start_time > form.end_time)) {
       setError("종료 시간은 시작 시간보다 늦어야 합니다.");
       return;
     }
