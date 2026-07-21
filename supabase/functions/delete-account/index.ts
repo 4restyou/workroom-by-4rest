@@ -15,7 +15,7 @@
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const DEFAULT_ALLOWED_ORIGINS = ["https://workroomby4rest.netlify.app", "http://localhost:5173", "http://127.0.0.1:5173"];
+const DEFAULT_ALLOWED_ORIGINS = ["https://work-room.kr", "https://www.work-room.kr", "https://workroomby4rest.netlify.app", "http://localhost:5173", "http://127.0.0.1:5173"];
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? DEFAULT_ALLOWED_ORIGINS.join(","))
   .split(",")
   .map((origin) => origin.trim())

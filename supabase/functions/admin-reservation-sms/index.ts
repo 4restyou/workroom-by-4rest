@@ -16,14 +16,15 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
 const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
-const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://work-room.kr";
+const DEFAULT_ALLOWED_ORIGINS = ["https://work-room.kr", "https://www.work-room.kr", "https://workroomby4rest.netlify.app"];
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
 
 function cors(request: Request) {
   const origin = request.headers.get("origin") ?? "";
-  const allowed = origin === "https://workroomby4rest.netlify.app" || origin.startsWith("http://127.0.0.1:") || origin.startsWith("http://localhost:");
+  const allowed = DEFAULT_ALLOWED_ORIGINS.includes(origin) || origin.startsWith("http://127.0.0.1:") || origin.startsWith("http://localhost:");
   return {
-    "Access-Control-Allow-Origin": allowed ? origin : "https://workroomby4rest.netlify.app",
+    "Access-Control-Allow-Origin": allowed ? origin : "https://work-room.kr",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };

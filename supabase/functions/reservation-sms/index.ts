@@ -42,7 +42,8 @@ const ADMIN_PHONE = (Deno.env.get("ADMIN_PHONE") ?? "").replace(/\D/g, "");
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://work-room.kr";
+const DOOR_PASSWORD = Deno.env.get("DOOR_PASSWORD") ?? "";
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
 const ONLINE_PAYMENT_NOTICE = "예약현황에서 카드 결제를 완료하면 예약이 바로 확정됩니다.";
 const ONSITE_PAYMENT_NOTICE = "현장 결제 예약은 운영자가 확인한 뒤 확정해 드립니다.";
@@ -202,9 +203,12 @@ Deno.serve(async (request) => {
       const message = STATUS_MESSAGE[row.status];
       if (statusChanged && message && row.phone) {
         const policyLine = row.status === "confirmed" ? `\n${REFUND_NOTICE}` : "";
+        const accessLine = row.status === "confirmed" && DOOR_PASSWORD
+          ? `\n출입문 비밀번호: ${DOOR_PASSWORD}`
+          : "";
         await sendSms(
           row.phone,
-          `[WORKROOM] ${message}\n${reservationLine(row)}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`,
+          `[WORKROOM] ${message}\n${reservationLine(row)}${accessLine}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`,
           {
             reservationId: row.id,
             recipientKind: "member",

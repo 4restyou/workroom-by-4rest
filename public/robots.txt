@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /account
 
-Sitemap: https://workroomby4rest.netlify.app/sitemap.xml
+Sitemap: https://work-room.kr/sitemap.xml
