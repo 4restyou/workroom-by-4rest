@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
 import { AlertIcon, BusIcon, CheckIcon, IdCardIcon, ParkingIcon, PinIcon, SubwayIcon } from "../components/icons";
 import MemberDashboard from "../components/MemberDashboard";
@@ -99,6 +99,10 @@ const heroPhotos = [
 ];
 
 export default function Home() {
+  const location = useLocation();
+  // 관리자는 기본적으로 관리자 홈으로 보내되, 헤더의 '사이트' 버튼(?site=1)으로
+  // 들어온 경우에는 공개 화면을 그대로 보여준다.
+  const viewSiteAsAdmin = new URLSearchParams(location.search).has("site");
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [viewerRole, setViewerRole] = useState<"guest" | "user" | "admin" | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
@@ -225,7 +229,8 @@ export default function Home() {
       {/* Signed-in members get a "today" dashboard in place of the marketing
           hero; visitors, admins (checking the public site) and the initial
           unknown state see the hero. Admins reach 관리자 홈 via the header. */}
-      {viewerRole === "admin" ? (
+      {viewerRole === "admin" && !viewSiteAsAdmin ? <Navigate replace to="/admin/dashboard" /> : null}
+      {viewerRole === "admin" && viewSiteAsAdmin ? (
         <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
           <div className={`${tintCard("yellow")} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}>
             <p className="text-sm font-bold">관리자로 로그인한 상태로 공개 화면을 보고 있어요.</p>
