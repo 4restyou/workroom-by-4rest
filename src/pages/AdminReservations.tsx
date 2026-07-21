@@ -587,8 +587,8 @@ function ReservationListItem({
         <p className="truncate font-bold">{reservation.name}</p>
         <p className="mt-1 truncate text-xs font-medium text-workroom-muted">
           {longTerm
-            ? `${formatDate(periodStart)}–${formatDate(periodEnd)} · ${passName}`
-            : `${formatDate(reservation.date)} ${formatTimeRange(reservation.start_time, reservation.end_time)} · ${passName}`}
+            ? `${formatCompactPeriod(periodStart, periodEnd)} · ${passName}`
+            : `${formatCompactDate(reservation.date)} · ${formatTimeRange(reservation.start_time, reservation.end_time)} · ${passName}`}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -597,6 +597,18 @@ function ReservationListItem({
       </div>
     </button>
   );
+}
+
+function formatCompactDate(value: string) {
+  const [, month, day] = value.split("-").map(Number);
+  return `${month}월 ${day}일`;
+}
+
+function formatCompactPeriod(start: string, end: string) {
+  const [, startMonth, startDay] = start.split("-").map(Number);
+  const [, endMonth, endDay] = end.split("-").map(Number);
+  if (startMonth === endMonth) return `${startMonth}월 ${startDay}–${endDay}일`;
+  return `${startMonth}월 ${startDay}일–${endMonth}월 ${endDay}일`;
 }
 
 function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit: (payload: ReservationInsert) => void }) {
