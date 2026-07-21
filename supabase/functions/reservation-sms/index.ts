@@ -25,6 +25,7 @@ type ReservationRow = {
   end_time: string | null;
   pass_type: string;
   pass_name_snapshot: string | null;
+  payment_preference: "online" | "onsite" | null;
 };
 
 type WebhookPayload = {
@@ -43,9 +44,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://workroomby4rest.netlify.app";
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
-const PAYMENT_NOTICE =
-  Deno.env.get("PAYMENT_NOTICE") ??
-  "온라인 결제를 선택하시면 예약 확인 후 별도의 결제 링크를 보내드립니다. 링크 수신 후 2시간 이내 결제해 주세요. 현장 결제는 방문 시 진행할 수 있습니다.";
+const ONLINE_PAYMENT_NOTICE = "예약현황에서 카드 결제를 완료하면 예약이 바로 확정됩니다.";
+const ONSITE_PAYMENT_NOTICE = "현장 결제 예약은 운영자가 확인한 뒤 확정해 드립니다.";
 
 const STATUS_MESSAGE: Record<string, string> = {
   confirmed: "예약이 확정되었습니다.",
@@ -61,6 +61,10 @@ function reservationLine(row: ReservationRow): string {
   const pass = row.pass_name_snapshot || row.pass_type;
   const time = row.start_time && row.end_time ? ` ${hhmm(row.start_time)}-${hhmm(row.end_time)}` : "";
   return `${pass} / ${row.date}${time}`;
+}
+
+function paymentNotice(row: ReservationRow): string {
+  return row.payment_preference === "onsite" ? ONSITE_PAYMENT_NOTICE : ONLINE_PAYMENT_NOTICE;
 }
 
 async function toHex(buffer: ArrayBuffer): Promise<string> {
@@ -173,7 +177,7 @@ Deno.serve(async (request) => {
       if (row.phone) {
         await sendSms(
           row.phone,
-          `[WORKROOM] 예약 신청이 접수되었습니다.\n${reservationLine(row)}\n${PAYMENT_NOTICE}\n문의: 010-4931-3298\n${SITE_URL}`,
+          `[WORKROOM] 예약 신청이 접수되었습니다.\n${reservationLine(row)}\n${paymentNotice(row)}\n문의: 010-4931-3298\n${SITE_URL}`,
           { reservationId: row.id, recipientKind: "member", event: "reservation_received" },
         );
       }
@@ -181,7 +185,7 @@ Deno.serve(async (request) => {
       if (ADMIN_PHONE) {
         await sendSms(
           ADMIN_PHONE,
-          `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n홈페이지에서 확인해 주세요.\n${SITE_URL}`,
+          `[WORKROOM] 새 예약 신청\n${row.name} / ${reservationLine(row)}\n${row.payment_preference === "onsite" ? "현장 결제 · 확인 필요" : "온라인 결제 대기"}\n${SITE_URL}`,
           { reservationId: row.id, recipientKind: "admin", event: "admin_new_reservation" },
         );
       }

@@ -13,7 +13,7 @@
 const TOSS_SECRET_KEY = Deno.env.get("TOSS_SECRET_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const DEFAULT_ALLOWED_ORIGINS = ["https://workroomby4rest.netlify.app", "http://localhost:5173", "http://127.0.0.1:5173"];
+const DEFAULT_ALLOWED_ORIGINS = ["https://work-room.kr", "https://www.work-room.kr", "https://workroomby4rest.netlify.app", "http://localhost:5173", "http://127.0.0.1:5173"];
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? DEFAULT_ALLOWED_ORIGINS.join(","))
   .split(",")
   .map((origin) => origin.trim())
@@ -146,6 +146,35 @@ Deno.serve(async (request) => {
       return json({ ok: false, message: "예약을 찾을 수 없습니다." }, 404, headers);
     }
     if (reservation.payment_status === "paid") {
+      if (reservation.status === "pending") {
+        const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${orderId}`, {
+          method: "PATCH",
+          headers: { ...authHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "confirmed" }),
+        });
+        if (!updateResponse.ok) {
+          await recordPaymentLog({
+            reservation_id: orderId,
+            profile_id: reservation.profile_id,
+            action: "confirm",
+            status: "failed",
+            amount,
+            provider_code: "DB_UPDATE_FAILED",
+            message: "결제 완료 예약의 자동 확정에 실패했습니다.",
+          });
+          return json({ ok: false, message: "결제는 완료되었지만 예약 확정에 실패했습니다. 운영자에게 문의해 주세요." }, 500, headers);
+        }
+        await recordPaymentLog({
+          reservation_id: orderId,
+          profile_id: reservation.profile_id,
+          action: "confirm",
+          status: "skipped",
+          amount,
+          provider_code: "PAID_RESERVATION_CONFIRMED",
+          message: "결제 완료 예약을 자동 확정했습니다.",
+        });
+        return json({ ok: true, alreadyPaid: true, message: "결제가 확인되어 예약이 확정되었습니다." }, 200, headers);
+      }
       await recordPaymentLog({
         reservation_id: orderId,
         profile_id: reservation.profile_id,
@@ -156,18 +185,6 @@ Deno.serve(async (request) => {
         message: "이미 결제 완료된 예약입니다.",
       });
       return json({ ok: true, alreadyPaid: true }, 200, headers);
-    }
-    if (reservation.status !== "confirmed") {
-      await recordPaymentLog({
-        reservation_id: orderId,
-        profile_id: reservation.profile_id,
-        action: "confirm",
-        status: "failed",
-        amount,
-        provider_code: "RESERVATION_NOT_CONFIRMED",
-        message: "확정되지 않은 예약 결제 시도입니다.",
-      });
-      return json({ ok: false, message: "확정된 예약만 결제할 수 있습니다." }, 400, headers);
     }
     if (Number(reservation.price_at_booking) !== Number(amount)) {
       await recordPaymentLog({
@@ -210,7 +227,12 @@ Deno.serve(async (request) => {
     const update = await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${orderId}`, {
       method: "PATCH",
       headers: { ...authHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ payment_status: "paid", payment_method: "카드", payment_key: paymentKey }),
+      body: JSON.stringify({
+        payment_status: "paid",
+        payment_method: "카드",
+        payment_key: paymentKey,
+        ...((reservation.status === "pending" || reservation.status === "confirmed") ? { status: "confirmed" } : {}),
+      }),
     });
     if (!update.ok) {
       await recordPaymentLog({
@@ -232,10 +254,10 @@ Deno.serve(async (request) => {
       status: "succeeded",
       amount,
       provider_code: "CONFIRMED",
-      message: "Toss 결제 승인이 완료되었습니다.",
+      message: reservation.status === "pending" || reservation.status === "confirmed" ? "Toss 결제 승인 및 예약 자동확정이 완료되었습니다." : "Toss 결제 승인이 완료되었습니다.",
     });
 
-    return json({ ok: true }, 200, headers);
+    return json({ ok: true, message: reservation.status === "pending" || reservation.status === "confirmed" ? "결제가 완료되어 예약이 확정되었습니다." : "결제가 완료되었습니다." }, 200, headers);
   } catch (error) {
     console.error("[confirm-payment] handler error", { message: errorMessage(error) });
     return json({ ok: false, message: "결제 처리 중 오류가 발생했습니다." }, 500, corsHeaders(request));

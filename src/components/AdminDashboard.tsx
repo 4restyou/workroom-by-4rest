@@ -117,7 +117,7 @@ export default function AdminDashboard() {
         <div className="mt-3 grid gap-2">
           {data && summary.todaySchedule.length ? summary.todaySchedule.map((reservation) => {
             const attendance = data.attendance.find((item) => item.reservation_id === reservation.id);
-            const visitLabel = reservation.status === "pending" ? "확인 필요" : attendance?.check_out_at ? "퇴실" : attendance ? "이용 중" : "입실 전";
+            const visitLabel = reservation.status === "pending" ? (reservation.payment_preference === "online" ? "결제 대기" : "확인 필요") : attendance?.check_out_at ? "퇴실" : attendance ? "이용 중" : "입실 전";
             const visitTone = reservation.status === "pending" ? "yellow" : attendance && !attendance.check_out_at ? "mint" : "sky";
             return (
               <Link

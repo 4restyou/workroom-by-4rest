@@ -57,7 +57,7 @@ type ReservationEdit = {
 };
 
 const statusHelp: Record<ReservationStatus, string> = {
-  pending: "확인·문자 발송 필요",
+  pending: "결제 또는 확인 대기",
   confirmed: "방문 예정",
   canceled: "취소됨",
   completed: "이용 완료",
@@ -320,14 +320,14 @@ export default function AdminReservations() {
 
   async function saveReservation(id: string, payload: ReservationEdit) {
     if (!supabase) return;
-    const { error: updateError } = await supabase.from("reservations").update(payload).eq("id", id);
-    if (updateError) {
-      setError(updateError.message);
+    const { data: updatedReservation, error: updateError } = await supabase.from("reservations").update(payload).eq("id", id).select("*").single();
+    if (updateError || !updatedReservation) {
+      setError(updateError?.message ?? "예약 변경사항을 확인하지 못했습니다.");
       return;
     }
     setError("");
     setSuccess("예약 변경사항을 저장했습니다.");
-    setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
+    setReservations((current) => current.map((reservation) => (reservation.id === id ? updatedReservation as Reservation : reservation)));
     const { data } = await supabase
       .from("reservation_audit_logs")
       .select("*")
@@ -339,14 +339,14 @@ export default function AdminReservations() {
 
   async function patchReservation(id: string, payload: Partial<Reservation>) {
     if (!supabase) return;
-    const { error: updateError } = await supabase.from("reservations").update(payload).eq("id", id);
-    if (updateError) {
-      setError(updateError.message);
+    const { data: updatedReservation, error: updateError } = await supabase.from("reservations").update(payload).eq("id", id).select("*").single();
+    if (updateError || !updatedReservation) {
+      setError(updateError?.message ?? "처리 결과를 확인하지 못했습니다.");
       return;
     }
     setError("");
     setSuccess("처리 상태를 변경했습니다.");
-    setReservations((current) => current.map((reservation) => (reservation.id === id ? { ...reservation, ...payload } : reservation)));
+    setReservations((current) => current.map((reservation) => (reservation.id === id ? updatedReservation as Reservation : reservation)));
   }
 
   // 포트원으로 결제된 예약의 실제 PG 환불. 성공하면 payment_status가 refunded로 바뀐다.
@@ -1329,7 +1329,7 @@ function paymentWorkflowDescription(reservation: Reservation) {
   if (reservation.payment_status === "refunded") return "환불 완료로 기록된 예약입니다.";
   if (reservation.status === "canceled") return reservation.payment_status === "unpaid" ? "미결제 취소입니다." : "환불 처리가 필요한지 확인해 주세요.";
   if (reservation.payment_preference === "onsite") return "현장 결제(카드·현금) 예약입니다. 방문 전 문의로 협의해 주세요.";
-  return "회원이 ‘예약현황’에서 카드로 결제하면 자동으로 결제완료로 바뀝니다.";
+  return "회원이 카드로 결제하면 결제완료와 예약확정이 함께 자동 반영됩니다.";
 }
 
 function paymentWorkflowTone(reservation: Reservation): TintColor {

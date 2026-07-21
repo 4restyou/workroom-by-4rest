@@ -6,7 +6,7 @@ import { buttonClass, tintCard } from "../lib/ui";
 
 // PortOne 결제창의 모바일 리디렉션 복귀 지점. SDK가 paymentId(성공) 또는
 // code/message(실패)를 쿼리로 붙여 보낸다. 성공 케이스는 서버 검증을 거쳐
-// 예약을 결제완료로 반영한 뒤 결과를 보여준다.
+// 예약을 결제완료·확정으로 반영한 뒤 결과를 보여준다.
 export default function PaymentPortone() {
   const [searchParams] = useSearchParams();
   const [state, setState] = useState<"checking" | "done" | "failed">("checking");

@@ -81,6 +81,28 @@ alter table reservations
 add constraint reservations_payment_status_check
 check (payment_status in ('unpaid', 'paid', 'refunded', 'service'));
 
+-- A successful payment confirms an otherwise pending reservation. Canceled,
+-- completed and no-show reservations keep their operational status so an
+-- exceptional late payment remains visible for operator review.
+create or replace function public.auto_confirm_paid_reservation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.payment_status = 'paid' and new.status = 'pending' then
+    new.status := 'confirmed';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists ad_auto_confirm_paid_reservation on public.reservations;
+create trigger ad_auto_confirm_paid_reservation
+before insert or update of payment_status on public.reservations
+for each row execute function public.auto_confirm_paid_reservation();
+
 update reservations set people = 1 where people is null or people < 1;
 update reservations set people = 12 where people > 12;
 
@@ -882,7 +904,7 @@ set open_time = excluded.open_time,
 insert into space_settings (key, value)
 values
   ('reservation_notice', '홈페이지 예약을 기준으로 운영합니다. 예약 신청 후 전화 또는 문자로 확인 안내를 드립니다.'),
-  ('payment_notice', '예약 확인 후 온라인 결제를 선택한 분께 별도의 결제 링크를 보내드립니다. 링크 수신 후 2시간 이내 결제해 주세요. 현장 결제는 방문 시 진행할 수 있습니다.'),
+  ('payment_notice', '온라인 예약은 신청 직후 카드로 결제할 수 있으며, 결제가 완료되면 예약이 자동 확정되고 확정 문자가 발송됩니다. 현장 결제와 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정합니다.'),
   ('cancellation_notice', '3시간권과 종일권은 예약 시간 전까지 당일 취소가 가능합니다. 예약 시간이 지난 뒤에는 취소 및 환불이 어렵습니다.'),
   ('extension_notice', '이용 시간 종료 후 15분까지는 유예되며, 이후에는 1시간 추가 요금이 적용됩니다.'),
   ('etiquette_notice', '냄새가 적은 간단한 음식과 음료는 가능하며, 통화는 조용히 부탁드립니다. 음악과 영상은 이어폰 또는 헤드폰으로 이용해 주세요.'),

@@ -12,7 +12,8 @@ export const hasPortoneConfig = Boolean(STORE_ID && CHANNEL_KEY);
 export function canPayOnline(reservation: Reservation): boolean {
   return (
     hasPortoneConfig &&
-    reservation.status === "confirmed" &&
+    (reservation.status === "pending" || reservation.status === "confirmed") &&
+    reservation.payment_preference === "online" &&
     reservation.payment_status !== "paid" &&
     reservation.payment_status !== "refunded" &&
     reservation.payment_status !== "service" &&
@@ -23,7 +24,7 @@ export function canPayOnline(reservation: Reservation): boolean {
 export type PayResult = { ok: boolean; message: string };
 
 // 결제창을 열고, 완료되면 서버(portone-payment 함수)에서 금액·상태를 재검증해
-// 예약을 결제완료로 반영한다. 모바일 리디렉션 흐름은 /payment/portone 페이지가 처리.
+// 예약을 결제완료·확정으로 반영한다. 모바일 리디렉션 흐름은 /payment/portone 페이지가 처리.
 export async function payReservation(reservation: Reservation): Promise<PayResult> {
   if (!STORE_ID || !CHANNEL_KEY) return { ok: false, message: "온라인 결제가 아직 준비되지 않았습니다." };
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };

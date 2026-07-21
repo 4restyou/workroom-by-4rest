@@ -211,7 +211,7 @@ export default function Account() {
       const result = await payReservation(reservation);
       if (result.ok) {
         setReservations((current) =>
-          current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "paid" as const } : item)),
+          current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "paid" as const, status: "confirmed" as const } : item)),
         );
         setSuccess(result.message);
       } else {
@@ -491,7 +491,11 @@ export default function Account() {
                             </div>
                             <StatusBadge status={reservation.status} />
                           </div>
-                          <p className="mt-3 text-sm font-bold text-workroom-muted">{reservationStatusMessage[reservation.status]}</p>
+                          <p className="mt-3 text-sm font-bold text-workroom-muted">
+                            {reservation.status === "pending" && reservation.payment_preference === "online"
+                              ? "카드 결제를 완료하면 예약이 바로 확정됩니다."
+                              : reservationStatusMessage[reservation.status]}
+                          </p>
 
                           {reservation.payment_status === "refunded" ? (
                             <div className="mt-3">
@@ -510,7 +514,7 @@ export default function Account() {
                             </div>
                           ) : null}
 
-                          {reservation.status === "confirmed" && reservation.payment_status !== "service" && (reservation.price_at_booking ?? 0) > 0 ? (
+                          {(reservation.status === "pending" || reservation.status === "confirmed") && reservation.payment_status !== "service" && (reservation.price_at_booking ?? 0) > 0 ? (
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
@@ -525,12 +529,12 @@ export default function Account() {
                                     {actionBusy === `pay-${reservation.id}` ? "결제 진행 중…" : `카드로 결제하기 · ${formatPrice(reservation.price_at_booking ?? 0)}`}
                                   </button>
                                   <p className="text-xs font-medium text-workroom-muted">
-                                    카드·간편결제로 바로 결제할 수 있어요. 현장 결제를 원하시면 방문 시 결제하셔도 됩니다.
+                                    결제가 완료되면 예약도 바로 확정되고 확정 문자가 발송됩니다.
                                   </p>
                                 </div>
                               ) : (
                                 <p className="text-xs font-medium text-workroom-muted">
-                                  예약이 확정되면 이곳에서 카드로 결제할 수 있어요. 현장 결제(카드·현금)는 방문 전 별도로 문의해 주세요.
+                                  현장 결제나 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정됩니다.
                                 </p>
                               )}
                             </div>

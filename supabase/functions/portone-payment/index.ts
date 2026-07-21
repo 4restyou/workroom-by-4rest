@@ -151,7 +151,7 @@ function reservationIdFromCustomData(payment: PortonePayment): string | null {
   }
 }
 
-// 결제 검증: PortOne에서 결제를 조회해 예약과 대조 후 결제완료 반영.
+// 결제 검증: PortOne에서 결제를 조회해 예약과 대조 후 결제완료·예약확정 반영.
 async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status: number; message: string }> {
   const payment = await fetchPortonePayment(paymentId);
   if (!payment) return { ok: false, status: 404, message: "결제 정보를 찾을 수 없습니다." };
@@ -163,12 +163,17 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
   if (!reservation) return { ok: false, status: 404, message: "예약을 찾을 수 없습니다." };
 
   if (reservation.payment_status === "paid") {
+    if (reservation.status === "pending") {
+      const updated = await updateReservation(reservationId, { status: "confirmed" });
+      if (!updated) {
+        await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: "DB_UPDATE_FAILED", message: "결제 완료 예약의 자동 확정에 실패했습니다." });
+        return { ok: false, status: 500, message: "결제는 완료되었지만 예약 확정에 실패했습니다. 운영자에게 문의해 주세요." };
+      }
+      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: "PAID_RESERVATION_CONFIRMED", message: "결제 완료 예약을 자동 확정했습니다." });
+      return { ok: true, status: 200, message: "결제가 확인되어 예약이 확정되었습니다." };
+    }
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: "ALREADY_PAID", message: "이미 결제 완료된 예약입니다." });
     return { ok: true, status: 200, message: "이미 결제 완료된 예약입니다." };
-  }
-  if (reservation.status !== "confirmed") {
-    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: "RESERVATION_NOT_CONFIRMED", message: "확정되지 않은 예약 결제 시도입니다." });
-    return { ok: false, status: 400, message: "확정된 예약만 결제할 수 있습니다." };
   }
   if (payment.status !== "PAID") {
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: payment.status ?? "UNKNOWN", message: "결제가 완료 상태가 아닙니다." });
@@ -180,18 +185,24 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
     return { ok: false, status: 400, message: "결제 금액이 예약 금액과 일치하지 않습니다." };
   }
 
+  const canAutoConfirm = reservation.status === "pending" || reservation.status === "confirmed";
   const updated = await updateReservation(reservationId, {
     payment_status: "paid",
     payment_method: "포트원 결제",
     payment_key: paymentId,
+    ...(canAutoConfirm ? { status: "confirmed" } : {}),
   });
   if (!updated) {
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", amount: paidAmount, provider_code: "DB_UPDATE_FAILED", message: "예약 결제 상태 반영에 실패했습니다." });
     return { ok: false, status: 500, message: "결제는 완료되었지만 반영에 실패했습니다. 운영자에게 문의해 주세요." };
   }
 
-  await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "succeeded", amount: paidAmount, message: "포트원 결제 확인 완료" });
-  return { ok: true, status: 200, message: "결제가 완료되었습니다." };
+  await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "succeeded", amount: paidAmount, message: canAutoConfirm ? "포트원 결제 확인 및 예약 자동확정 완료" : `결제 확인 완료 · 예약 상태 ${reservation.status}` });
+  return {
+    ok: true,
+    status: 200,
+    message: canAutoConfirm ? "결제가 완료되어 예약이 확정되었습니다." : "결제는 완료되었으며 예약 상태는 운영자가 확인합니다.",
+  };
 }
 
 Deno.serve(async (request) => {

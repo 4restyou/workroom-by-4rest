@@ -17,10 +17,11 @@ import { maxBookingDateValue,
   todayValue,
 } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
+import { canPayOnline, payReservation } from "../lib/portone";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
-import type { BusinessDateException, BusinessHour, Pass, Profile, ReservationInsert } from "../lib/types";
+import type { BusinessDateException, BusinessHour, Pass, Profile, Reservation, ReservationInsert } from "../lib/types";
 
 const emptyForm = {
   pass_type: "",
@@ -44,6 +45,7 @@ type PassOption = Pass & {
 };
 
 type SubmittedReservation = {
+  reservation: Reservation;
   passName: string;
   date: string;
   startTime: string;
@@ -69,6 +71,9 @@ export default function Reserve() {
   const [form, setForm] = useState(emptyForm);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPaymentBusy, setIsPaymentBusy] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [paymentError, setPaymentError] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [submittedReservation, setSubmittedReservation] = useState<SubmittedReservation | null>(null);
@@ -453,16 +458,17 @@ export default function Reserve() {
     };
 
     setIsSubmitting(true);
-    const { error: submitError } = await supabase.from("reservations").insert(payload);
+    const { data: createdReservation, error: submitError } = await supabase.from("reservations").insert(payload).select("*").single();
     setIsSubmitting(false);
 
-    if (submitError) {
-      console.error("[reservation] insert failed", { code: submitError.code, message: submitError.message });
-      setError(readableReservationError(submitError));
+    if (submitError || !createdReservation) {
+      console.error("[reservation] insert failed", { code: submitError?.code, message: submitError?.message ?? "missing inserted row" });
+      setError(readableReservationError(submitError ?? { message: "예약 정보를 확인하지 못했습니다." }));
       return;
     }
 
     setSubmittedReservation({
+      reservation: createdReservation as Reservation,
       passName: selectedPass?.name ?? form.pass_type,
       date: form.date,
       startTime: form.start_time,
@@ -485,6 +491,27 @@ export default function Reserve() {
     setStep(1);
   }
 
+  async function paySubmittedReservation() {
+    if (!submittedReservation) return;
+    setPaymentError("");
+    setPaymentMessage("");
+    setIsPaymentBusy(true);
+    try {
+      const result = await payReservation(submittedReservation.reservation);
+      if (!result.ok) {
+        setPaymentError(result.message);
+        return;
+      }
+      setSubmittedReservation((current) => current ? {
+        ...current,
+        reservation: { ...current.reservation, payment_status: "paid", status: "confirmed" },
+      } : current);
+      setPaymentMessage(result.message);
+    } finally {
+      setIsPaymentBusy(false);
+    }
+  }
+
   const groupedPasses = groupPasses(passes);
   const selectedPassInfo = passes.find((pass) => pass.name === form.pass_type) ?? null;
   const stepLabels = ["이용권", "날짜·시간", "정보·확인"];
@@ -494,8 +521,8 @@ export default function Reserve() {
       <Section eyebrow="Reserve" title="예약" accent="yellow">
         <div className="mb-6 grid gap-3 border-y border-workroom-ink py-4 text-sm font-bold leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
-            <p>회원 전용 예약 · 예약 신청 후 확인 문자를 보내드립니다.</p>
-            <p className="mt-1 font-medium text-workroom-muted">온라인 결제는 예약 확정 후 ‘예약현황’에서 카드로 진행 · 현장 결제(카드·현금)는 별도 문의 · 예약은 오늘부터 2개월 이내</p>
+            <p>회원 전용 예약 · 온라인 결제 완료 시 예약이 바로 확정됩니다.</p>
+            <p className="mt-1 font-medium text-workroom-muted">예약 신청 후 카드 결제 → 자동확정·확정 문자 발송 · 현장 결제와 예외 예약은 관리자 확인 · 예약은 오늘부터 2개월 이내</p>
             {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
           </div>
           <span className={badge("yellow")}>MEMBER ONLY</span>
@@ -709,7 +736,7 @@ export default function Reserve() {
                     />
                     <span>
                       <span className="block font-bold">온라인 카드 결제</span>
-                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">예약 확정 후 ‘예약현황’에서 카드로 바로 결제합니다.</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">예약 신청 직후 결제하며, 결제가 완료되면 예약도 바로 확정됩니다.</span>
                     </span>
                   </label>
                   <label
@@ -726,7 +753,7 @@ export default function Reserve() {
                     />
                     <span>
                       <span className="block font-bold">현장 결제</span>
-                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">현장 결제(카드·현금)는 방문 전 별도로 문의해 주세요.</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">현장 결제(카드·현금)는 운영자가 확인한 뒤 예약을 확정합니다.</span>
                     </span>
                   </label>
                 </div>
@@ -798,9 +825,15 @@ export default function Reserve() {
             className={`${card} animate-sheet-up max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-b-none rounded-t-card p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:rounded-card sm:pb-6`}
           >
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-pill bg-workroom-line sm:hidden" />
-            <p className="text-2xl font-bold">예약 신청이 접수되었습니다 🎉</p>
+            <p className="text-2xl font-bold">
+              {submittedReservation?.reservation.payment_status === "paid" ? "예약이 확정되었습니다 🎉" : "예약 신청이 접수되었습니다"}
+            </p>
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
-              확인 후 전화 또는 문자로 안내드릴게요. 확정 안내를 받기 전까지는 일정이 조정될 수 있습니다.
+              {submittedReservation?.reservation.payment_status === "paid"
+                ? "결제가 완료되어 예약이 바로 확정되었습니다. 확정 문자도 함께 발송됩니다."
+                : submittedReservation?.paymentPreference === "online" && (submittedReservation.price ?? 0) > 0
+                  ? "아래에서 결제하면 예약이 바로 확정됩니다."
+                  : "현장 결제나 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정합니다."}
             </p>
 
             {submittedReservation ? (
@@ -829,6 +862,9 @@ export default function Reserve() {
               </div>
             ) : null}
 
+            {paymentMessage ? <p className={`${tintCard("mint")} mt-4 p-3 text-sm font-bold`}>{paymentMessage}</p> : null}
+            {paymentError ? <p className={`${tintCard("danger")} mt-4 p-3 text-sm font-bold`}>{paymentError}</p> : null}
+
             {noticeItems.length ? (
               <div className="mt-5 grid gap-3">
                 <p className="text-sm font-bold">이용 전 꼭 확인해 주세요</p>
@@ -841,8 +877,21 @@ export default function Reserve() {
               </div>
             ) : null}
 
-            <Link className={buttonClass("primary", "lg", "mt-6 w-full")} to="/account?tab=reservations">
-              예약현황에서 보기
+            {submittedReservation && canPayOnline(submittedReservation.reservation) ? (
+              <button
+                className={buttonClass("accent", "lg", "mt-6 w-full")}
+                disabled={isPaymentBusy}
+                onClick={() => void paySubmittedReservation()}
+                type="button"
+              >
+                {isPaymentBusy ? "결제 진행 중…" : `${formatPrice(submittedReservation.price ?? 0)} 결제하고 예약 확정`}
+              </button>
+            ) : null}
+            <Link
+              className={buttonClass(submittedReservation?.reservation.payment_status === "paid" ? "primary" : "secondary", "lg", "mt-2 w-full")}
+              to="/account?tab=reservations"
+            >
+              {submittedReservation?.reservation.payment_status === "paid" ? "확정된 예약 보기" : "예약현황에서 보기"}
             </Link>
             <button className={buttonClass("secondary", "md", "mt-2 w-full")} onClick={() => setSuccess(false)} type="button">
               닫기
