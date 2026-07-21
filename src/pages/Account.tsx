@@ -423,6 +423,18 @@ export default function Account() {
                 </button>
 
                 {profile.role !== "admin" ? (
+                  <div className="mt-2 border-t border-workroom-line pt-4">
+                    <p className="text-sm font-bold">이메일 로그인 비밀번호</p>
+                    <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">
+                      구글 계정으로 가입했더라도 비밀번호를 설정하면 현재 이메일로 직접 로그인할 수 있습니다.
+                    </p>
+                    <Link className={buttonClass("secondary", "sm", "mt-3")} to="/reset-password">
+                      비밀번호 설정·변경
+                    </Link>
+                  </div>
+                ) : null}
+
+                {profile.role !== "admin" ? (
                 <div className="mt-2 border-t-2 border-workroom-line pt-4">
                   <p className="text-sm font-bold">회원 탈퇴</p>
                   <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">

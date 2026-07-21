@@ -31,6 +31,7 @@ const PaymentPortone = lazy(() => import("./pages/PaymentPortone"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Reserve = lazy(() => import("./pages/Reserve"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Terms = lazy(() => import("./pages/Terms"));
 
 initAnalytics();
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route element={<App />}>
           <Route index element={<Home />} />
           <Route path="login" element={<Auth />} />
+          <Route path="reset-password" element={<ResetPassword />} />
           <Route path="account" element={<Account />} />
           <Route path="reserve" element={<Reserve />} />
           <Route path="attendance" element={<Attendance />} />

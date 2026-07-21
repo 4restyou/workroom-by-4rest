@@ -11,7 +11,7 @@ import type { Profile } from "./lib/types";
 
 // Pages a not-yet-onboarded member may visit (to finish the profile or read
 // the policies). Everything else redirects to profile completion.
-const ONBOARDING_ALLOWED = ["/account", "/privacy", "/terms", "/login"];
+const ONBOARDING_ALLOWED = ["/account", "/privacy", "/terms", "/login", "/reset-password"];
 
 export default function App() {
   const location = useLocation();
