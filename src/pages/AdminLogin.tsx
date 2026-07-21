@@ -1,9 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Section from "../components/Section";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { configuredAdminEmails, hasSupabaseConfig, supabase } from "../lib/supabase";
-import { buttonClass, card, tintCard } from "../lib/ui";
+import { buttonClass, tintCard } from "../lib/ui";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -77,9 +76,13 @@ export default function AdminLogin() {
   }
 
   return (
-    <main className="pb-16">
-      <Section eyebrow="Admin" title="관리자 로그인" accent="ink">
-        <form className={`mx-auto grid max-w-md gap-4 ${card} p-6`} onSubmit={handleSubmit}>
+    <main className="px-4 pb-20 pt-10 sm:pt-16">
+      <section className="mx-auto max-w-md">
+        <div className="border-b border-workroom-ink pb-5">
+          <p className="text-sm font-semibold text-workroom-muted">WORKROOM 운영</p>
+          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">관리자 로그인</h1>
+        </div>
+        <form className="mt-5 grid gap-4 border border-workroom-line bg-white p-5 sm:p-6" onSubmit={handleSubmit}>
           {!hasSupabaseConfig ? (
             <p className={`${tintCard("yellow")} p-4 text-sm font-bold`}>
               `.env`에 Supabase URL과 anon key를 넣으면 로그인이 활성화됩니다.
@@ -106,7 +109,7 @@ export default function AdminLogin() {
             {isGoogleSubmitting ? "구글로 이동 중…" : "Google 관리자 로그인"}
           </button>
         </form>
-      </Section>
+      </section>
     </main>
   );
 }

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatDate } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
-import { buttonClass, cardFlat, tintCard } from "../lib/ui";
+import { buttonClass, cardFlat } from "../lib/ui";
 import type { ReservationNotification } from "../lib/types";
 
 const SEEN_KEY = "wr_notif_seen_at";
@@ -12,9 +11,6 @@ const SEEN_KEY = "wr_notif_seen_at";
 function routeFor(item: ReservationNotification, isAdmin: boolean): string {
   if (isAdmin) {
     return item.reservation_id ? `/admin/reservations?reservation=${item.reservation_id}` : "/admin/dashboard";
-  }
-  if (item.type === "inquiry") {
-    return item.reservation_id ? `/admin/reservations?reservation=${item.reservation_id}` : "/admin/reservations";
   }
   return "/account?tab=reservations";
 }
@@ -27,9 +23,13 @@ export default function NotificationBell() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  function goTo(item: ReservationNotification) {
+  async function goTo(item: ReservationNotification) {
     setOpen(false);
     setToast(null);
+    if (!item.is_read && supabase) {
+      await supabase.from("reservation_notifications").update({ is_read: true }).eq("id", item.id);
+      setItems((current) => current.map((entry) => (entry.id === item.id ? { ...entry, is_read: true } : entry)));
+    }
     navigate(routeFor(item, isAdmin));
   }
 
@@ -102,25 +102,16 @@ export default function NotificationBell() {
 
   const unread = items.filter((item) => !item.is_read).length;
 
-  async function markRead() {
-    if (!supabase) return;
-    const unreadIds = items.filter((item) => !item.is_read).map((item) => item.id);
-    if (!unreadIds.length) return;
-    await supabase.from("reservation_notifications").update({ is_read: true }).in("id", unreadIds);
-    setItems((current) => current.map((item) => (unreadIds.includes(item.id) ? { ...item, is_read: true } : item)));
-  }
-
-  async function openDropdown() {
+  function openDropdown() {
     setToast(null);
     setOpen(true);
-    await markRead();
   }
 
   return (
     <div className="relative" ref={wrapperRef}>
       <button
         type="button"
-        onClick={() => (open ? setOpen(false) : void openDropdown())}
+        onClick={() => (open ? setOpen(false) : openDropdown())}
         aria-label={`알림${unread ? ` ${unread}건` : ""}`}
         aria-expanded={open}
         className="relative grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-workroom-surface text-workroom-ink transition-colors hover:border-workroom-ink"
@@ -146,11 +137,14 @@ export default function NotificationBell() {
           </div>
           <div className="mt-3 grid max-h-[60vh] gap-2 overflow-y-auto">
             {items.length ? (
-              items.map((item) => (
-                <button type="button" onClick={() => goTo(item)} className={`${tintCard("yellow")} block w-full p-3 text-left`} key={item.id}>
-                  <p className="text-sm font-bold">{item.title}</p>
+                items.map((item) => (
+                <button type="button" onClick={() => void goTo(item)} className={`block w-full border p-3 text-left ${item.is_read ? "border-workroom-line bg-workroom-surface" : "border-workroom-ink border-l-[3px] bg-workroom-yellow/20"}`} key={item.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold">{item.title}</p>
+                    {!item.is_read ? <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-workroom-yellow ring-1 ring-workroom-ink" aria-label="읽지 않음" /> : null}
+                  </div>
                   {item.body ? <p className="mt-1 text-sm font-medium leading-6">{item.body}</p> : null}
-                  <p className="mt-1 text-xs font-medium text-workroom-muted">{formatDate(item.created_at.slice(0, 10))}</p>
+                  <p className="mt-1 text-xs font-medium text-workroom-muted">{formatNotificationTime(item.created_at)}</p>
                 </button>
               ))
             ) : (
@@ -166,7 +160,7 @@ export default function NotificationBell() {
           aria-live="polite"
           className="fixed right-3 top-[70px] z-[60] w-[min(20rem,calc(100vw-1.5rem))] animate-pop-in rounded-card border border-workroom-ink bg-workroom-yellow"
         >
-          <button type="button" onClick={() => goTo(toast)} className="block w-full p-4 pr-9 text-left">
+          <button type="button" onClick={() => void goTo(toast)} className="block w-full p-4 pr-9 text-left">
             <p className="text-sm font-bold">{toast.title}</p>
             {toast.body ? <p className="mt-1 text-sm font-medium leading-6">{toast.body}</p> : null}
           </button>
@@ -182,4 +176,14 @@ export default function NotificationBell() {
       ) : null}
     </div>
   );
+}
+
+function formatNotificationTime(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }

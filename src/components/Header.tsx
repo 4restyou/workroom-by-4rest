@@ -63,15 +63,15 @@ export default function Header({ adminMode }: HeaderProps) {
         {adminMode ? (
           <nav className="flex items-center gap-2 text-xs font-bold sm:text-sm">
             <div className="hidden items-center gap-1 sm:flex sm:gap-2">
-              <NavLink className={adminNavClass} to="/admin/dashboard">홈</NavLink>
+              <NavLink className={adminNavClass} to="/admin/dashboard">오늘</NavLink>
               <NavLink className={adminNavClass} to="/admin/reservations">예약</NavLink>
-              <NavLink className={adminNavClass} to="/admin/attendance">출석</NavLink>
-              <NavLink className={adminNavClass} to="/admin/stats">통계</NavLink>
+              <NavLink className={adminNavClass} to="/admin/attendance">입퇴실</NavLink>
               <NavLink className={adminNavClass} to="/admin/members">회원</NavLink>
+              <NavLink className={adminNavClass} to="/admin/stats">매출</NavLink>
               <NavLink className={adminNavClass} to="/admin/settings">설정</NavLink>
             </div>
             <NotificationBell />
-            <button className={authButtonClass} onClick={() => void signOut()} type="button">로그아웃</button>
+            <button className={authButtonClass} onClick={() => void signOut()} type="button">나가기</button>
           </nav>
         ) : (
           <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-6 sm:text-sm">

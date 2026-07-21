@@ -6,10 +6,9 @@ export type ButtonVariant = "primary" | "accent" | "secondary" | "mint" | "lilac
 export type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "inline-flex select-none items-center justify-center gap-2 rounded-[6px] border border-workroom-ink font-bold leading-none " +
-  "transition-[transform,background-color,opacity] duration-100 " +
-  "hover:-translate-y-px " +
-  "active:translate-y-0 active:scale-[0.97] active:opacity-90 " +
+  "inline-flex select-none items-center justify-center gap-2 rounded-[6px] border border-workroom-ink font-semibold leading-none " +
+  "transition-[background-color,color,border-color,opacity] duration-100 " +
+  "active:opacity-75 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workroom-yellow " +
   "disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0 disabled:active:scale-100";
 
@@ -45,8 +44,7 @@ export const cardFlat = card;
 // settles with a subtle press on tap so taps feel acknowledged. Reduced-motion
 // users get the static end state (globals.css neutralises the transition).
 export const pressable =
-  "transition-[transform,background-color,border-color,opacity] duration-150 ease-out " +
-  "hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:opacity-95";
+  "transition-[background-color,border-color,opacity] duration-150 ease-out hover:border-workroom-ink active:opacity-80";
 
 export type TintColor = "yellow" | "mint" | "lilac" | "sky" | "coral" | "danger" | "ink";
 
@@ -71,5 +69,5 @@ export function badge(color: TintColor = "yellow", extra = "") {
   const c = normTint(color);
   const bg = c === "ink" ? "bg-workroom-ink text-white" : `bg-workroom-${c} text-workroom-ink`;
   const border = c === "ink" ? "border-workroom-ink" : "border-workroom-line";
-  return `inline-flex items-center rounded-[4px] border ${border} px-2.5 py-1 text-[11px] font-bold ${bg} ${extra}`.trim();
+  return `inline-flex items-center rounded-[4px] border ${border} px-2 py-0.5 text-[11px] font-semibold ${bg} ${extra}`.trim();
 }

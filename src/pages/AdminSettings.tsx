@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
+import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import MoneyInput from "../components/MoneyInput";
-import Section from "../components/Section";
 import { todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { getCurrentProfile } from "../lib/profiles";
@@ -35,6 +35,11 @@ const settingLabels: Record<(typeof settingKeys)[number], string> = {
 };
 
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+type SettingsTab = "operation" | "products" | "guidance" | "checkin";
+
+function settingsSnapshot(seats: SeatType[], passRows: Pass[], hours: BusinessHour[], values: Record<string, string>) {
+  return JSON.stringify({ seats, passRows, hours, values });
+}
 
 export default function AdminSettings() {
   const navigate = useNavigate();
@@ -61,6 +66,8 @@ export default function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [tab, setTab] = useState<SettingsTab>("operation");
+  const [savedSnapshot, setSavedSnapshot] = useState("");
 
   useEffect(() => {
     async function checkAndLoad() {
@@ -109,11 +116,16 @@ export default function AdminSettings() {
       return;
     }
 
-    setSeatTypes((seatResult.data ?? []) as SeatType[]);
-    setPasses((passResult.data ?? []) as Pass[]);
-    setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
+    const nextSeats = (seatResult.data ?? []) as SeatType[];
+    const nextPasses = (passResult.data ?? []) as Pass[];
+    const nextHours = (hourResult.data ?? []) as BusinessHour[];
+    const nextSettings = Object.fromEntries(((settingResult.data ?? []) as SpaceSetting[]).map((setting) => [setting.key, setting.value]));
+    setSeatTypes(nextSeats);
+    setPasses(nextPasses);
+    setBusinessHours(nextHours);
     setDateExceptions((exceptionResult.data ?? []) as BusinessDateException[]);
-    setSettings(Object.fromEntries(((settingResult.data ?? []) as SpaceSetting[]).map((setting) => [setting.key, setting.value])));
+    setSettings(nextSettings);
+    setSavedSnapshot(settingsSnapshot(nextSeats, nextPasses, nextHours, nextSettings));
   }
 
   async function saveAll() {
@@ -273,30 +285,29 @@ export default function AdminSettings() {
     setSuccess("예외 일정을 삭제했습니다.");
   }
 
+  const hasChanges = Boolean(savedSnapshot && savedSnapshot !== settingsSnapshot(seatTypes, passes, businessHours, settings));
+
   return (
-    <main className="pb-12">
-      <Section accent="ink" eyebrow="Admin" title="운영 설정">
-        <div className="mb-5 flex flex-wrap gap-3">
-          <button className={buttonClass("accent", "md")} disabled={isSaving} onClick={saveAll} type="button">
-            {isSaving ? "저장 중" : "전체 저장"}
-          </button>
-          <button className={buttonClass("secondary", "md")} onClick={loadSettings} type="button">
-            새로고침
-          </button>
-          <Link className={buttonClass("secondary", "md")} to="/admin/reservations">
-            예약관리
-          </Link>
-        </div>
+    <AdminPage
+      actions={<><Link className={buttonClass("secondary", "md")} to="/admin/stats">매출·통계</Link><button className={buttonClass(hasChanges ? "accent" : "secondary", "md")} disabled={isSaving || !hasChanges} onClick={saveAll} type="button">{isSaving ? "저장 중" : "변경사항 저장"}</button></>}
+      description="자주 바꾸는 운영시간과 휴무일, 가격, 안내, 출석 설정을 나누어 관리합니다."
+      title="설정"
+    >
+      <div className="admin-compact">
 
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>운영 설정을 불러오는 중입니다.</p> : null}
-        {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
-        {success ? <p className={`mb-4 ${tintCard("mint")} p-4 text-sm font-bold`}>{success}</p> : null}
+        <AdminFeedback error={error} success={success} />
+
+        <div className="mb-5 border-y border-workroom-line bg-white px-3 pt-1">
+          <AdminTabs items={[{ value: "operation", label: "운영시간·휴무" }, { value: "products", label: "좌석·이용권" }, { value: "guidance", label: "예약·안내" }, { value: "checkin", label: "출석·QR" }]} onChange={setTab} value={tab} />
+        </div>
 
         <div className="grid gap-5">
+          {tab === "products" ? <>
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">좌석 유형</h2>
             <p className="mt-1 text-sm font-medium text-workroom-muted">
-              예약 시 정원 계산에 쓰입니다. 칸은 차례로 좌석 이름 · 정원 · 정렬 순서 · 노출 여부입니다.
+              예약 정원 계산에 사용합니다. 화살표로 예약 화면의 표시 순서를 바꿀 수 있습니다.
             </p>
             <div className="mt-4 grid gap-3">
               {seatTypes.map((seatType, index) => (
@@ -309,10 +320,7 @@ export default function AdminSettings() {
                     정원(명)
                     <input min={0} type="number" value={seatType.capacity} onChange={(event) => updateSeatType(index, "capacity", Number(event.target.value))} />
                   </label>
-                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
-                    정렬 순서
-                    <input min={0} type="number" value={seatType.sort_order} onChange={(event) => updateSeatType(index, "sort_order", Number(event.target.value))} />
-                  </label>
+                  <div className="grid gap-1"><span className="text-xs font-bold text-workroom-muted">순서</span><div className="flex gap-1"><button aria-label="위로" className={buttonClass("secondary", "sm", "!px-3 sm:h-[42px]")} disabled={index === 0} onClick={() => moveSeat(index, -1)} type="button">↑</button><button aria-label="아래로" className={buttonClass("secondary", "sm", "!px-3 sm:h-[42px]")} disabled={index === seatTypes.length - 1} onClick={() => moveSeat(index, 1)} type="button">↓</button></div></div>
                   <label className="flex items-center gap-2 text-sm font-bold sm:h-12">
                     <input checked={seatType.is_active} className="h-5 w-5" type="checkbox" onChange={(event) => updateSeatType(index, "is_active", event.target.checked)} />
                     노출
@@ -337,11 +345,10 @@ export default function AdminSettings() {
               </button>
             </form>
           </section>
-
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">이용권 / 가격</h2>
             <p className="mt-1 text-sm font-medium text-workroom-muted">
-              칸은 차례로 이름 · 설명 · 가격(원) · 좌석 · 정렬 · 노출이며, 노출을 끄거나 삭제로 정리할 수 있습니다.
+              이름, 설명, 가격과 연결 좌석을 관리합니다. 화살표로 예약 화면의 표시 순서를 바꿀 수 있습니다.
             </p>
             <div className="mt-4 grid gap-3">
               {passes.map((pass, index) => (
@@ -369,10 +376,7 @@ export default function AdminSettings() {
                       ))}
                     </select>
                   </label>
-                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
-                    정렬
-                    <input min={0} type="number" value={pass.sort_order ?? 0} onChange={(event) => updatePass(index, "sort_order", Number(event.target.value))} />
-                  </label>
+                  <div className="grid gap-1"><span className="text-xs font-bold text-workroom-muted">순서</span><div className="flex gap-1"><button aria-label="위로" className={buttonClass("secondary", "sm", "!px-3 lg:h-[42px]")} disabled={index === 0} onClick={() => movePass(index, -1)} type="button">↑</button><button aria-label="아래로" className={buttonClass("secondary", "sm", "!px-3 lg:h-[42px]")} disabled={index === passes.length - 1} onClick={() => movePass(index, 1)} type="button">↓</button></div></div>
                   <label className="flex items-center gap-2 text-sm font-bold lg:h-12">
                     <input checked={pass.is_active ?? true} className="h-5 w-5" type="checkbox" onChange={(event) => updatePass(index, "is_active", event.target.checked)} />
                     노출
@@ -408,7 +412,9 @@ export default function AdminSettings() {
               </button>
             </form>
           </section>
+          </> : null}
 
+          {tab === "operation" ? <>
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">운영 시간</h2>
             <div className="mt-4 grid gap-3">
@@ -425,7 +431,6 @@ export default function AdminSettings() {
               ))}
             </div>
           </section>
-
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">특정일 휴무 · 단축영업</h2>
             <p className="mt-1 text-sm font-medium text-workroom-muted">공휴일이나 임시 휴무처럼 정기 운영시간과 다른 날짜만 등록합니다. 등록 즉시 예약 달력과 서버 검증에 적용됩니다.</p>
@@ -453,7 +458,9 @@ export default function AdminSettings() {
               {!dateExceptions.length ? <p className={`${cardFlat} p-4 text-sm text-workroom-muted`}>등록된 예정 예외 일정이 없습니다.</p> : null}
             </div>
           </section>
+          </> : null}
 
+          {tab === "guidance" ? (
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">운영 안내</h2>
             <div className="mt-4 grid gap-4">
@@ -481,7 +488,9 @@ export default function AdminSettings() {
                 ))}
             </div>
           </section>
+          ) : null}
 
+          {tab === "checkin" ? (
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">출근부 (QR 출근)</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -576,9 +585,11 @@ export default function AdminSettings() {
               <p className="mt-2 text-xs font-medium text-workroom-muted">‘현재 위치로 설정’은 매장에서 눌러주세요. 설정 후 ‘변경사항 저장’을 눌러야 적용돼요.</p>
             </div>
           </section>
+          ) : null}
         </div>
-      </Section>
-    </main>
+        {hasChanges ? <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-20 mt-5 flex items-center justify-between gap-3 border border-workroom-ink bg-workroom-yellow px-4 py-3 sm:bottom-4"><p className="text-sm font-semibold">저장하지 않은 변경사항이 있습니다.</p><button className={buttonClass("primary", "sm")} disabled={isSaving} onClick={saveAll} type="button">저장</button></div> : null}
+      </div>
+    </AdminPage>
   );
 
   function downloadQrSvg() {
@@ -638,5 +649,25 @@ export default function AdminSettings() {
 
   function updateBusinessHour<K extends keyof BusinessHour>(index: number, key: K, value: BusinessHour[K]) {
     setBusinessHours((current) => current.map((hour, itemIndex) => (itemIndex === index ? { ...hour, [key]: value } : hour)));
+  }
+
+  function moveSeat(index: number, direction: -1 | 1) {
+    setSeatTypes((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next.map((item, itemIndex) => ({ ...item, sort_order: itemIndex + 1 }));
+    });
+  }
+
+  function movePass(index: number, direction: -1 | 1) {
+    setPasses((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next.map((item, itemIndex) => ({ ...item, sort_order: itemIndex + 1 }));
+    });
   }
 }

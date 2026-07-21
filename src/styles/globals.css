@@ -42,6 +42,21 @@ body {
   background-color: #f7f5ef;
 }
 
+/* Admin screens use tighter, quieter controls than the customer-facing site. */
+.admin-compact input:not([type="checkbox"]):not([type="radio"]),
+.admin-compact select,
+.admin-compact textarea {
+  min-height: 42px;
+  padding: 9px 12px;
+}
+
+.admin-row {
+  border-bottom: 1px solid #ded9cf;
+}
+.admin-row:last-child {
+  border-bottom: 0;
+}
+
 /* Horizontal scroller without a visible scrollbar (category chips). The fade
    mask already signals that there's more to scroll. */
 .no-scrollbar {

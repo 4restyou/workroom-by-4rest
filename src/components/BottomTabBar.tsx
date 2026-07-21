@@ -55,6 +55,13 @@ const infoIcon = (
     <path d="M12 11v5M12 7.5h.01" />
   </svg>
 );
+const moreIcon = (
+  <svg {...iconProps}>
+    <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
 const loginIcon = (
   <svg {...iconProps}>
     <path d="M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
@@ -77,11 +84,11 @@ const guestTabs: Tab[] = [
 ];
 
 const adminTabs: Tab[] = [
-  { to: "/admin/dashboard", label: "홈", icon: homeIcon, match: (p) => p === "/admin/dashboard" },
+  { to: "/admin/dashboard", label: "오늘", icon: homeIcon, match: (p) => p === "/admin/dashboard" },
   { to: "/admin/reservations", label: "예약", icon: reserveIcon, match: (p) => p.startsWith("/admin/reservations") },
-  { to: "/admin/attendance", label: "출석", icon: attendanceIcon, match: (p) => p.startsWith("/admin/attendance") },
+  { to: "/admin/attendance", label: "입퇴실", icon: attendanceIcon, match: (p) => p.startsWith("/admin/attendance") },
   { to: "/admin/members", label: "회원", icon: userIcon, match: (p) => p.startsWith("/admin/members") },
-  { to: "/admin/settings", label: "설정", icon: infoIcon, match: (p) => p.startsWith("/admin/settings") || p.startsWith("/admin/stats") },
+  { to: "/admin/settings", label: "더보기", icon: moreIcon, match: (p) => p.startsWith("/admin/settings") || p.startsWith("/admin/stats") },
 ];
 
 export default function BottomTabBar() {

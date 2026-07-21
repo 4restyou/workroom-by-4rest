@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import Section from "../components/Section";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import StatusBadge from "../components/StatusBadge";
 import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
@@ -19,7 +19,7 @@ import type {
   ReservationStatus,
   ReservationInsert,
 } from "../lib/types";
-import { buttonClass, card, tintCard, type TintColor } from "../lib/ui";
+import { buttonClass, card, tintCard } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
 const statusTabs: ("all" | ReservationStatus)[] = ["pending", "confirmed", "all", "canceled", "completed", "no_show"];
@@ -30,6 +30,7 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
   service: "서비스",
 };
 const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded", "service"];
+type ReservationView = "today" | "pending" | "longterm" | "all";
 
 type ReservationEdit = {
   status: ReservationStatus;
@@ -56,38 +57,6 @@ type ReservationEdit = {
   people: number;
 };
 
-const statusHelp: Record<ReservationStatus, string> = {
-  pending: "결제 또는 확인 대기",
-  confirmed: "방문 예정",
-  canceled: "취소됨",
-  completed: "이용 완료",
-  no_show: "미방문",
-};
-
-const statusListClass: Record<ReservationStatus, string> = {
-  pending: "border-workroom-ink bg-workroom-yellow/20",
-  confirmed: "border-workroom-line bg-workroom-sky/35",
-  canceled: "border-workroom-line bg-workroom-surface opacity-70",
-  completed: "border-workroom-line bg-workroom-surface",
-  no_show: "border-workroom-line bg-workroom-danger/20",
-};
-
-const statusMetaClass: Record<ReservationStatus, string> = {
-  pending: "bg-workroom-yellow text-workroom-ink",
-  confirmed: "bg-workroom-sky text-workroom-ink",
-  canceled: "bg-workroom-surface text-workroom-muted",
-  completed: "bg-workroom-ink text-white",
-  no_show: "bg-workroom-danger text-workroom-ink",
-};
-
-const statusPanelClass: Record<ReservationStatus, string> = {
-  pending: "border-workroom-ink bg-workroom-yellow/20",
-  confirmed: "border-workroom-ink bg-workroom-sky/80",
-  canceled: "border-workroom-line bg-workroom-surface opacity-85",
-  completed: "border-workroom-ink bg-workroom-surface",
-  no_show: "border-workroom-ink bg-workroom-danger/70",
-};
-
 function isReservationStatus(value: string | null): value is ReservationStatus {
   return Boolean(value && statusOptions.includes(value as ReservationStatus));
 }
@@ -105,6 +74,8 @@ export default function AdminReservations() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>(isReservationStatus(statusParam) ? statusParam : "all");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
+  const [viewMode, setViewMode] = useState<ReservationView>(statusParam === "pending" ? "pending" : reservationParam ? "all" : "today");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(reservationParam));
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [auditLogs, setAuditLogs] = useState<ReservationAuditLog[]>([]);
@@ -185,13 +156,15 @@ export default function AdminReservations() {
     return reservations
       .filter((reservation) => (archiveFilter === "archived" ? Boolean(reservation.deleted_at) : !reservation.deleted_at))
       .filter((reservation) => (dateFilter ? reservationCoversDate(reservation, dateFilter) : true))
+      .filter((reservation) => (viewMode === "longterm" ? isLongTermReservation(reservation) : true))
+      .filter((reservation) => (viewMode === "today" ? reservation.status !== "canceled" && reservation.status !== "no_show" : true))
       .filter((reservation) => {
         if (!q) return true;
         const nameMatch = reservation.name.toLowerCase().includes(q);
         const phoneMatch = qDigits.length > 0 && reservation.phone.replace(/\D/g, "").includes(qDigits);
         return nameMatch || phoneMatch;
       });
-  }, [archiveFilter, dateFilter, query, reservations]);
+  }, [archiveFilter, dateFilter, query, reservations, viewMode]);
 
   const statusCounts = useMemo(() => {
     const counts = Object.fromEntries(statusOptions.map((status) => [status, 0])) as Record<ReservationStatus, number>;
@@ -238,7 +211,9 @@ export default function AdminReservations() {
       setStatusFilter("all");
       setQuery("");
       setArchiveFilter(reservation.deleted_at ? "archived" : "active");
+      setViewMode("all");
       setSelectedReservationId(reservationParam);
+      setMobileDetailOpen(true);
     }
   }, [reservationParam, reservations]);
 
@@ -246,6 +221,7 @@ export default function AdminReservations() {
     if (reservationParam) return;
     setStatusFilter(isReservationStatus(statusParam) ? statusParam : "all");
     setDateFilter(dateParam ?? (statusParam ? "" : todayValue()));
+    setViewMode(statusParam === "pending" ? "pending" : dateParam ? "today" : statusParam ? "all" : "today");
   }, [dateParam, reservationParam, statusParam]);
 
   useEffect(() => {
@@ -422,12 +398,6 @@ export default function AdminReservations() {
     );
   }
 
-  async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    navigate("/admin", { replace: true });
-  }
-
   const pendingCount = reservations.filter((reservation) => !reservation.deleted_at && reservation.status === "pending").length;
   const selectedReservation = visibleReservations.find((reservation) => reservation.id === selectedReservationId) ?? null;
   const selectedDateConfirmed = dateFilter
@@ -435,6 +405,24 @@ export default function AdminReservations() {
     : [];
   const selectedDateLongTerm = selectedDateConfirmed.filter(isLongTermReservation);
   const selectedDatePeople = selectedDateConfirmed.reduce((sum, reservation) => sum + reservation.people, 0);
+
+  function changeView(next: ReservationView) {
+    setViewMode(next);
+    setArchiveFilter("active");
+    if (next === "today") {
+      setDateFilter(todayValue());
+      setStatusFilter("all");
+    } else if (next === "pending") {
+      setDateFilter("");
+      setStatusFilter("pending");
+    } else if (next === "longterm") {
+      setDateFilter("");
+      setStatusFilter("confirmed");
+    } else {
+      setDateFilter("");
+      setStatusFilter("all");
+    }
+  }
 
   function exportReservations() {
     downloadCsv(
@@ -460,101 +448,79 @@ export default function AdminReservations() {
     );
   }
 
+  const reservationCard = selectedReservation ? (
+    <ReservationCard
+      conflictCount={getConflictCount(selectedReservation, reservations)}
+      auditLogs={auditLogs}
+      paymentLogs={paymentLogs}
+      smsLogs={smsLogs}
+      passes={passes}
+      isArchived={Boolean(selectedReservation.deleted_at)}
+      key={selectedReservation.id}
+      reservation={selectedReservation}
+      inquiries={inquiries}
+      onArchive={() => void archiveReservation(selectedReservation.id)}
+      onReply={(inquiryId, reply) => void replyInquiry(inquiryId, reply)}
+      onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
+      onPatch={(payload) => void patchReservation(selectedReservation.id, payload)}
+      onPortoneRefund={() => void refundViaPortone(selectedReservation)}
+      onResendSms={(kind) => void resendStatusSms(selectedReservation, kind)}
+    />
+  ) : null;
+
   return (
-    <main className="pb-12">
-      <Section eyebrow="Admin" title="예약 관리" accent="ink">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium text-workroom-muted">오늘 이용자를 기본으로 표시하며, 월권·주간권 이용자도 이용기간에 맞춰 함께 표시합니다.</p>
-          <div className="flex flex-wrap gap-2">
-            <button className={buttonClass("secondary", "md")} disabled={!visibleReservations.length} onClick={exportReservations} type="button">현재 목록 CSV</button>
-            <button className={buttonClass("accent", "md")} onClick={() => setShowCreate((current) => !current)} type="button">
-              {showCreate ? "등록 닫기" : "+ 관리자 예약 등록"}
-            </button>
-          </div>
-        </div>
+    <AdminPage
+      actions={
+        <>
+          <button className={buttonClass("secondary", "md")} disabled={!visibleReservations.length} onClick={exportReservations} type="button">CSV 저장</button>
+          <button className={buttonClass("accent", "md")} onClick={() => setShowCreate((current) => !current)} type="button">
+            {showCreate ? "등록 닫기" : "예약 등록"}
+          </button>
+        </>
+      }
+      description="오늘 이용 현황을 기본으로 표시합니다. 월권·주간권도 이용일에 맞춰 포함됩니다."
+      title="예약"
+    >
+      <div className="admin-compact">
         {showCreate ? <ManualReservationForm onSubmit={(payload) => void createManualReservation(payload)} passes={passes} /> : null}
-        <div className={`${card} mb-5 grid gap-3 p-4`}>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className={buttonClass(archiveFilter === "active" ? "accent" : "secondary", "sm")}
-              onClick={() => setArchiveFilter("active")}
-              type="button"
-            >
-              진행 예약
-            </button>
-            <button
-              className={buttonClass(archiveFilter === "archived" ? "accent" : "secondary", "sm")}
-              onClick={() => setArchiveFilter("archived")}
-              type="button"
-            >
-              보관 예약
-            </button>
+        <div className="mb-4 bg-white px-3 pt-1 border-y border-workroom-line">
+          <AdminTabs
+            items={[
+              { value: "today", label: "오늘 운영", count: reservations.filter((item) => !item.deleted_at && reservationCoversDate(item, todayValue()) && item.status !== "canceled" && item.status !== "no_show").length },
+              { value: "pending", label: "확인 대기", count: pendingCount },
+              { value: "longterm", label: "장기 이용", count: reservations.filter((item) => !item.deleted_at && item.status === "confirmed" && isLongTermReservation(item)).length },
+              { value: "all", label: "전체·지난 예약" },
+            ]}
+            onChange={changeView}
+            value={viewMode}
+          />
+          <div className="grid gap-2 py-3 sm:grid-cols-[1fr_170px_auto_auto] sm:items-end">
+            <label className="grid gap-1 text-xs font-semibold text-workroom-muted">이름·전화 검색<input placeholder="이름 또는 전화번호" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+            <label className="grid gap-1 text-xs font-semibold text-workroom-muted">이용일<input type="date" value={dateFilter} onChange={(event) => { setDateFilter(event.target.value); setViewMode(event.target.value === todayValue() ? "today" : "all"); }} /></label>
+            <button className={buttonClass("secondary", "sm", "sm:h-[42px]")} onClick={() => void loadReservations()} type="button">새로고침</button>
+            <button className={buttonClass("secondary", "sm", "sm:h-[42px]")} onClick={() => { setArchiveFilter((current) => current === "active" ? "archived" : "active"); setViewMode("all"); }} type="button">{archiveFilter === "active" ? "보관 예약" : "진행 예약"}</button>
           </div>
-          <label className="grid gap-2 text-sm font-bold">
-            이름 · 전화 검색
-            <input placeholder="이름 또는 전화번호로 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
-          </label>
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end">
-            <label className="grid gap-2 text-sm font-bold">
-              이용일 필터 · 월권 포함
-              <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
-            </label>
-            <button className={buttonClass("accent", "md")} onClick={loadReservations} type="button">
-              새로고침
-            </button>
-            <button className={buttonClass("secondary", "md")} onClick={() => setDateFilter(todayValue())} type="button">
-              오늘
-            </button>
-            <button className={buttonClass("secondary", "md")} onClick={() => setDateFilter("")} type="button">
-              전체 날짜
-            </button>
-            <button className={buttonClass("secondary", "md")} onClick={signOut} type="button">
-              로그아웃
-            </button>
-          </div>
-          <div className="grid gap-2 border-t border-workroom-line pt-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-bold">상태별 보기</p>
-              {dateFilter ? (
-                <p className="text-xs font-bold text-workroom-muted">
-                  {formatDate(dateFilter)} 확정 이용 {selectedDateConfirmed.length}건 · {selectedDatePeople}명 · 장기 이용권 {selectedDateLongTerm.length}건
-                </p>
-              ) : null}
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <details className="border-t border-workroom-line py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-workroom-muted">예약 상태로 더 좁히기</summary>
+            <div className="mt-2 flex flex-wrap gap-1.5 pb-1">
               {statusTabs.map((status) => (
-                <StatusTab
-                  count={status === "all" ? statusBaseReservations.length : statusCounts[status]}
-                  isActive={statusFilter === status}
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  status={status}
-                />
+                <button className={`rounded-[4px] border px-2.5 py-1.5 text-xs font-semibold ${statusFilter === status ? "border-workroom-ink bg-workroom-ink text-white" : "border-workroom-line bg-white"}`} key={status} onClick={() => setStatusFilter(status)} type="button">
+                  {status === "all" ? "전체" : statusLabel[status]} {status === "all" ? statusBaseReservations.length : statusCounts[status]}
+                </button>
               ))}
             </div>
-          </div>
+          </details>
         </div>
 
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <p className={`${tintCard("yellow")} p-4 text-sm font-bold`}>
-            전체 확인이 필요한 예약 {pendingCount}건
-          </p>
-          <Link className={buttonClass("secondary", "md", "p-4 text-center text-sm")} to="/admin/stats">
-            통계 보기
-          </Link>
-          <Link className={buttonClass("secondary", "md", "p-4 text-center text-sm")} to="/admin/members">
-            회원 관리로 이동
-          </Link>
-        </div>
+        {dateFilter ? <p className="mb-4 text-sm font-medium text-workroom-muted">{formatDate(dateFilter)} · 확정 {selectedDateConfirmed.length}건 · {selectedDatePeople}명 · 장기 이용 {selectedDateLongTerm.length}건</p> : null}
 
         {isLoading ? <p className={`${tintCard("yellow")} p-4 font-bold`}>예약을 불러오는 중입니다.</p> : null}
-        {error ? <p className={`${tintCard("danger")} mb-4 p-4 text-sm font-bold`}>{error}</p> : null}
-        {success ? <p className={`${tintCard("mint")} mb-4 p-4 text-sm font-bold`}>{success}</p> : null}
+        <AdminFeedback error={error} success={success} />
         {!isLoading && !visibleReservations.length ? (
           <p className={`${card} mb-4 p-6 text-center font-bold`}>조건에 맞는 예약이 없습니다.</p>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+        <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
           <section className={`${card} p-3`}>
             <div className="mb-3 flex items-center justify-between gap-3 px-2">
               <h2 className="text-lg font-bold">{archiveFilter === "archived" ? "보관 예약" : "예약 목록"}</h2>
@@ -566,39 +532,31 @@ export default function AdminReservations() {
                   filterDate={dateFilter}
                   isSelected={reservation.id === selectedReservationId}
                   key={reservation.id}
-                  onSelect={() => setSelectedReservationId(reservation.id)}
+                  onSelect={() => { setSelectedReservationId(reservation.id); setMobileDetailOpen(true); }}
                   reservation={reservation}
                 />
               ))}
             </div>
           </section>
 
-          {selectedReservation ? (
-            <ReservationCard
-              conflictCount={getConflictCount(selectedReservation, reservations)}
-              auditLogs={auditLogs}
-              paymentLogs={paymentLogs}
-              smsLogs={smsLogs}
-              passes={passes}
-              isArchived={Boolean(selectedReservation.deleted_at)}
-              key={selectedReservation.id}
-              reservation={selectedReservation}
-              inquiries={inquiries}
-              onArchive={() => void archiveReservation(selectedReservation.id)}
-              onReply={(inquiryId, reply) => void replyInquiry(inquiryId, reply)}
-              onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
-              onPatch={(payload) => void patchReservation(selectedReservation.id, payload)}
-              onPortoneRefund={() => void refundViaPortone(selectedReservation)}
-              onResendSms={(kind) => void resendStatusSms(selectedReservation, kind)}
-            />
-          ) : (
+          <div className="hidden xl:block">{reservationCard ?? (
             <p className={`${card} p-6 text-center font-bold`}>
               왼쪽 목록에서 예약을 선택하면 상세가 표시됩니다.
             </p>
-          )}
+          )}</div>
         </div>
-      </Section>
-    </main>
+        {mobileDetailOpen && selectedReservation ? (
+          <div className="fixed inset-0 z-[70] overflow-y-auto bg-workroom-background xl:hidden">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-workroom-ink bg-workroom-background px-4 py-3">
+              <button className={buttonClass("secondary", "sm")} onClick={() => setMobileDetailOpen(false)} type="button">← 목록</button>
+              <p className="text-sm font-semibold">예약 상세</p>
+              <span className="w-[70px]" />
+            </div>
+            <div className="mx-auto max-w-2xl p-3 pb-24">{reservationCard}</div>
+          </div>
+        ) : null}
+      </div>
+    </AdminPage>
   );
 }
 
@@ -614,8 +572,8 @@ function ReservationListItem({
   reservation: Reservation;
 }) {
   const selectedClass = isSelected
-    ? "border-workroom-ink bg-workroom-yellow"
-    : `${statusListClass[reservation.status]} transition-colors hover:border-workroom-ink`;
+    ? "border-workroom-ink border-l-[4px] border-l-workroom-yellow bg-white"
+    : "border-workroom-line border-l-[4px] border-l-transparent bg-white transition-colors hover:border-workroom-ink";
   const mutedText = "text-workroom-muted";
   const longTerm = isLongTermReservation(reservation);
   const periodStart = reservation.access_start_date ?? reservation.date;
@@ -623,16 +581,10 @@ function ReservationListItem({
 
   return (
     <button
-      className={`rounded-card border px-4 py-3 text-left ${selectedClass}`}
+      className={`rounded-[6px] border px-4 py-3 text-left ${selectedClass}`}
       onClick={onSelect}
       type="button"
     >
-      <div className="mb-3 flex items-center justify-between gap-2 border-b border-workroom-line pb-2">
-        <span className={`rounded-[4px] border border-workroom-ink px-2 py-1 text-[11px] font-black ${statusMetaClass[reservation.status]}`}>
-          {statusHelp[reservation.status]}
-        </span>
-        {reservation.deleted_at ? <span className="text-[11px] font-bold text-workroom-muted">보관됨</span> : null}
-      </div>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold">{reservation.name}</p>
@@ -647,7 +599,7 @@ function ReservationListItem({
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
-          <span className="text-[11px] font-bold text-workroom-muted">{paymentWorkflowLabel(reservation)}</span>
+          <span className="text-[11px] font-medium text-workroom-muted">{paymentWorkflowLabel(reservation)}</span>
         </div>
       </div>
     </button>
@@ -756,45 +708,6 @@ function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit:
       </label>
       <button className={buttonClass("primary", "md", "w-full sm:w-auto sm:justify-self-start")} type="submit">예약 등록</button>
     </form>
-  );
-}
-
-function StatusTab({
-  count,
-  isActive,
-  onClick,
-  status,
-}: {
-  count: number;
-  isActive: boolean;
-  onClick: () => void;
-  status: "all" | ReservationStatus;
-}) {
-  const label = status === "all" ? "전체" : statusLabel[status];
-  const helper = status === "all" ? "모든 예약" : statusHelp[status];
-  const activeClass =
-    status === "all"
-      ? "border-workroom-ink bg-workroom-ink text-white"
-      : statusMetaClass[status];
-
-  return (
-    <button
-      className={`rounded-card border p-3 text-left transition-colors hover:border-workroom-ink ${
-        isActive ? activeClass : "border-workroom-line bg-workroom-surface"
-      }`}
-      onClick={onClick}
-      type="button"
-    >
-      <span className="block text-sm font-black">{label}</span>
-      <span className="mt-1 block text-2xl font-black">{count}건</span>
-      <span
-        className={`mt-1 block text-[11px] font-bold ${
-          isActive && (status === "all" || status === "completed") ? "text-white/70" : "text-workroom-muted"
-        }`}
-      >
-        {helper}
-      </span>
-    </button>
   );
 }
 
@@ -916,7 +829,7 @@ function ReservationCard({
   }
 
   return (
-    <article className={`${statusPanelClass[reservation.status]} rounded-card border p-5`}>
+    <article className="rounded-[8px] border border-workroom-line bg-white p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-2xl font-bold">{reservation.name}</h3>
@@ -941,12 +854,13 @@ function ReservationCard({
         <a className={buttonClass("secondary", "sm")} href={`sms:${reservation.phone}`}>
           문자 보내기
         </a>
-        <button className={buttonClass("accent", "sm")} onClick={() => void copyMessage("confirmed")} type="button">
-          {copiedMessage === "confirmed" ? "복사됨" : "확정 문구 복사"}
-        </button>
-        <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("canceled")} type="button">
-          {copiedMessage === "canceled" ? "복사됨" : "취소 문구 복사"}
-        </button>
+        <details className="relative">
+          <summary className={`${buttonClass("secondary", "sm")} list-none`}>안내 문구</summary>
+          <div className="absolute left-0 top-[calc(100%+6px)] z-10 grid w-40 gap-1 border border-workroom-ink bg-white p-2">
+            <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("confirmed")} type="button">{copiedMessage === "confirmed" ? "복사됨" : "확정 문구 복사"}</button>
+            <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("canceled")} type="button">{copiedMessage === "canceled" ? "복사됨" : "취소 문구 복사"}</button>
+          </div>
+        </details>
       </div>
 
       {conflictCount > 0 ? (
@@ -955,56 +869,44 @@ function ReservationCard({
         </p>
       ) : null}
 
-      <div className={`${tintCard(paymentWorkflowTone(reservation))} mt-4 p-4`}>
+      <div className="mt-4 border border-workroom-line border-l-[4px] border-l-workroom-yellow bg-workroom-background px-4 py-3.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-black">결제 진행 · {paymentWorkflowLabel(reservation)}</p>
+            <p className="text-sm font-semibold">결제 · {paymentWorkflowLabel(reservation)}</p>
             <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">{paymentWorkflowDescription(reservation)}</p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
             <button
-              className={buttonClass("primary", "sm")}
-              onClick={() => onPatch({ payment_status: "paid", payment_method: reservation.payment_preference === "onsite" ? "현장결제" : "온라인 카드" })}
+              className={buttonClass("accent", "sm")}
+              onClick={() => {
+                if (window.confirm(`${reservation.name}님의 외부·현장 결제를 완료 처리할까요? 예약도 함께 확정됩니다.`)) {
+                  onPatch({ payment_status: "paid", payment_method: reservation.payment_preference === "onsite" ? "현장결제" : "외부결제", status: "confirmed" });
+                }
+              }}
               type="button"
             >
-              결제 완료 처리
+              외부·현장 결제 완료
             </button>
           ) : null}
           {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
             <button
               className={buttonClass("secondary", "sm")}
-              onClick={() => onPatch({ payment_status: "service", payment_method: "서비스" })}
+              onClick={() => onPatch({ payment_status: "service", payment_method: "서비스", status: "confirmed" })}
               type="button"
             >
-              서비스 처리
+              서비스로 확정
             </button>
           ) : null}
-          {reservation.payment_status === "paid" && reservation.payment_key && (reservation.payment_method ?? "").includes("포트원") ? (
-            <button className={buttonClass("secondary", "sm", "border-workroom-danger")} onClick={onPortoneRefund} type="button">
-              PG 환불 실행
-            </button>
-          ) : null}
-          {reservation.status === "pending" ? (
-            <button className={buttonClass("secondary", "sm")} onClick={() => onPatch({ status: "confirmed" })} type="button">
+          {reservation.status === "pending" && (reservation.payment_status === "paid" || reservation.payment_status === "service") ? (
+            <button className={buttonClass("accent", "sm")} onClick={() => onPatch({ status: "confirmed" })} type="button">
               예약 확정
             </button>
           ) : null}
           {reservation.status === "confirmed" ? (
-            <button className={buttonClass("secondary", "sm")} onClick={() => onPatch({ status: "completed" })} type="button">
+            <button className={buttonClass("primary", "sm")} onClick={() => onPatch({ status: "completed" })} type="button">
               이용 완료
-            </button>
-          ) : null}
-          {reservation.status === "pending" || reservation.status === "confirmed" ? (
-            <button
-              className={buttonClass("secondary", "sm", "border-workroom-danger text-workroom-ink")}
-              onClick={() => {
-                if (window.confirm(`${reservation.name}님 예약을 노쇼로 처리할까요?`)) onPatch({ status: "no_show" });
-              }}
-              type="button"
-            >
-              노쇼 처리
             </button>
           ) : null}
         </div>
@@ -1148,7 +1050,9 @@ function ReservationCard({
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-3">
+      <details className="mt-5 border-t border-workroom-line pt-4">
+        <summary className="cursor-pointer text-sm font-semibold text-workroom-muted">상태·결제 기록 직접 수정</summary>
+      <div className="mt-4 grid gap-3">
         <label className="grid gap-2 text-sm font-bold">
           상태 변경
           <select value={status} onChange={(event) => setStatus(event.target.value as ReservationStatus)}>
@@ -1202,8 +1106,20 @@ function ReservationCard({
           </button>
         )}
       </div>
+      <div className="mt-3 flex flex-wrap gap-2 border-t border-workroom-line pt-3">
+        {reservation.status === "pending" || reservation.status === "confirmed" ? (
+          <button className={buttonClass("secondary", "sm", "border-red-400")} onClick={() => { if (window.confirm(`${reservation.name}님 예약을 노쇼로 처리할까요?`)) onPatch({ status: "no_show" }); }} type="button">노쇼 처리</button>
+        ) : null}
+        {reservation.payment_status === "paid" && reservation.payment_key && (reservation.payment_method ?? "").includes("포트원") ? (
+          <button className={buttonClass("secondary", "sm", "border-red-400")} onClick={onPortoneRefund} type="button">PG 환불 실행</button>
+        ) : null}
+      </div>
+      </details>
 
-      <div className="mt-5">
+      <details className="mt-5 border-t border-workroom-line pt-4">
+        <summary className="cursor-pointer text-sm font-semibold text-workroom-muted">문자·결제·변경 이력</summary>
+        <div className="mt-4">
+      <div>
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-bold">문자 발송 이력</p>
           <div className="flex flex-wrap gap-2">
@@ -1268,6 +1184,8 @@ function ReservationCard({
           </p>
         )}
       </div>
+        </div>
+      </details>
     </article>
   );
 }
@@ -1355,14 +1273,6 @@ function paymentWorkflowDescription(reservation: Reservation) {
   if (reservation.status === "canceled") return reservation.payment_status === "unpaid" ? "미결제 취소입니다." : "환불 처리가 필요한지 확인해 주세요.";
   if (reservation.payment_preference === "onsite") return "현장 결제(카드·현금) 예약입니다. 방문 전 문의로 협의해 주세요.";
   return "회원이 카드로 결제하면 결제완료와 예약확정이 함께 자동 반영됩니다.";
-}
-
-function paymentWorkflowTone(reservation: Reservation): TintColor {
-  if (reservation.payment_status === "service") return "sky";
-  if (reservation.payment_status === "paid" || reservation.payment_status === "refunded") return "mint";
-  if (reservation.status === "canceled") return "danger";
-  if (reservation.payment_due_at && new Date(reservation.payment_due_at).getTime() < Date.now()) return "danger";
-  return reservation.payment_preference === "onsite" ? "sky" : "yellow";
 }
 
 function smsEventLabel(event: string) {
