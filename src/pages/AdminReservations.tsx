@@ -520,16 +520,15 @@ export default function AdminReservations() {
           <p className={`${card} mb-4 p-6 text-center font-bold`}>조건에 맞는 예약이 없습니다.</p>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+        <div className="grid gap-4 xl:grid-cols-[330px_minmax(0,1fr)]">
           <section className={`${card} p-3`}>
             <div className="mb-3 flex items-center justify-between gap-3 px-2">
               <h2 className="text-lg font-bold">{archiveFilter === "archived" ? "보관 예약" : "예약 목록"}</h2>
               <span className="text-sm font-bold text-workroom-muted">{visibleReservations.length}건</span>
             </div>
-            <div className="grid max-h-[680px] gap-2 overflow-y-auto pr-1">
+            <div className="overflow-hidden rounded-[6px] border border-workroom-line bg-white">
               {visibleReservations.map((reservation) => (
                 <ReservationListItem
-                  filterDate={dateFilter}
                   isSelected={reservation.id === selectedReservationId}
                   key={reservation.id}
                   onSelect={() => { setSelectedReservationId(reservation.id); setMobileDetailOpen(true); }}
@@ -561,46 +560,40 @@ export default function AdminReservations() {
 }
 
 function ReservationListItem({
-  filterDate,
   isSelected,
   onSelect,
   reservation,
 }: {
-  filterDate: string;
   isSelected: boolean;
   onSelect: () => void;
   reservation: Reservation;
 }) {
   const selectedClass = isSelected
-    ? "border-workroom-ink border-l-[4px] border-l-workroom-yellow bg-white"
-    : "border-workroom-line border-l-[4px] border-l-transparent bg-white transition-colors hover:border-workroom-ink";
-  const mutedText = "text-workroom-muted";
+    ? "bg-[#f3f0e8]"
+    : "bg-white hover:bg-[#faf8f2]";
   const longTerm = isLongTermReservation(reservation);
   const periodStart = reservation.access_start_date ?? reservation.date;
   const periodEnd = reservation.access_end_date ?? reservation.date;
+  const passName = reservation.pass_name_snapshot || reservation.pass_type;
 
   return (
     <button
-      className={`rounded-[6px] border px-4 py-3 text-left ${selectedClass}`}
+      aria-pressed={isSelected}
+      className={`group flex w-full items-center justify-between gap-3 border-b border-workroom-line px-4 py-3 text-left transition-colors last:border-b-0 ${selectedClass}`}
       onClick={onSelect}
       type="button"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-bold">{reservation.name}</p>
-          <p className={`mt-1 text-xs font-medium ${mutedText}`}>
-            {longTerm
-              ? `${filterDate ? `${formatDate(filterDate)} 이용 · ` : ""}${formatDate(periodStart)}–${formatDate(periodEnd)}`
-              : `${formatDate(reservation.date)} · ${formatTimeRange(reservation.start_time, reservation.end_time)}`}
-          </p>
-          <p className={`mt-1 text-xs font-medium ${mutedText}`}>
-            {reservation.pass_name_snapshot || reservation.pass_type}{longTerm ? " · 장기 이용" : ""}
-          </p>
-        </div>
-        <div className="grid justify-items-end gap-1">
-          <StatusBadge status={reservation.status} />
-          <span className="text-[11px] font-medium text-workroom-muted">{paymentWorkflowLabel(reservation)}</span>
-        </div>
+      <div className="min-w-0">
+        <p className="truncate font-bold">{reservation.name}</p>
+        <p className="mt-1 truncate text-xs font-medium text-workroom-muted">
+          {longTerm
+            ? `${formatDate(periodStart)}–${formatDate(periodEnd)} · ${passName}`
+            : `${formatDate(reservation.date)} ${formatTimeRange(reservation.start_time, reservation.end_time)} · ${passName}`}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <StatusBadge status={reservation.status} />
+        <span aria-hidden="true" className="text-base text-workroom-muted transition-transform group-hover:translate-x-0.5">›</span>
       </div>
     </button>
   );
