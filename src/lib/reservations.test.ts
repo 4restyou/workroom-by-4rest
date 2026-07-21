@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLongTermReservation, reservationEndTime, reservationPassName, reservationStartTime } from "./reservations";
+import { isLongTermReservation, reservationCoversDate, reservationEndTime, reservationPassName, reservationStartTime } from "./reservations";
 import type { Reservation } from "./types";
 
 function reservation(overrides: Partial<Reservation> = {}) {
@@ -25,6 +25,31 @@ describe("reservation helpers", () => {
     expect(isLongTermReservation(reservation({ pass_type: "주간권" }))).toBe(true);
     expect(isLongTermReservation(reservation({ access_start_date: "2026-07-19", access_end_date: "2026-08-15" }))).toBe(true);
     expect(isLongTermReservation(reservation())).toBe(false);
+  });
+
+  it("includes long-term passes on dates inside their access period", () => {
+    const monthly = reservation({
+      pass_name_snapshot: "월권 자유석",
+      access_start_date: "2026-07-01",
+      access_end_date: "2026-07-28",
+    });
+    expect(reservationCoversDate(monthly, "2026-07-22")).toBe(true);
+    expect(reservationCoversDate(monthly, "2026-07-29")).toBe(false);
+    expect(reservationCoversDate(reservation(), "2026-07-22")).toBe(false);
+  });
+
+  it("excludes paused days and unavailable weekdays from long-term access", () => {
+    const monthly = reservation({
+      pass_name_snapshot: "월권 자유석",
+      access_start_date: "2026-07-01",
+      access_end_date: "2026-07-28",
+      access_weekdays: [1, 2, 3, 4, 5],
+      access_paused_from: "2026-07-20",
+      access_paused_until: "2026-07-22",
+    });
+    expect(reservationCoversDate(monthly, "2026-07-19")).toBe(false);
+    expect(reservationCoversDate(monthly, "2026-07-21")).toBe(false);
+    expect(reservationCoversDate(monthly, "2026-07-23")).toBe(true);
   });
 
   it("builds reservation timestamps in Korea time", () => {

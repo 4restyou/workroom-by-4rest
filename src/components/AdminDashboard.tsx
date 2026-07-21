@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatDate, formatTimeRange, statusLabel, todayValue } from "../lib/format";
+import { reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, pressable, tintCard } from "../lib/ui";
 import type { Reservation } from "../lib/types";
@@ -27,7 +28,7 @@ export default function AdminDashboard() {
           .from("reservations")
           .select("*")
           .is("deleted_at", null)
-          .or(`date.gte.${today},status.eq.pending`)
+          .or(`date.gte.${today},status.eq.pending,access_end_date.gte.${today}`)
           .order("date", { ascending: true })
           .order("start_time", { ascending: true })
           .limit(120),
@@ -54,16 +55,18 @@ export default function AdminDashboard() {
     const today = todayValue();
     const pending = reservations.filter((reservation) => reservation.status === "pending");
     const overduePending = pending.filter((reservation) => reservation.date < today);
-    const todayConfirmed = reservations.filter((reservation) => reservation.date === today && reservation.status === "confirmed");
+    const todayConfirmed = reservations.filter((reservation) => reservationCoversDate(reservation, today) && reservation.status === "confirmed");
     const todaySchedule = reservations.filter(
-      (reservation) => reservation.date === today && (reservation.status === "pending" || reservation.status === "confirmed"),
+      (reservation) => reservationCoversDate(reservation, today) && (reservation.status === "pending" || reservation.status === "confirmed"),
     );
+    const todayConfirmedPeople = todayConfirmed.reduce((sum, reservation) => sum + reservation.people, 0);
     const upcoming = reservations.filter((reservation) => reservation.date >= today && isActiveReservation(reservation)).slice(0, 4);
 
     return {
       pending,
       overduePending,
       todayConfirmed,
+      todayConfirmedPeople,
       todaySchedule,
       upcoming,
       confirmed: reservations.filter((reservation) => reservation.status === "confirmed").length,
@@ -90,8 +93,8 @@ export default function AdminDashboard() {
         </Link>
         <Link to={`/admin/reservations?status=confirmed&date=${todayValue()}`} className={`${card} ${pressable} p-5 hover:border-workroom-ink`}>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">오늘 방문</p>
-          <p className="mt-2 text-4xl font-black">{data ? summary.todayConfirmed.length : "…"}</p>
-          <p className="mt-1 text-sm font-bold text-workroom-muted">확정 예약</p>
+          <p className="mt-2 text-4xl font-black">{data ? `${summary.todayConfirmedPeople}명` : "…"}</p>
+          <p className="mt-1 text-sm font-bold text-workroom-muted">확정 이용 · 월권 포함</p>
         </Link>
         <Link to="/admin/reservations?status=confirmed" className={`${tintCard("sky")} ${pressable} p-5 hover:border-workroom-ink`}>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-ink/70">확정 예약</p>

@@ -6,7 +6,7 @@ import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, formatTimeRange, statusLabel, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { refundReservationPayment } from "../lib/portone";
-import { isLongTermReservation } from "../lib/reservations";
+import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import type {
   PaymentStatus,
@@ -101,9 +101,9 @@ export default function AdminReservations() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [dateFilter, setDateFilter] = useState(dateParam ?? "");
+  const [dateFilter, setDateFilter] = useState(dateParam ?? (reservationParam || statusParam ? "" : todayValue()));
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>(isReservationStatus(statusParam) ? statusParam : "pending");
+  const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>(isReservationStatus(statusParam) ? statusParam : "all");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
@@ -184,7 +184,7 @@ export default function AdminReservations() {
     const qDigits = q.replace(/\D/g, "");
     return reservations
       .filter((reservation) => (archiveFilter === "archived" ? Boolean(reservation.deleted_at) : !reservation.deleted_at))
-      .filter((reservation) => (dateFilter ? reservation.date === dateFilter : true))
+      .filter((reservation) => (dateFilter ? reservationCoversDate(reservation, dateFilter) : true))
       .filter((reservation) => {
         if (!q) return true;
         const nameMatch = reservation.name.toLowerCase().includes(q);
@@ -209,12 +209,13 @@ export default function AdminReservations() {
         const aPending = a.status === "pending" ? 0 : 1;
         const bPending = b.status === "pending" ? 0 : 1;
         if (aPending !== bPending) return aPending - bPending;
+        if (dateFilter) return (a.start_time ?? "").localeCompare(b.start_time ?? "");
         const aFuture = a.date >= today ? 0 : 1;
         const bFuture = b.date >= today ? 0 : 1;
         if (aFuture !== bFuture) return aFuture - bFuture;
         return `${a.date} ${a.start_time ?? ""}`.localeCompare(`${b.date} ${b.start_time ?? ""}`);
       });
-  }, [statusBaseReservations, statusFilter]);
+  }, [dateFilter, statusBaseReservations, statusFilter]);
 
   useEffect(() => {
     if (!visibleReservations.length) {
@@ -243,8 +244,8 @@ export default function AdminReservations() {
 
   useEffect(() => {
     if (reservationParam) return;
-    if (isReservationStatus(statusParam)) setStatusFilter(statusParam);
-    if (dateParam) setDateFilter(dateParam);
+    setStatusFilter(isReservationStatus(statusParam) ? statusParam : "all");
+    setDateFilter(dateParam ?? (statusParam ? "" : todayValue()));
   }, [dateParam, reservationParam, statusParam]);
 
   useEffect(() => {
@@ -429,13 +430,20 @@ export default function AdminReservations() {
 
   const pendingCount = reservations.filter((reservation) => !reservation.deleted_at && reservation.status === "pending").length;
   const selectedReservation = visibleReservations.find((reservation) => reservation.id === selectedReservationId) ?? null;
+  const selectedDateConfirmed = dateFilter
+    ? statusBaseReservations.filter((reservation) => reservation.status === "confirmed")
+    : [];
+  const selectedDateLongTerm = selectedDateConfirmed.filter(isLongTermReservation);
+  const selectedDatePeople = selectedDateConfirmed.reduce((sum, reservation) => sum + reservation.people, 0);
 
   function exportReservations() {
     downloadCsv(
       `workroom-reservations-${todayValue()}.csv`,
-      ["예약일", "시작", "종료", "이름", "연락처", "이용권", "인원", "예약상태", "결제선택", "결제상태", "예약금액", "요청사항", "관리자메모"],
+      ["이용일", "이용기간 시작", "이용기간 종료", "시작", "종료", "이름", "연락처", "이용권", "인원", "예약상태", "결제선택", "결제상태", "예약금액", "요청사항", "관리자메모"],
       visibleReservations.map((reservation) => [
-        reservation.date,
+        dateFilter && reservationCoversDate(reservation, dateFilter) ? dateFilter : reservation.date,
+        reservation.access_start_date ?? reservation.date,
+        reservation.access_end_date ?? reservation.date,
         reservation.start_time,
         reservation.end_time,
         reservation.name,
@@ -456,7 +464,7 @@ export default function AdminReservations() {
     <main className="pb-12">
       <Section eyebrow="Admin" title="예약 관리" accent="ink">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium text-workroom-muted">전화·현장 예약도 같은 목록에서 관리할 수 있습니다.</p>
+          <p className="text-sm font-medium text-workroom-muted">오늘 이용자를 기본으로 표시하며, 월권·주간권 이용자도 이용기간에 맞춰 함께 표시합니다.</p>
           <div className="flex flex-wrap gap-2">
             <button className={buttonClass("secondary", "md")} disabled={!visibleReservations.length} onClick={exportReservations} type="button">현재 목록 CSV</button>
             <button className={buttonClass("accent", "md")} onClick={() => setShowCreate((current) => !current)} type="button">
@@ -488,7 +496,7 @@ export default function AdminReservations() {
           </label>
           <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end">
             <label className="grid gap-2 text-sm font-bold">
-              날짜별 필터
+              이용일 필터 · 월권 포함
               <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
             </label>
             <button className={buttonClass("accent", "md")} onClick={loadReservations} type="button">
@@ -505,7 +513,14 @@ export default function AdminReservations() {
             </button>
           </div>
           <div className="grid gap-2 border-t border-workroom-line pt-3">
-            <p className="text-sm font-bold">상태별 보기</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold">상태별 보기</p>
+              {dateFilter ? (
+                <p className="text-xs font-bold text-workroom-muted">
+                  {formatDate(dateFilter)} 확정 이용 {selectedDateConfirmed.length}건 · {selectedDatePeople}명 · 장기 이용권 {selectedDateLongTerm.length}건
+                </p>
+              ) : null}
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
               {statusTabs.map((status) => (
                 <StatusTab
@@ -522,7 +537,7 @@ export default function AdminReservations() {
 
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
           <p className={`${tintCard("yellow")} p-4 text-sm font-bold`}>
-            확인이 필요한 예약 {pendingCount}건
+            전체 확인이 필요한 예약 {pendingCount}건
           </p>
           <Link className={buttonClass("secondary", "md", "p-4 text-center text-sm")} to="/admin/stats">
             통계 보기
@@ -548,6 +563,7 @@ export default function AdminReservations() {
             <div className="grid max-h-[680px] gap-2 overflow-y-auto pr-1">
               {visibleReservations.map((reservation) => (
                 <ReservationListItem
+                  filterDate={dateFilter}
                   isSelected={reservation.id === selectedReservationId}
                   key={reservation.id}
                   onSelect={() => setSelectedReservationId(reservation.id)}
@@ -587,10 +603,12 @@ export default function AdminReservations() {
 }
 
 function ReservationListItem({
+  filterDate,
   isSelected,
   onSelect,
   reservation,
 }: {
+  filterDate: string;
   isSelected: boolean;
   onSelect: () => void;
   reservation: Reservation;
@@ -599,6 +617,9 @@ function ReservationListItem({
     ? "border-workroom-ink bg-workroom-yellow"
     : `${statusListClass[reservation.status]} transition-colors hover:border-workroom-ink`;
   const mutedText = "text-workroom-muted";
+  const longTerm = isLongTermReservation(reservation);
+  const periodStart = reservation.access_start_date ?? reservation.date;
+  const periodEnd = reservation.access_end_date ?? reservation.date;
 
   return (
     <button
@@ -616,9 +637,13 @@ function ReservationListItem({
         <div>
           <p className="font-bold">{reservation.name}</p>
           <p className={`mt-1 text-xs font-medium ${mutedText}`}>
-            {formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}
+            {longTerm
+              ? `${filterDate ? `${formatDate(filterDate)} 이용 · ` : ""}${formatDate(periodStart)}–${formatDate(periodEnd)}`
+              : `${formatDate(reservation.date)} · ${formatTimeRange(reservation.start_time, reservation.end_time)}`}
           </p>
-          <p className={`mt-1 text-xs font-medium ${mutedText}`}>{reservation.pass_name_snapshot || reservation.pass_type}</p>
+          <p className={`mt-1 text-xs font-medium ${mutedText}`}>
+            {reservation.pass_name_snapshot || reservation.pass_type}{longTerm ? " · 장기 이용" : ""}
+          </p>
         </div>
         <div className="grid justify-items-end gap-1">
           <StatusBadge status={reservation.status} />
