@@ -70,6 +70,8 @@ export default function Header({ adminMode }: HeaderProps) {
               <NavLink className={adminNavClass} to="/admin/stats">매출</NavLink>
               <NavLink className={adminNavClass} to="/admin/settings">설정</NavLink>
             </div>
+            {/* 공개 사이트(홈·명함첩·메모판)로 나가는 문 — 모바일에서도 노출 */}
+            <Link className={authButtonClass} to="/">사이트</Link>
             <NotificationBell />
             <button className={authButtonClass} onClick={() => void signOut()} type="button">나가기</button>
           </nav>

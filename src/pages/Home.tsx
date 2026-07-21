@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import FeatureCard, { type FeatureIcon } from "../components/FeatureCard";
 import { AlertIcon, BusIcon, CheckIcon, IdCardIcon, ParkingIcon, PinIcon, SubwayIcon } from "../components/icons";
 import MemberDashboard from "../components/MemberDashboard";
@@ -223,10 +223,17 @@ export default function Home() {
   return (
     <main className="pb-28 sm:pb-0">
       {/* Signed-in members get a "today" dashboard in place of the marketing
-          hero; visitors (and the initial unknown state) see the hero. */}
+          hero; visitors, admins (checking the public site) and the initial
+          unknown state see the hero. Admins reach 관리자 홈 via the header. */}
       {viewerRole === "admin" ? (
-        <Navigate replace to="/admin/dashboard" />
-      ) : viewerRole === "user" ? (
+        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <div className={`${tintCard("yellow")} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}>
+            <p className="text-sm font-bold">관리자로 로그인한 상태로 공개 화면을 보고 있어요.</p>
+            <Link className={buttonClass("primary", "sm")} to="/admin/dashboard">관리자 홈으로</Link>
+          </div>
+        </div>
+      ) : null}
+      {viewerRole === "user" ? (
         <MemberDashboard />
       ) : (
         <section className="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:px-6 sm:pb-16 sm:pt-16">
