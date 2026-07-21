@@ -897,9 +897,9 @@ update passes
 set is_active = false
 where name in ('1시간권', '종일권 라이트', '종일권 스탠다드', '주간권 라이트', '주간권 스탠다드');
 
-update passes set description = '기본 이용권 / 커피 1잔', price = 12000, sort_order = 1, is_active = true where name = '3시간권';
+update passes set description = '기본 이용권 / 커피 1잔', price = 14000, sort_order = 1, is_active = true where name = '3시간권';
 insert into passes (name, description, price, sort_order)
-select '3시간권', '기본 이용권 / 커피 1잔', 12000, 1
+select '3시간권', '기본 이용권 / 커피 1잔', 14000, 1
 where not exists (select 1 from passes where name = '3시간권');
 
 update passes set description = '3시간 이후 좌석 여유 시 연장', price = 4000, sort_order = 2, is_active = true where name = '추가 1시간';
@@ -917,15 +917,25 @@ insert into passes (name, description, price, sort_order)
 select '주간권', '월-금 09:00-22:00 / 커피 1일 3잔', 149000, 4
 where not exists (select 1 from passes where name = '주간권');
 
-update passes set description = '4주 기준 / 비지정석 / 커피 1일 3잔', price = 199000, sort_order = 5, is_active = true where name = '월권 자유석';
+update passes set description = '4주 기준 / 비지정석 / 커피 1일 3잔', price = 229000, sort_order = 5, is_active = true where name = '월권 자유석';
 insert into passes (name, description, price, sort_order)
-select '월권 자유석', '4주 기준 / 비지정석 / 커피 1일 3잔', 199000, 5
+select '월권 자유석', '4주 기준 / 비지정석 / 커피 1일 3잔', 229000, 5
 where not exists (select 1 from passes where name = '월권 자유석');
 
 update passes set description = '4주 기준 / 지정석 / 커피 1일 3잔', price = 299000, sort_order = 6, is_active = true where name = '월권 지정석';
 insert into passes (name, description, price, sort_order)
 select '월권 지정석', '4주 기준 / 지정석 / 커피 1일 3잔', 299000, 6
 where not exists (select 1 from passes where name = '월권 지정석');
+
+update passes
+set description = '현재는 일요일만 가능합니다. 09:00~22:00, 주류 및 음식 반입은 불가하며 음료와 간단한 핑거푸드는 가능합니다.',
+    price = 300000,
+    sort_order = 7,
+    is_active = true
+where name = '단체 및 모임 문의';
+insert into passes (name, description, price, sort_order)
+select '단체 및 모임 문의', '현재는 일요일만 가능합니다. 09:00~22:00, 주류 및 음식 반입은 불가하며 음료와 간단한 핑거푸드는 가능합니다.', 300000, 7
+where not exists (select 1 from passes where name = '단체 및 모임 문의');
 
 update passes
 set seat_type_id = (select id from seat_types where name = '공용석')
