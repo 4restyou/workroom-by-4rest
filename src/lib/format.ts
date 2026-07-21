@@ -41,6 +41,14 @@ export function todayValue() {
   return formatDateInputValue(new Date());
 }
 
+// 예약 가능 기간: 오늘부터 최대 2개월 뒤 날짜(YYYY-MM-DD)까지.
+export const MAX_BOOKING_MONTHS = 2;
+
+export function maxBookingDateValue(from = new Date()) {
+  const limit = new Date(from.getFullYear(), from.getMonth() + MAX_BOOKING_MONTHS, from.getDate());
+  return formatDateInputValue(limit);
+}
+
 export function formatDateInputValue(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

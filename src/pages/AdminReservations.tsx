@@ -19,7 +19,7 @@ import type {
   ReservationStatus,
   ReservationInsert,
 } from "../lib/types";
-import { badge, buttonClass, card, tintCard, type TintColor } from "../lib/ui";
+import { buttonClass, card, tintCard, type TintColor } from "../lib/ui";
 
 const statusOptions: ReservationStatus[] = ["pending", "confirmed", "canceled", "completed", "no_show"];
 const statusTabs: ("all" | ReservationStatus)[] = ["pending", "confirmed", "all", "canceled", "completed", "no_show"];
@@ -363,20 +363,6 @@ export default function AdminReservations() {
     setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "refunded" as const } : item)));
   }
 
-  async function markPaymentLinkSent(reservation: Reservation) {
-    const count = reservation.payment_link_send_count ?? 0;
-    if (count >= 1 && !window.confirm(`이미 결제 링크 발송 기록이 ${count}회 있습니다. 다시 기록할까요?`)) return;
-    const sentAt = new Date();
-    const dueAt = new Date(sentAt.getTime() + 2 * 60 * 60 * 1000);
-    await patchReservation(reservation.id, {
-      payment_preference: "online",
-      payment_method: "온라인 카드",
-      payment_link_sent_at: sentAt.toISOString(),
-      payment_due_at: dueAt.toISOString(),
-      payment_link_send_count: (reservation.payment_link_send_count ?? 0) + 1,
-    });
-  }
-
   async function resendStatusSms(reservation: Reservation, kind: "confirmed" | "canceled") {
     if (!supabase) return;
     const { error: invokeError } = await supabase.functions.invoke("admin-reservation-sms", {
@@ -585,7 +571,6 @@ export default function AdminReservations() {
               onReply={(inquiryId, reply) => void replyInquiry(inquiryId, reply)}
               onSave={(payload) => void saveReservation(selectedReservation.id, payload)}
               onPatch={(payload) => void patchReservation(selectedReservation.id, payload)}
-              onPaymentLinkSent={() => void markPaymentLinkSent(selectedReservation)}
               onPortoneRefund={() => void refundViaPortone(selectedReservation)}
               onResendSms={(kind) => void resendStatusSms(selectedReservation, kind)}
             />
@@ -799,7 +784,6 @@ function ReservationCard({
   onReply,
   onSave,
   onPatch,
-  onPaymentLinkSent,
   onPortoneRefund,
   onResendSms,
 }: {
@@ -815,7 +799,6 @@ function ReservationCard({
   onReply: (inquiryId: string, reply: string) => void;
   onSave: (payload: ReservationEdit) => void;
   onPatch: (payload: Partial<Reservation>) => void;
-  onPaymentLinkSent: () => void;
   onPortoneRefund: () => void;
   onResendSms: (kind: "confirmed" | "canceled") => void;
 }) {
@@ -951,16 +934,8 @@ function ReservationCard({
             <p className="text-sm font-black">결제 진행 · {paymentWorkflowLabel(reservation)}</p>
             <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">{paymentWorkflowDescription(reservation)}</p>
           </div>
-          {reservation.payment_link_send_count ? (
-            <span className={badge("sky")}>링크 기록 {reservation.payment_link_send_count}회</span>
-          ) : null}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {reservation.payment_preference === "online" && reservation.payment_status !== "paid" ? (
-            <button className={buttonClass("accent", "sm")} onClick={onPaymentLinkSent} type="button">
-              {reservation.payment_link_sent_at ? "결제 링크 재발송 기록" : "결제 링크 발송 완료"}
-            </button>
-          ) : null}
           {reservation.payment_status !== "paid" && reservation.status !== "canceled" ? (
             <button
               className={buttonClass("primary", "sm")}
@@ -1332,9 +1307,7 @@ function paymentWorkflowLabel(reservation: Reservation) {
   if (reservation.payment_status === "refunded") return "환불 완료";
   if (reservation.payment_status === "paid") return "결제 완료";
   if (reservation.status === "canceled") return "취소 · 환불 확인";
-  if (reservation.payment_preference === "onsite") return "방문 결제 예정";
-  if (!reservation.payment_link_sent_at) return "결제 링크 발송 전";
-  if (reservation.payment_due_at && new Date(reservation.payment_due_at).getTime() < Date.now()) return "결제 기한 초과";
+  if (reservation.payment_preference === "onsite") return "현장 결제 예정 (문의)";
   return "온라인 결제 대기";
 }
 
@@ -1342,10 +1315,8 @@ function paymentWorkflowDescription(reservation: Reservation) {
   if (reservation.payment_status === "paid") return `${reservation.payment_method || "결제"}로 완료 처리되었습니다.`;
   if (reservation.payment_status === "refunded") return "환불 완료로 기록된 예약입니다.";
   if (reservation.status === "canceled") return reservation.payment_status === "unpaid" ? "미결제 취소입니다." : "환불 처리가 필요한지 확인해 주세요.";
-  if (reservation.payment_preference === "onsite") return "방문 시 현장에서 결제할 예약입니다.";
-  if (!reservation.payment_link_sent_at) return "포스기에서 링크를 만든 뒤 고객에게 보내고 ‘발송 완료’를 눌러주세요.";
-  if (reservation.payment_due_at) return `결제 기한 · ${formatAuditTime(reservation.payment_due_at)}`;
-  return "결제 완료 여부를 확인해 주세요.";
+  if (reservation.payment_preference === "onsite") return "현장 결제(카드·현금) 예약입니다. 방문 전 문의로 협의해 주세요.";
+  return "회원이 ‘예약현황’에서 카드로 결제하면 자동으로 결제완료로 바뀝니다.";
 }
 
 function paymentWorkflowTone(reservation: Reservation): TintColor {

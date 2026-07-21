@@ -6,13 +6,14 @@ type CalendarProps = {
   month: Date; // any date within the month to display
   selected: string; // YYYY-MM-DD
   minMonth: Date; // can't navigate before this month
+  maxMonth?: Date; // can't navigate past this month (booking window limit)
   onSelect: (date: string) => void;
   onMonthChange: (month: Date) => void;
   isDisabled: (date: string) => boolean;
   isFull?: (date: string) => boolean;
 };
 
-export default function Calendar({ month, selected, minMonth, onSelect, onMonthChange, isDisabled, isFull }: CalendarProps) {
+export default function Calendar({ month, selected, minMonth, maxMonth, onSelect, onMonthChange, isDisabled, isFull }: CalendarProps) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const startWeekday = new Date(year, monthIndex, 1).getDay();
@@ -23,6 +24,8 @@ export default function Calendar({ month, selected, minMonth, onSelect, onMonthC
   for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
 
   const canPrev = year > minMonth.getFullYear() || (year === minMonth.getFullYear() && monthIndex > minMonth.getMonth());
+  const canNext =
+    !maxMonth || year < maxMonth.getFullYear() || (year === maxMonth.getFullYear() && monthIndex < maxMonth.getMonth());
 
   return (
     <div>
@@ -41,8 +44,9 @@ export default function Calendar({ month, selected, minMonth, onSelect, onMonthC
         </p>
         <button
           type="button"
+          disabled={!canNext}
           onClick={() => onMonthChange(new Date(year, monthIndex + 1, 1))}
-          className="grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-white text-sm font-bold"
+          className="grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-white text-sm font-bold disabled:text-workroom-line"
           aria-label="다음 달"
         >
           ›

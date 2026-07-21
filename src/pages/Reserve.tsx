@@ -5,7 +5,7 @@ import Section from "../components/Section";
 import { trackEvent } from "../lib/analytics";
 import { defaultPasses } from "../lib/defaultPasses";
 import { computeFullDates, type IntervalInput } from "../lib/availability";
-import {
+import { maxBookingDateValue,
   formatDate,
   formatDateInputValue,
   formatPhone,
@@ -226,9 +226,11 @@ export default function Reserve() {
   }, [calendarMonth, selectedSeatTypeId, seatCapacities, success]);
 
   const today = todayValue();
+  const maxBookable = maxBookingDateValue();
 
   function isDateDisabled(date: string) {
     if (date < today) return true;
+    if (date > maxBookable) return true;
     const exception = dateExceptions[date];
     if (exception?.is_closed) return true;
     const weekday = new Date(`${date}T00:00:00`).getDay();
@@ -301,6 +303,7 @@ export default function Reserve() {
     if (step === 2) {
       if (!form.date || form.date < todayValue()) return "오늘 이후 날짜를 선택해 주세요.";
       if (isClosedDay) return "선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.";
+      if (form.date > maxBookable) return "예약은 오늘부터 2개월 이내 날짜까지만 가능해요.";
       if (!form.start_time || !form.end_time) return "이용 시간을 확인해 주세요.";
       if (selectedDuration && shiftTime(form.start_time, selectedDuration) !== form.end_time)
         return `시간권은 시작 시간부터 ${selectedDuration}시간으로 예약됩니다.`;
@@ -492,7 +495,7 @@ export default function Reserve() {
         <div className="mb-6 grid gap-3 border-y border-workroom-ink py-4 text-sm font-bold leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
             <p>회원 전용 예약 · 예약 신청 후 확인 문자를 보내드립니다.</p>
-            <p className="mt-1 font-medium text-workroom-muted">온라인 결제 링크는 예약 확인 후 별도 발송 · 링크 수신 후 2시간 이내 결제 · 현장 결제는 방문 시 진행</p>
+            <p className="mt-1 font-medium text-workroom-muted">온라인 결제는 예약 확정 후 ‘예약현황’에서 카드로 진행 · 현장 결제(카드·현금)는 별도 문의 · 예약은 오늘부터 2개월 이내</p>
             {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
           </div>
           <span className={badge("yellow")}>MEMBER ONLY</span>
@@ -605,6 +608,7 @@ export default function Reserve() {
                   month={calendarMonth}
                   selected={form.date}
                   minMonth={startOfMonth(new Date())}
+                  maxMonth={startOfMonth(new Date(`${maxBookable}T00:00:00`))}
                   onSelect={(date) => selectDate(date)}
                   onMonthChange={setCalendarMonth}
                   isDisabled={isDateDisabled}
@@ -704,8 +708,8 @@ export default function Reserve() {
                       type="radio"
                     />
                     <span>
-                      <span className="block font-bold">온라인 결제</span>
-                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">예약 확인 후 문자로 결제 링크를 보내드립니다.</span>
+                      <span className="block font-bold">온라인 카드 결제</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">예약 확정 후 ‘예약현황’에서 카드로 바로 결제합니다.</span>
                     </span>
                   </label>
                   <label
@@ -721,8 +725,8 @@ export default function Reserve() {
                       type="radio"
                     />
                     <span>
-                      <span className="block font-bold">방문 결제</span>
-                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">방문할 때 현장에서 바로 결제합니다.</span>
+                      <span className="block font-bold">현장 결제</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">현장 결제(카드·현금)는 방문 전 별도로 문의해 주세요.</span>
                     </span>
                   </label>
                 </div>
@@ -754,7 +758,7 @@ export default function Reserve() {
                 <dt className="font-bold text-workroom-muted">금액</dt>
                 <dd className="font-bold">{selectedPassInfo?.price ? formatPrice(selectedPassInfo.price) : "확인 후 안내"}</dd>
                 <dt className="font-bold text-workroom-muted">결제</dt>
-                <dd className="font-bold">{form.payment_preference === "online" ? "온라인 결제 링크" : "방문 결제"}</dd>
+                <dd className="font-bold">{form.payment_preference === "online" ? "온라인 카드 결제" : "현장 결제(문의)"}</dd>
               </dl>
             </div>
           ) : null}
@@ -820,7 +824,7 @@ export default function Reserve() {
                   <dt className="font-bold text-workroom-muted">금액</dt>
                   <dd className="font-bold">{submittedReservation.price ? formatPrice(submittedReservation.price) : "확인 후 안내"}</dd>
                   <dt className="font-bold text-workroom-muted">결제</dt>
-                  <dd className="font-bold">{submittedReservation.paymentPreference === "online" ? "온라인 결제 링크" : "방문 결제"}</dd>
+                  <dd className="font-bold">{submittedReservation.paymentPreference === "online" ? "온라인 카드 결제" : "현장 결제(문의)"}</dd>
                 </dl>
               </div>
             ) : null}

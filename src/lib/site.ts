@@ -8,8 +8,10 @@ export const SITE = {
   booking: {
     memberOnly: true,
     confirmationLabel: "예약 신청 후 확인 문자를 보내드립니다.",
-    onlinePayment: "예약 확인 후 온라인 결제를 선택한 분께 별도의 결제 링크를 보내드립니다. 링크 수신 후 2시간 이내 결제해 주세요.",
-    onsitePayment: "현장 결제는 방문 시 바로 진행할 수 있습니다.",
+    onlinePayment: "온라인 결제는 예약 확정 후 ‘예약현황’에서 카드로 바로 결제할 수 있습니다.",
+    onsitePayment: "현장 결제(카드·현금)를 원하시면 방문 전 별도로 문의해 주세요.",
+    advanceLimitLabel: "예약은 이용일 기준 오늘부터 최대 2개월 이내까지 가능합니다.",
+    recurringNotice: "월권(자유석·지정석)은 정기결제로 이용할 수 있습니다. 정기결제 신청·해지는 문의해 주세요.",
   },
   business: {
     // 전자상거래법 표시 의무 항목. 대표자명은 확인 후 채운다.

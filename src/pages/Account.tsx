@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
-import { formatDate, formatPhone, formatPrice, formatTimeRange, todayValue } from "../lib/format";
+import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, todayValue } from "../lib/format";
 import { canPayOnline, payReservation } from "../lib/portone";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
@@ -501,7 +501,7 @@ export default function Account() {
                                 </div>
                               ) : (
                                 <p className="text-xs font-medium text-workroom-muted">
-                                  결제 안내는 확정 후 문자로 보내드립니다.
+                                  예약이 확정되면 이곳에서 카드로 결제할 수 있어요. 현장 결제(카드·현금)는 방문 전 별도로 문의해 주세요.
                                 </p>
                               )}
                             </div>
@@ -517,6 +517,7 @@ export default function Account() {
                                     <input
                                       type="date"
                                       min={todayValue()}
+                                      max={maxBookingDateValue()}
                                       value={editDraft.date}
                                       onChange={(event) => setEditDraft((draft) => ({ ...draft, date: event.target.value }))}
                                     />

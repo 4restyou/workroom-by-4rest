@@ -3,7 +3,7 @@ import { supabase } from "./supabase";
 import type { Reservation } from "./types";
 
 // PortOne(V2) 결제. 환경 변수 두 개가 모두 설정된 경우에만 활성화되며,
-// 없으면 기존 수동(결제 링크 안내) 흐름이 그대로 유지된다.
+// 없으면 결제 버튼이 숨겨지고 안내 문구만 표시된다.
 const STORE_ID = import.meta.env.VITE_PORTONE_STORE_ID as string | undefined;
 const CHANNEL_KEY = import.meta.env.VITE_PORTONE_CHANNEL_KEY as string | undefined;
 
