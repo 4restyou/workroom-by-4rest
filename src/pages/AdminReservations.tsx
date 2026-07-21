@@ -27,8 +27,9 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
   unpaid: "미결제",
   paid: "결제완료",
   refunded: "환불",
+  service: "서비스",
 };
-const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded"];
+const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded", "service"];
 
 type ReservationEdit = {
   status: ReservationStatus;
@@ -655,7 +656,7 @@ function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit:
       price_at_booking: pass?.price ?? null,
       seat_type_id: pass?.seat_type_id ?? null,
       payment_preference: draft.payment_preference,
-      payment_method: draft.payment_preference === "onsite" ? "현장결제" : null,
+      payment_method: draft.payment_status === "service" ? "서비스" : draft.payment_preference === "onsite" ? "현장결제" : null,
       payment_status: draft.payment_status,
       name: draft.name.trim(),
       phone: draft.phone.trim(),
@@ -719,8 +720,9 @@ function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit:
         </label>
         <label className="grid gap-1 text-xs font-bold text-workroom-muted">결제 상태
           <select value={draft.payment_status} onChange={(event) => setDraft((current) => ({ ...current, payment_status: event.target.value as PaymentStatus }))}>
-            <option value="unpaid">미결제</option>
-            <option value="paid">결제완료</option>
+            {paymentStatusOptions.filter((option) => option !== "refunded").map((option) => (
+              <option key={option} value={option}>{paymentStatusLabels[option]}</option>
+            ))}
           </select>
         </label>
       </div>
@@ -857,7 +859,7 @@ function ReservationCard({
     const longTerm = bookingDraft.pass_type.includes("주간권") || bookingDraft.pass_type.includes("월권");
     onSave({
       status,
-      payment_method: paymentMethod || null,
+      payment_method: paymentStatus === "service" ? "서비스" : paymentMethod === "서비스" ? null : paymentMethod || null,
       payment_status: paymentStatus,
       payment_preference: paymentPreference,
       admin_note: note,
@@ -936,13 +938,22 @@ function ReservationCard({
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {reservation.payment_status !== "paid" && reservation.status !== "canceled" ? (
+          {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
             <button
               className={buttonClass("primary", "sm")}
               onClick={() => onPatch({ payment_status: "paid", payment_method: reservation.payment_preference === "onsite" ? "현장결제" : "온라인 카드" })}
               type="button"
             >
               결제 완료 처리
+            </button>
+          ) : null}
+          {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
+            <button
+              className={buttonClass("secondary", "sm")}
+              onClick={() => onPatch({ payment_status: "service", payment_method: "서비스" })}
+              type="button"
+            >
+              서비스 처리
             </button>
           ) : null}
           {reservation.payment_status === "paid" && reservation.payment_key && (reservation.payment_method ?? "").includes("포트원") ? (
@@ -1304,6 +1315,7 @@ function paymentLogTint(status: ReservationPaymentLog["status"]) {
 }
 
 function paymentWorkflowLabel(reservation: Reservation) {
+  if (reservation.payment_status === "service") return "서비스 이용";
   if (reservation.payment_status === "refunded") return "환불 완료";
   if (reservation.payment_status === "paid") return "결제 완료";
   if (reservation.status === "canceled") return "취소 · 환불 확인";
@@ -1312,6 +1324,7 @@ function paymentWorkflowLabel(reservation: Reservation) {
 }
 
 function paymentWorkflowDescription(reservation: Reservation) {
+  if (reservation.payment_status === "service") return "결제 없이 제공한 서비스 예약입니다. 매출과 미수금에 포함되지 않습니다.";
   if (reservation.payment_status === "paid") return `${reservation.payment_method || "결제"}로 완료 처리되었습니다.`;
   if (reservation.payment_status === "refunded") return "환불 완료로 기록된 예약입니다.";
   if (reservation.status === "canceled") return reservation.payment_status === "unpaid" ? "미결제 취소입니다." : "환불 처리가 필요한지 확인해 주세요.";
@@ -1320,6 +1333,7 @@ function paymentWorkflowDescription(reservation: Reservation) {
 }
 
 function paymentWorkflowTone(reservation: Reservation): TintColor {
+  if (reservation.payment_status === "service") return "sky";
   if (reservation.payment_status === "paid" || reservation.payment_status === "refunded") return "mint";
   if (reservation.status === "canceled") return "danger";
   if (reservation.payment_due_at && new Date(reservation.payment_due_at).getTime() < Date.now()) return "danger";

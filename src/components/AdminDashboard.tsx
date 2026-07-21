@@ -128,7 +128,7 @@ export default function AdminDashboard() {
                 <p className="font-black">{formatTimeRange(reservation.start_time, reservation.end_time)}</p>
                 <div>
                   <p className="font-bold">{reservation.name} · {reservation.people}명</p>
-                  <p className="mt-0.5 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type} · {reservation.payment_status === "paid" ? "결제완료" : reservation.payment_preference === "onsite" ? "방문결제" : "미결제"}</p>
+                  <p className="mt-0.5 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type} · {reservation.payment_status === "paid" ? "결제완료" : reservation.payment_status === "service" ? "서비스" : reservation.payment_preference === "onsite" ? "방문결제" : "미결제"}</p>
                 </div>
                 <span className={badge(visitTone)}>{visitLabel}</span>
               </Link>

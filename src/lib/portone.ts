@@ -15,6 +15,7 @@ export function canPayOnline(reservation: Reservation): boolean {
     reservation.status === "confirmed" &&
     reservation.payment_status !== "paid" &&
     reservation.payment_status !== "refunded" &&
+    reservation.payment_status !== "service" &&
     (reservation.price_at_booking ?? 0) > 0
   );
 }

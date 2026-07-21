@@ -106,6 +106,7 @@ export default function AdminStats() {
       actualRevenue,
       receivable,
       refunded,
+      service: visibleReservations.filter((reservation) => reservation.payment_status === "service").length,
     };
   }, [priceByPassName, visibleReservations]);
 
@@ -199,6 +200,7 @@ export default function AdminStats() {
           <StatCard label="실결제 매출" value={formatPrice(summary.actualRevenue)} />
           <StatCard label="미수금" value={formatPrice(summary.receivable)} />
           <StatCard label="환불 처리 금액" value={formatPrice(summary.refunded)} />
+          <StatCard label="서비스 이용" value={`${summary.service}건`} />
         </div>
 
         <section className={`mt-5 ${card} p-5`}>

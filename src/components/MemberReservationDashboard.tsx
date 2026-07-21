@@ -110,8 +110,8 @@ function CurrentReservation({ attendance, now, reservation, today }: { attendanc
         {reservation.status === "confirmed" && (using || (isLong && today >= periodStart && today <= periodEnd)) ? (
           <Link className={buttonClass("primary", "sm")} to="/attendance">출근부 확인</Link>
         ) : null}
-        <span className={badge(reservation.payment_status === "paid" ? "mint" : reservation.payment_status === "refunded" ? "lilac" : "yellow")}>
-          {reservation.payment_status === "paid" ? "결제완료" : reservation.payment_status === "refunded" ? "환불완료" : "미결제"}
+        <span className={badge(reservation.payment_status === "paid" ? "mint" : reservation.payment_status === "refunded" ? "lilac" : reservation.payment_status === "service" ? "sky" : "yellow")}>
+          {reservation.payment_status === "paid" ? "결제완료" : reservation.payment_status === "refunded" ? "환불완료" : reservation.payment_status === "service" ? "서비스" : "미결제"}
         </span>
       </div>
     </article>

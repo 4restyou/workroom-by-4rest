@@ -23,7 +23,13 @@ const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const DEFAULT_ALLOWED_ORIGINS = ["https://workroomby4rest.netlify.app", "http://localhost:5173", "http://127.0.0.1:5173"];
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://work-room.kr",
+  "https://www.work-room.kr",
+  "https://workroomby4rest.netlify.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? DEFAULT_ALLOWED_ORIGINS.join(","))
   .split(",")
   .map((origin) => origin.trim())
@@ -159,6 +165,10 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
   if (reservation.payment_status === "paid") {
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: "ALREADY_PAID", message: "이미 결제 완료된 예약입니다." });
     return { ok: true, status: 200, message: "이미 결제 완료된 예약입니다." };
+  }
+  if (reservation.status !== "confirmed") {
+    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: "RESERVATION_NOT_CONFIRMED", message: "확정되지 않은 예약 결제 시도입니다." });
+    return { ok: false, status: 400, message: "확정된 예약만 결제할 수 있습니다." };
   }
   if (payment.status !== "PAID") {
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: payment.status ?? "UNKNOWN", message: "결제가 완료 상태가 아닙니다." });

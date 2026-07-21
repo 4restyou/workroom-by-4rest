@@ -1,5 +1,5 @@
 export type ReservationStatus = "pending" | "confirmed" | "canceled" | "completed" | "no_show";
-export type PaymentStatus = "unpaid" | "paid" | "refunded";
+export type PaymentStatus = "unpaid" | "paid" | "refunded" | "service";
 export type PaymentPreference = "online" | "onsite";
 export type MemberStatus = "pending" | "approved" | "rejected";
 

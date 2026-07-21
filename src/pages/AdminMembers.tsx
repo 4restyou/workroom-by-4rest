@@ -238,7 +238,7 @@ function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }:
               <p className="mt-1 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className={badge(reservation.payment_status === "paid" ? "mint" : reservation.payment_status === "refunded" ? "lilac" : "yellow")}>{reservation.payment_status === "paid" ? "결제완료" : reservation.payment_status === "refunded" ? "환불" : "미결제"}</span>
+              <span className={badge(reservation.payment_status === "paid" ? "mint" : reservation.payment_status === "refunded" ? "lilac" : reservation.payment_status === "service" ? "sky" : "yellow")}>{reservation.payment_status === "paid" ? "결제완료" : reservation.payment_status === "refunded" ? "환불" : reservation.payment_status === "service" ? "서비스" : "미결제"}</span>
               <StatusBadge status={reservation.status} />
             </div>
           </Link>

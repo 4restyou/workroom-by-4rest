@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
+import AddressSearchField from "../components/AddressSearchField";
 import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, todayValue } from "../lib/format";
 import { canPayOnline, payReservation } from "../lib/portone";
 import { ensureCurrentProfile } from "../lib/profiles";
@@ -66,6 +67,7 @@ export default function Account() {
   const [inquiryEditDraft, setInquiryEditDraft] = useState("");
   const [activeTab, setActiveTab] = useState<AccountTab>(tabParam === "profile" ? "profile" : "reservations");
   const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
+  const [detailAddress, setDetailAddress] = useState("");
   const [consent, setConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -149,9 +151,11 @@ export default function Account() {
     });
   }, [reservations]);
 
-  function updateField(name: keyof typeof form, value: string) {
+  const updateField = useCallback((name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }));
-  }
+  }, []);
+
+  const updateAddress = useCallback((value: string) => updateField("address", value), [updateField]);
 
   async function sendInquiry(reservationId: string) {
     if (!supabase || !profile) return;
@@ -287,12 +291,13 @@ export default function Account() {
       return;
     }
 
+    const isCompletingSignup = profile.role !== "admin" && (!profile.full_name || !profile.phone || !profile.consented_at);
     setIsSaving(true);
     const nextProfile = {
       ...profile,
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
-      address: form.address.trim() || null,
+      address: [form.address.trim(), detailAddress.trim()].filter(Boolean).join(" ") || null,
     };
 
     const { data: savedProfile, error: updateError } = await supabase.rpc("update_my_profile", {
@@ -314,6 +319,12 @@ export default function Account() {
     }
 
     setProfile(savedProfile as Profile);
+    setForm((current) => ({ ...current, address: (savedProfile as Profile).address ?? "" }));
+    setDetailAddress("");
+    if (isCompletingSignup) {
+      navigate("/", { replace: true });
+      return;
+    }
     setSuccess("내정보를 저장했습니다.");
   }
 
@@ -398,10 +409,12 @@ export default function Account() {
                     onChange={(event) => updateField("phone", formatPhone(event.target.value))}
                   />
                 </label>
-                <label className="grid gap-2 text-sm font-bold">
-                  주소
-                  <input placeholder="선택 입력" value={form.address} onChange={(event) => updateField("address", event.target.value)} />
-                </label>
+                <AddressSearchField
+                  address={form.address}
+                  detailAddress={detailAddress}
+                  onAddressChange={updateAddress}
+                  onDetailAddressChange={setDetailAddress}
+                />
                 <label className={`${tintCard("yellow")} flex items-start gap-3 p-4 text-sm font-bold`}>
                   <input
                     className="mt-0.5 h-5 w-5 shrink-0"
@@ -491,9 +504,13 @@ export default function Account() {
                                 결제된 예약이 취소되어 운영자가 환불을 확인 중입니다. 환불이 완료되면 이곳에 표시됩니다.
                               </p>
                             </div>
+                          ) : reservation.payment_status === "service" ? (
+                            <div className="mt-3">
+                              <span className={badge("sky")}>서비스 이용 · 결제 없음</span>
+                            </div>
                           ) : null}
 
-                          {reservation.status === "confirmed" && (reservation.price_at_booking ?? 0) > 0 ? (
+                          {reservation.status === "confirmed" && reservation.payment_status !== "service" && (reservation.price_at_booking ?? 0) > 0 ? (
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>

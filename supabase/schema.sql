@@ -50,7 +50,7 @@ create table if not exists reservations (
   message text,
   status text default 'pending' check (status in ('pending', 'confirmed', 'canceled', 'completed', 'no_show')),
   payment_method text,
-  payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'refunded')),
+  payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'refunded', 'service')),
   admin_note text,
   deleted_at timestamp with time zone,
   created_at timestamp with time zone default now(),
@@ -79,7 +79,7 @@ check (status in ('pending', 'confirmed', 'canceled', 'completed', 'no_show'));
 alter table reservations drop constraint if exists reservations_payment_status_check;
 alter table reservations
 add constraint reservations_payment_status_check
-check (payment_status in ('unpaid', 'paid', 'refunded'));
+check (payment_status in ('unpaid', 'paid', 'refunded', 'service'));
 
 update reservations set people = 1 where people is null or people < 1;
 update reservations set people = 12 where people > 12;
