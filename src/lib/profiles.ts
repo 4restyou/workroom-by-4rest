@@ -1,11 +1,11 @@
 import { supabase } from "./supabase";
 import type { Profile } from "./types";
 
-export function getGoogleRedirectUrl(path = "/account") {
+export function getGoogleRedirectUrl(path = "/") {
   return `${window.location.origin}${path}`;
 }
 
-export async function signInWithGoogle(path = "/account") {
+export async function signInWithGoogle(path = "/") {
   if (!supabase) {
     throw new Error("서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
   }

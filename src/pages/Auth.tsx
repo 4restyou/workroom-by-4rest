@@ -32,7 +32,7 @@ export default function Auth() {
       const { data } = await supabase.auth.getSession();
       if (!data.session) return;
       const profile = await getCurrentProfile();
-      navigate(profile?.role === "admin" ? "/admin/dashboard" : "/account", { replace: true });
+      navigate(profile?.role === "admin" ? "/admin/dashboard" : "/", { replace: true });
     }
 
     void redirectIfSignedIn();
@@ -51,7 +51,7 @@ export default function Auth() {
     setMessage("");
     setIsGoogleSubmitting(true);
     try {
-      await signInWithGoogle("/account");
+      await signInWithGoogle("/");
     } catch (loginError) {
       setError(authErrorMessage(loginError, "구글 로그인을 시작하지 못했습니다."));
       setIsGoogleSubmitting(false);
@@ -138,7 +138,7 @@ export default function Auth() {
       return;
     }
 
-    navigate("/account", { replace: true });
+    navigate("/", { replace: true });
   }
 
   return (
