@@ -2,25 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import { signInWithGoogle } from "../lib/profiles";
+import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { CheckInResult } from "../lib/types";
 
 type State = "checking" | "need-login" | "done";
-
-function getPosition(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
-    );
-  });
-}
 
 export default function CheckIn() {
   const [params] = useSearchParams();
@@ -47,11 +34,11 @@ export default function CheckIn() {
         return;
       }
       // 현재 위치는 출근 확인에만 사용하고 저장하지 않습니다. (매장 좌표 미설정 시 위치는 무시됨)
-      const pos = await getPosition();
+      const geo = await getPosition();
       const { data, error } = await supabase.rpc("attendance_check_in", {
         p_token: token,
-        p_lat: pos?.lat ?? null,
-        p_lng: pos?.lng ?? null,
+        p_lat: geo.pos?.lat ?? null,
+        p_lng: geo.pos?.lng ?? null,
       });
       if (error) {
         setResult({ ok: false, message: "출근 처리 중 오류가 발생했습니다." });

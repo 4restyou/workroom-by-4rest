@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, pressable, tintCard } from "../lib/ui";
 import { CheckIcon } from "./icons";
@@ -34,20 +35,6 @@ type DashData = {
   checkedInToday: boolean;
 };
 
-function getPosition(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
-    );
-  });
-}
-
 type GeoCheckInState =
   | { phase: "idle" }
   | { phase: "busy" }
@@ -65,12 +52,21 @@ export default function MemberDashboard() {
   async function geoCheckIn(silent: boolean) {
     if (!supabase) return;
     setGeoState({ phase: "busy" });
-    const pos = await getPosition();
-    if (!pos) {
-      setGeoState(silent ? { phase: "idle" } : { phase: "failed", message: "위치를 확인하지 못했어요. 위치 권한을 허용해 주세요." });
+    const geo = await getPosition();
+    if (!geo.pos) {
+      setGeoState(
+        silent
+          ? { phase: "idle" }
+          : {
+              phase: "failed",
+              message: geo.denied
+                ? "위치 권한이 꺼져 있어요. 아이폰은 설정 > 개인정보 보호 > 위치 서비스 > Safari 웹사이트를 '사용하는 동안'으로 켠 뒤 다시 시도해 주세요."
+                : "위치를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.",
+            },
+      );
       return;
     }
-    const { data: rpcData, error } = await supabase.rpc("attendance_check_in_geo", { p_lat: pos.lat, p_lng: pos.lng });
+    const { data: rpcData, error } = await supabase.rpc("attendance_check_in_geo", { p_lat: geo.pos.lat, p_lng: geo.pos.lng });
     const result = rpcData as { ok?: boolean; already?: boolean; message?: string; coupon?: boolean } | null;
     if (error || !result?.ok) {
       setGeoState(silent ? { phase: "idle" } : { phase: "failed", message: result?.message ?? "지금은 출근 처리를 할 수 없어요." });
