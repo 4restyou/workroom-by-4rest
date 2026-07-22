@@ -524,10 +524,22 @@ export default function AdminSettings() {
               <div className="grid gap-2">
                 <p className="text-sm font-medium leading-6 text-workroom-muted">
                   이 QR을 출력해 매장에 붙이세요. 회원이 스캔하면 출근 도장이 찍혀요. (오늘 확정 예약자만 출근 가능)
+                  NFC 스티커에도 아래 ‘체크인 주소 복사’로 같은 주소를 쓰면, 폰을 갖다 대는 것만으로 체크인됩니다.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button className={buttonClass("accent", "sm")} disabled={!settings["attendance_qr_token"]} onClick={downloadQrSvg} type="button">
                     SVG로 저장
+                  </button>
+                  <button
+                    className={buttonClass("secondary", "sm")}
+                    disabled={!settings["attendance_qr_token"]}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(`${window.location.origin}/checkin?t=${settings["attendance_qr_token"]}`);
+                      setSuccess("체크인 주소를 복사했습니다. NFC 스티커에 그대로 쓰면 돼요.");
+                    }}
+                    type="button"
+                  >
+                    체크인 주소 복사 (NFC용)
                   </button>
                   <button className={buttonClass("secondary", "sm")} onClick={() => void regenerateToken()} type="button">
                     QR 재발급
@@ -629,7 +641,7 @@ export default function AdminSettings() {
 
   async function regenerateToken() {
     if (!supabase) return;
-    if (!window.confirm("QR 토큰을 재생성할까요?\n매장에 붙어 있는 기존 QR은 즉시 사용할 수 없게 되며, 새 QR로 교체해야 합니다.")) return;
+    if (!window.confirm("QR 토큰을 재생성할까요?\n기존 QR과 NFC 스티커는 즉시 사용할 수 없게 되며, 새 주소로 모두 교체해야 합니다.")) return;
     const token = crypto.randomUUID().replace(/-/g, "");
     const { error: tokenError } = await supabase.from("space_settings").upsert({ key: "attendance_qr_token", value: token }, { onConflict: "key" });
     if (tokenError) {

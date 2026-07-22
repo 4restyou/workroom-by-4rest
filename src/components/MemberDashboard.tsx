@@ -34,10 +34,72 @@ type DashData = {
   checkedInToday: boolean;
 };
 
+function getPosition(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+    );
+  });
+}
+
+type GeoCheckInState =
+  | { phase: "idle" }
+  | { phase: "busy" }
+  | { phase: "done"; message: string }
+  | { phase: "failed"; message: string };
+
 export default function MemberDashboard() {
   const [data, setData] = useState<DashData | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [geoState, setGeoState] = useState<GeoCheckInState>({ phase: "idle" });
+
+  // 위치 기반 출근. silent=true(자동 시도)일 때는 실패해도 조용히 넘어간다 —
+  // 예약이 없거나 매장 밖이면 배너만 남고 아무 일도 일어나지 않는다.
+  async function geoCheckIn(silent: boolean) {
+    if (!supabase) return;
+    setGeoState({ phase: "busy" });
+    const pos = await getPosition();
+    if (!pos) {
+      setGeoState(silent ? { phase: "idle" } : { phase: "failed", message: "위치를 확인하지 못했어요. 위치 권한을 허용해 주세요." });
+      return;
+    }
+    const { data: rpcData, error } = await supabase.rpc("attendance_check_in_geo", { p_lat: pos.lat, p_lng: pos.lng });
+    const result = rpcData as { ok?: boolean; already?: boolean; message?: string; coupon?: boolean } | null;
+    if (error || !result?.ok) {
+      setGeoState(silent ? { phase: "idle" } : { phase: "failed", message: result?.message ?? "지금은 출근 처리를 할 수 없어요." });
+      return;
+    }
+    setGeoState({
+      phase: "done",
+      message: result.already ? "이미 출근 도장이 찍혀 있어요." : result.coupon ? "출근 도장 완료! 스탬프를 다 채워 쿠폰이 발급됐어요 🎉" : "출근 도장이 자동으로 찍혔어요!",
+    });
+    setData((current) => (current ? { ...current, checkedInToday: true, stamps: result.already ? current.stamps : current.stamps + 1 } : current));
+  }
+
+  // 위치 권한을 이미 허용해 둔 회원은 대시보드를 여는 것만으로 자동 출근을
+  // 시도한다 (권한 미허용 상태에서는 팝업을 띄우지 않도록 버튼으로만).
+  useEffect(() => {
+    if (!data || data.checkedInToday || geoState.phase !== "idle") return;
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return;
+    let active = true;
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((status) => {
+        if (active && status.state === "granted") void geoCheckIn(true);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.checkedInToday, data === null]);
 
   useEffect(() => {
     let active = true;
@@ -114,6 +176,29 @@ export default function MemberDashboard() {
           </span>
         ) : null}
       </div>
+
+      {data && !data.checkedInToday && geoState.phase !== "done" ? (
+        <div className={`${tintCard("sky")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}>
+          <p className="text-sm font-bold">
+            지금 워크룸에 계신가요? 위치 확인으로 출근 도장을 찍을 수 있어요.
+            <span className="block text-xs font-medium text-workroom-muted">위치는 확인에만 사용하고 저장하지 않아요. 한 번 허용하면 다음부터 자동으로 찍혀요.</span>
+          </p>
+          <button
+            className={buttonClass("primary", "sm")}
+            disabled={geoState.phase === "busy"}
+            onClick={() => void geoCheckIn(false)}
+            type="button"
+          >
+            {geoState.phase === "busy" ? "확인 중…" : "위치로 출근 도장"}
+          </button>
+        </div>
+      ) : null}
+      {geoState.phase === "done" ? (
+        <p className={`${tintCard("yellow")} mt-4 px-4 py-3 text-sm font-bold`}>{geoState.message}</p>
+      ) : null}
+      {geoState.phase === "failed" ? (
+        <p className={`${tintCard("danger")} mt-4 px-4 py-3 text-sm font-bold`}>{geoState.message}</p>
+      ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-[1.4fr_1fr]">
         {/* Next reservation */}
