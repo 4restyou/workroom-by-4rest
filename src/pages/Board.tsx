@@ -144,9 +144,9 @@ function Note({
   const [draft, setDraft] = useState(post.body);
   const [draftColor, setDraftColor] = useState<CardAccent>(post.color);
   const [saving, setSaving] = useState(false);
-  // 긴 메모는 접어두고 '더보기'로 펼친다 (같은 줄 카드가 세로로 끝없이 길어지는 것 방지)
-  const isLong = post.body.length > 180 || post.body.split("\n").length > 6;
-  const [expanded, setExpanded] = useState(false);
+  // 긴 메모는 열 흐름을 끊고 전체 폭(1단)으로 넓게 붙인다 — 세로로 길어지는 대신
+  // 가로로 풀어써서 읽기 편하게. (모바일 2단 → 긴 글은 1단)
+  const isLong = post.body.length > 140 || post.body.split("\n").length > 5;
   // 답글(이어붙이는 메모)
   const [replying, setReplying] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
@@ -179,7 +179,7 @@ function Note({
 
   return (
     <li
-      className={`relative mb-5 mt-2 flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${tilt(post.id)}`}
+      className={`relative mb-5 mt-2 flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "[column-span:all] rotate-0" : tilt(post.id)}`}
     >
       {/* 압정 */}
       <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
@@ -223,18 +223,7 @@ function Note({
         </div>
       ) : (
         <>
-          <p className={`whitespace-pre-line break-words text-sm font-bold leading-6 ${isLong && !expanded ? "line-clamp-5" : ""}`}>
-            {post.body}
-          </p>
-          {isLong ? (
-            <button
-              type="button"
-              className="self-start text-[11px] font-black underline underline-offset-2 text-workroom-ink/70 hover:text-workroom-ink"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? "접기 ▲" : "더보기 ▾"}
-            </button>
-          ) : null}
+          <p className="whitespace-pre-line break-words text-sm font-bold leading-6">{post.body}</p>
           <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-[11px] font-bold text-workroom-ink/60">
             <span className="truncate">{post.author_name}</span>
             <span className="shrink-0">{formatDate(post.created_at)}</span>
