@@ -18,6 +18,7 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     color: "yellow",
     is_pinned: true,
     is_hidden: false,
+    parent_id: null,
     created_at: "2026-06-18T10:00:00+09:00",
   },
   {
@@ -29,6 +30,7 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     color: "sky",
     is_pinned: false,
     is_hidden: false,
+    parent_id: null,
     created_at: "2026-06-19T11:30:00+09:00",
   },
   {
@@ -40,6 +42,7 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     color: "yellow",
     is_pinned: false,
     is_hidden: false,
+    parent_id: null,
     created_at: "2026-06-19T15:10:00+09:00",
   },
   {
@@ -51,6 +54,7 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     color: "sky",
     is_pinned: false,
     is_hidden: false,
+    parent_id: null,
     created_at: "2026-06-20T09:20:00+09:00",
   },
   {
@@ -62,7 +66,20 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     color: "yellow",
     is_pinned: false,
     is_hidden: false,
+    parent_id: null,
     created_at: "2026-06-20T13:45:00+09:00",
+  },
+  {
+    id: "demo-reply-1",
+    profile_id: "demo-profile-4",
+    author_name: "해인",
+    kind: "message",
+    body: "저도 금요일 좋아요! 몇 시쯤 생각하세요?",
+    color: "sky",
+    is_pinned: false,
+    is_hidden: false,
+    parent_id: "demo-post-3",
+    created_at: "2026-06-19T18:00:00+09:00",
   },
   {
     id: "demo-post-6",
@@ -73,6 +90,7 @@ const DEMO_BOARD_POSTS: BoardPost[] = [
     color: "sky",
     is_pinned: false,
     is_hidden: false,
+    parent_id: null,
     created_at: "2026-06-20T17:05:00+09:00",
   },
 ];
@@ -96,28 +114,52 @@ function tilt(id: string): string {
 
 function Note({
   post,
+  replies,
+  uid,
   canManage,
   canEdit,
+  canReply,
   isAdmin,
   onDelete,
   onTogglePin,
   onToggleHide,
   onSave,
+  onReply,
 }: {
   post: BoardPost;
+  replies: BoardPost[];
+  uid: string | null;
   canManage: boolean;
   canEdit: boolean;
+  canReply: boolean;
   isAdmin: boolean;
   onDelete: (p: BoardPost) => void;
   onTogglePin: (p: BoardPost) => void;
   onToggleHide: (p: BoardPost) => void;
   onSave: (p: BoardPost, body: string, color: CardAccent) => void | Promise<void>;
+  onReply: (parent: BoardPost, body: string) => void | Promise<void>;
 }) {
   const isNotice = post.kind === "notice";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(post.body);
   const [draftColor, setDraftColor] = useState<CardAccent>(post.color);
   const [saving, setSaving] = useState(false);
+  // 긴 메모는 접어두고 '더보기'로 펼친다 (같은 줄 카드가 세로로 끝없이 길어지는 것 방지)
+  const isLong = post.body.length > 180 || post.body.split("\n").length > 6;
+  const [expanded, setExpanded] = useState(false);
+  // 답글(이어붙이는 메모)
+  const [replying, setReplying] = useState(false);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replyBusy, setReplyBusy] = useState(false);
+
+  async function sendReply() {
+    if (!replyDraft.trim()) return;
+    setReplyBusy(true);
+    await onReply(post, replyDraft.trim());
+    setReplyBusy(false);
+    setReplyDraft("");
+    setReplying(false);
+  }
 
   async function save() {
     if (!draft.trim()) return;
@@ -137,7 +179,7 @@ function Note({
 
   return (
     <li
-      className={`relative flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${tilt(post.id)}`}
+      className={`relative mb-5 mt-2 flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${tilt(post.id)}`}
     >
       {/* 압정 */}
       <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
@@ -181,13 +223,71 @@ function Note({
         </div>
       ) : (
         <>
-          <p className="whitespace-pre-line break-words text-sm font-bold leading-6">{post.body}</p>
+          <p className={`whitespace-pre-line break-words text-sm font-bold leading-6 ${isLong && !expanded ? "line-clamp-5" : ""}`}>
+            {post.body}
+          </p>
+          {isLong ? (
+            <button
+              type="button"
+              className="self-start text-[11px] font-black underline underline-offset-2 text-workroom-ink/70 hover:text-workroom-ink"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? "접기 ▲" : "더보기 ▾"}
+            </button>
+          ) : null}
           <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-[11px] font-bold text-workroom-ink/60">
             <span className="truncate">{post.author_name}</span>
             <span className="shrink-0">{formatDate(post.created_at)}</span>
           </div>
-          {canManage && (
+
+          {/* 이어붙인 답글: 본 메모 아래 살짝 겹쳐 붙은 작은 쪽지들 */}
+          {replies.length ? (
+            <ul className="grid gap-1.5 border-t border-dashed border-workroom-ink/30 pt-2">
+              {replies.map((reply) => (
+                <li className="rounded-[4px] border border-workroom-ink/40 bg-workroom-surface/90 px-2.5 py-2" key={reply.id}>
+                  <p className="whitespace-pre-line break-words text-[13px] font-bold leading-5">{reply.body}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-bold text-workroom-ink/55">
+                    <span className="truncate">↳ {reply.author_name} · {formatDate(reply.created_at)}</span>
+                    {isAdmin || (!!uid && reply.profile_id === uid) ? (
+                      <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => onDelete(reply)}>
+                        삭제
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {replying ? (
+            <div className="grid gap-1.5 border-t border-dashed border-workroom-ink/30 pt-2">
+              <textarea
+                className="min-h-[56px] w-full resize-y rounded-[4px] border border-workroom-ink bg-workroom-surface px-2.5 py-2 text-[13px] font-bold focus:outline-none focus:ring-2 focus:ring-workroom-ink"
+                aria-label="답글 내용"
+                placeholder="이어서 한마디 붙이기"
+                value={replyDraft}
+                maxLength={200}
+                onChange={(e) => setReplyDraft(e.target.value)}
+              />
+              <div className="flex items-center gap-1 text-[11px] font-black">
+                <button type="button" className={actionBtn} disabled={replyBusy || !replyDraft.trim()} onClick={() => void sendReply()}>
+                  {replyBusy ? "붙이는 중…" : "붙이기"}
+                </button>
+                <button type="button" className={actionBtn} onClick={() => { setReplying(false); setReplyDraft(""); }}>
+                  취소
+                </button>
+                <span className="ml-auto text-[10px] font-bold text-workroom-ink/60">{replyDraft.length}/200</span>
+              </div>
+            </div>
+          ) : null}
+
+          {(canManage || canReply) && (
             <div className="-mb-1 flex flex-wrap items-center gap-1 border-t border-workroom-ink/15 pt-1.5 text-[11px] font-black">
+              {canReply && !replying ? (
+                <button type="button" className={actionBtn} onClick={() => setReplying(true)}>
+                  답글
+                </button>
+              ) : null}
               {isAdmin ? (
                 <>
                   <button type="button" className={actionBtn} onClick={() => onTogglePin(post)}>
@@ -297,9 +397,30 @@ export default function Board() {
     await load();
   }
 
+  async function replyTo(parent: BoardPost, replyBody: string) {
+    if (!supabase || !uid) {
+      navigate("/login");
+      return;
+    }
+    const { error: insertError } = await supabase.from("board_posts").insert({
+      profile_id: uid,
+      author_name: authorName || "회원",
+      kind: "message",
+      body: replyBody,
+      color: parent.color,
+      parent_id: parent.id,
+    });
+    if (insertError) {
+      setError("답글 등록에 실패했어요. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    setError("");
+    await load();
+  }
+
   async function removePost(post: BoardPost) {
     if (!supabase) return;
-    if (!window.confirm("이 메모를 삭제할까요?")) return;
+    if (!window.confirm(post.parent_id ? "이 답글을 삭제할까요?" : "이 메모를 삭제할까요?")) return;
     await supabase.from("board_posts").delete().eq("id", post.id);
     await load();
   }
@@ -330,6 +451,20 @@ export default function Board() {
   }
 
   const visible = useMemo(() => posts.filter((p) => !p.is_hidden || isAdmin), [posts, isAdmin]);
+  // 본 메모와 답글 분리. 답글은 부모 카드 안에 이어붙여 보여준다.
+  const topLevel = useMemo(() => visible.filter((p) => !p.parent_id), [visible]);
+  const repliesByParent = useMemo(() => {
+    const map = new Map<string, BoardPost[]>();
+    visible
+      .filter((p) => p.parent_id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .forEach((p) => {
+        const list = map.get(p.parent_id as string) ?? [];
+        list.push(p);
+        map.set(p.parent_id as string, list);
+      });
+    return map;
+  }, [visible]);
 
   return (
     <main className="pb-16">
@@ -393,19 +528,23 @@ export default function Board() {
             <Skeleton className="h-36" />
             <Skeleton className="h-36" />
           </div>
-        ) : visible.length ? (
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-            {visible.map((post) => (
+        ) : topLevel.length ? (
+          <ul className="columns-2 gap-4 sm:columns-3 lg:columns-4">
+            {topLevel.map((post) => (
               <Note
                 key={post.id}
                 post={post}
+                replies={repliesByParent.get(post.id) ?? []}
+                uid={uid}
                 isAdmin={isAdmin}
                 canManage={isAdmin || post.profile_id === uid}
                 canEdit={!!uid && post.profile_id === uid}
+                canReply={!!uid}
                 onDelete={(p) => void removePost(p)}
                 onTogglePin={(p) => void togglePin(p)}
                 onToggleHide={(p) => void toggleHide(p)}
                 onSave={(p, b, c) => void savePost(p, b, c)}
+                onReply={(parent, b) => replyTo(parent, b)}
               />
             ))}
           </ul>

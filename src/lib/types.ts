@@ -224,6 +224,7 @@ export type BoardPost = {
   color: CardAccent;
   is_pinned: boolean;
   is_hidden: boolean;
+  parent_id: string | null;
   created_at: string;
 };
 
