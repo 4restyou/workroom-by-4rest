@@ -179,7 +179,7 @@ function Note({
 
   return (
     <li
-      className={`relative mb-5 mt-2 flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "[column-span:all] rotate-0" : tilt(post.id)}`}
+      className={`relative mb-5 mt-2 flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "[column-span:all] mx-auto w-full max-w-2xl rotate-0" : tilt(post.id)}`}
     >
       {/* 압정 */}
       <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
