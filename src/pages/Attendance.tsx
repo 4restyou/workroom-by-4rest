@@ -67,7 +67,8 @@ export default function Attendance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const total = records.length;
+  // 도장은 하루 1회 — 재입실 기록이 있어도 '입실한 날짜 수'로 센다.
+  const total = new Set(records.map((r) => kstDate(r.check_in_at))).size;
   const filled = total === 0 ? 0 : total % goal === 0 ? goal : total % goal;
   const today = kstDate(new Date());
   const openToday = records.find((r) => !r.check_out_at && kstDate(r.check_in_at) === today);

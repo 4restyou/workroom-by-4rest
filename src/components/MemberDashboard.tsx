@@ -131,7 +131,8 @@ export default function MemberDashboard() {
         if (!active) return;
         const setMap = Object.fromEntries(((sets ?? []) as { key: string; value: string }[]).map((s) => [s.key, s.value]));
         const goal = Number(setMap.attendance_stamp_goal) || 10;
-        const total = (att ?? []).length;
+        const kst = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(v));
+        const total = new Set((att ?? []).map((r: { check_in_at: string }) => kst(r.check_in_at))).size;
         const checkedInToday = (att ?? []).some(
           (r: { check_in_at: string; check_out_at: string | null }) =>
             new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(r.check_in_at)) === today,
