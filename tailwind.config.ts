@@ -29,6 +29,9 @@ export default {
           lilac: "#DBD0F7",
           sky: "#E8E5DC",
           coral: "#F6CBB8",
+          gray: "#E3E3E3",
+          pink: "#F8D0DC",
+          blue: "#CBE0F4",
           danger: "#F6BDBD",
           // Deprecated alias: `purple` is actually the mint tone.
           purple: "#CDE8D6",

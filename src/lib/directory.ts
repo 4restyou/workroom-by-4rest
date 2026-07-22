@@ -32,9 +32,12 @@ export const ACCENTS: CardAccent[] = ["yellow", "sky"];
 export const ACCENT_LABEL: Record<CardAccent, string> = {
   yellow: "노랑",
   sky: "하늘",
+  gray: "그레이",
+  pink: "핑크",
+  blue: "하늘",
   mint: "하늘",
   lilac: "하늘",
-  coral: "노랑",
+  coral: "핑크",
 };
 
 // Tailwind background per accent. Listed literally so the content scanner keeps
@@ -42,7 +45,10 @@ export const ACCENT_LABEL: Record<CardAccent, string> = {
 export const ACCENT_BG: Record<CardAccent, string> = {
   yellow: "bg-workroom-yellow",
   sky: "bg-workroom-sky",
+  gray: "bg-workroom-gray",
+  pink: "bg-workroom-pink",
+  blue: "bg-workroom-blue",
   mint: "bg-workroom-sky",
   lilac: "bg-workroom-sky",
-  coral: "bg-workroom-yellow",
+  coral: "bg-workroom-pink",
 };

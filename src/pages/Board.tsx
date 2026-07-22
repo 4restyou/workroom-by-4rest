@@ -3,7 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import Skeleton from "../components/Skeleton";
 import { supabase } from "../lib/supabase";
-import { ACCENT_BG, ACCENT_LABEL, ACCENTS } from "../lib/directory";
+import { ACCENT_BG, ACCENT_LABEL } from "../lib/directory";
+
+// 메모지 색상: 노랑 · 그레이 · 핑크 · 하늘 (명함첩 팔레트와 별개)
+const BOARD_ACCENTS: CardAccent[] = ["yellow", "gray", "pink", "blue"];
 import { PinIcon } from "../components/icons";
 import { buttonClass, tintCard } from "../lib/ui";
 import type { BoardPost, CardAccent } from "../lib/types";
@@ -179,7 +182,7 @@ function Note({
 
   return (
     <li
-      className={`relative mb-5 mt-2 flex break-inside-avoid flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "[column-span:all] mx-auto w-full max-w-2xl rotate-0" : tilt(post.id)}`}
+      className={`relative flex flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "col-span-2 rotate-0" : tilt(post.id)}`}
     >
       {/* 압정 */}
       <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
@@ -200,7 +203,7 @@ function Note({
             onChange={(e) => setDraft(e.target.value)}
           />
           <div className="flex items-center gap-1.5">
-            {ACCENTS.map((a) => (
+            {BOARD_ACCENTS.map((a) => (
               <button
                 key={a}
                 type="button"
@@ -478,7 +481,7 @@ export default function Board() {
               />
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-1.5">
-                  {ACCENTS.map((a) => (
+                  {BOARD_ACCENTS.map((a) => (
                     <button
                       key={a}
                       type="button"
@@ -518,7 +521,7 @@ export default function Board() {
             <Skeleton className="h-36" />
           </div>
         ) : topLevel.length ? (
-          <ul className="columns-2 gap-4 sm:columns-3 lg:columns-4">
+          <ul className="grid grid-flow-dense grid-cols-2 items-start gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
             {topLevel.map((post) => (
               <Note
                 key={post.id}

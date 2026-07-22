@@ -195,7 +195,7 @@ export type Coupon = {
   used_at: string | null;
 };
 
-export type CardAccent = "yellow" | "mint" | "lilac" | "sky" | "coral";
+export type CardAccent = "yellow" | "mint" | "lilac" | "sky" | "coral" | "gray" | "pink" | "blue";
 
 export type MemberCard = {
   id: string;
