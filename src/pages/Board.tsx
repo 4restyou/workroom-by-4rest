@@ -150,7 +150,8 @@ function Note({
   // 긴 메모는 열 흐름을 끊고 전체 폭(1단)으로 넓게 붙인다 — 세로로 길어지는 대신
   // 가로로 풀어써서 읽기 편하게. (모바일 2단 → 긴 글은 1단)
   const isLong = post.body.length > 140 || post.body.split("\n").length > 5;
-  // 답글(이어붙이는 메모)
+  // 답글(이어붙이는 메모) — 기본은 접어두고 개수만 표시
+  const [showReplies, setShowReplies] = useState(false);
   const [replying, setReplying] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
@@ -162,6 +163,7 @@ function Note({
     setReplyBusy(false);
     setReplyDraft("");
     setReplying(false);
+    setShowReplies(true);
   }
 
   async function save() {
@@ -182,7 +184,7 @@ function Note({
 
   return (
     <li
-      className={`relative flex flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "col-span-2 rotate-0" : tilt(post.id)}`}
+      className={`relative flex min-w-0 flex-col gap-2 rounded-[4px] border border-workroom-ink p-4 transition-transform hover:rotate-0 ${ACCENT_BG[editing ? draftColor : post.color]} ${isLong ? "col-span-2 rotate-0" : tilt(post.id)}`}
     >
       {/* 압정 */}
       <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-workroom-ink bg-workroom-surface" />
@@ -232,23 +234,35 @@ function Note({
             <span className="shrink-0">{formatDate(post.created_at)}</span>
           </div>
 
-          {/* 이어붙인 답글: 본 메모 아래 살짝 겹쳐 붙은 작은 쪽지들 */}
+          {/* 이어붙인 답글: 기본은 접어두고 개수만, 펼치면 작은 쪽지 목록 */}
           {replies.length ? (
-            <ul className="grid gap-1.5 border-t border-dashed border-workroom-ink/30 pt-2">
-              {replies.map((reply) => (
-                <li className="rounded-[4px] border border-workroom-ink/40 bg-workroom-surface/90 px-2.5 py-2" key={reply.id}>
-                  <p className="whitespace-pre-line break-words text-[13px] font-bold leading-5">{reply.body}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-bold text-workroom-ink/55">
-                    <span className="truncate">↳ {reply.author_name} · {formatDate(reply.created_at)}</span>
-                    {isAdmin || (!!uid && reply.profile_id === uid) ? (
-                      <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => onDelete(reply)}>
-                        삭제
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="min-w-0 border-t border-dashed border-workroom-ink/30 pt-2">
+              <button
+                type="button"
+                className="text-[11px] font-black underline underline-offset-2 text-workroom-ink/70 hover:text-workroom-ink"
+                aria-expanded={showReplies}
+                onClick={() => setShowReplies((v) => !v)}
+              >
+                {showReplies ? "답글 접기 ▲" : `답글 ${replies.length}개 보기 ▾`}
+              </button>
+              {showReplies ? (
+                <ul className="mt-1.5 grid w-full min-w-0 gap-1.5">
+                  {replies.map((reply) => (
+                    <li className="min-w-0 rounded-[4px] border border-workroom-ink/40 bg-workroom-surface/90 px-2.5 py-2" key={reply.id}>
+                      <p className="whitespace-pre-line break-words text-[13px] font-bold leading-5">{reply.body}</p>
+                      <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[10px] font-bold text-workroom-ink/55">
+                        <span className="min-w-0 flex-1 truncate">↳ {reply.author_name} · {formatDate(reply.created_at)}</span>
+                        {isAdmin || (!!uid && reply.profile_id === uid) ? (
+                          <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => onDelete(reply)}>
+                            삭제
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
 
           {replying ? (
