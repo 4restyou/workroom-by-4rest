@@ -5,7 +5,7 @@ import { formatTimeRange, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
-import { badge, buttonClass } from "../lib/ui";
+import { badge, buttonClass, type TintColor } from "../lib/ui";
 import type { Reservation } from "../lib/types";
 
 type AttendanceRow = {
@@ -178,30 +178,55 @@ export default function AdminAttendance() {
 
         {!isLoading && view === "today" ? (
           <>
-            <div className="border-y border-workroom-line bg-white">
-              {todayReservations.map((reservation) => {
+            {(() => {
+              // 상태별로 묶어 한눈에: 이용 중 → 입실 예정(미입실·대기 포함) → 퇴실 완료
+              const entries = todayReservations.map((reservation) => {
                 const attendance = todayAttendanceByReservation.get(reservation.id);
                 const start = startMinute(reservation.start_time);
                 const late = !attendance && reservation.status === "confirmed" && !isLongTermReservation(reservation) && start !== null && currentMinute() > start + 15;
                 const state = reservation.status === "pending" ? "확인 대기" : attendance?.check_out_at ? "퇴실" : attendance ? "이용 중" : late ? "미입실" : "입실 전";
-                const tone = state === "미입실" ? "danger" : state === "이용 중" ? "ink" : state === "확인 대기" ? "yellow" : "sky";
-                return (
-                  <div className={`admin-row grid gap-3 px-4 py-4 sm:grid-cols-[120px_1fr_auto] sm:items-center ${late ? "border-l-[3px] border-l-red-500" : ""}`} key={reservation.id}>
-                    <p className="text-sm font-bold tabular-nums">{isLongTermReservation(reservation) ? "장기 이용" : formatTimeRange(reservation.start_time, reservation.end_time)}</p>
-                    <div>
-                      <p className="text-sm font-semibold">{reservation.name} · {reservation.people}명</p>
-                      <p className="mt-0.5 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}{reservation.phone ? ` · ${reservation.phone}` : ""}</p>
-                    </div>
-                    <div className="flex items-center gap-2 sm:justify-end">
-                      <span className={badge(tone)}>{state}</span>
-                      {!attendance && reservation.status === "confirmed" && reservation.profile_id ? <button className={buttonClass("primary", "sm")} disabled={busy === reservation.id} onClick={() => void addAttendance(reservation.profile_id!, reservation.id, reservation.name)} type="button">입실</button> : null}
-                      {attendance && !attendance.check_out_at ? <button className={buttonClass("primary", "sm")} disabled={busy === attendance.id} onClick={() => void updateAttendance(attendance.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button> : null}
-                    </div>
+                const tone: TintColor = state === "미입실" ? "danger" : state === "이용 중" ? "ink" : state === "확인 대기" ? "yellow" : "sky";
+                return { reservation, attendance, late, state, tone };
+              });
+              const groups: [string, typeof entries][] = [
+                ["현재 이용 중", entries.filter((e) => e.state === "이용 중")],
+                ["입실 예정", entries.filter((e) => e.state === "입실 전" || e.state === "미입실" || e.state === "확인 대기")],
+                ["퇴실 완료", entries.filter((e) => e.state === "퇴실")],
+              ];
+              const renderRow = ({ reservation, attendance, late, state, tone }: (typeof entries)[number]) => (
+                <div className={`admin-row grid gap-3 px-4 py-4 sm:grid-cols-[120px_1fr_auto] sm:items-center ${late ? "border-l-[3px] border-l-red-500" : ""}`} key={reservation.id}>
+                  <p className="text-sm font-bold tabular-nums">{isLongTermReservation(reservation) ? "장기 이용" : formatTimeRange(reservation.start_time, reservation.end_time)}</p>
+                  <div>
+                    <p className="text-sm font-semibold">{reservation.name} · {reservation.people}명</p>
+                    <p className="mt-0.5 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}{reservation.phone ? ` · ${reservation.phone}` : ""}</p>
                   </div>
-                );
-              })}
-              {!todayReservations.length ? <AdminEmpty>오늘 방문 예정자가 없습니다.</AdminEmpty> : null}
-            </div>
+                  <div className="flex items-center gap-2 sm:justify-end">
+                    <span className={badge(tone)}>{state}</span>
+                    {!attendance && reservation.status === "confirmed" && reservation.profile_id ? <button className={buttonClass("primary", "sm")} disabled={busy === reservation.id} onClick={() => void addAttendance(reservation.profile_id!, reservation.id, reservation.name)} type="button">입실</button> : null}
+                    {attendance && !attendance.check_out_at ? <button className={buttonClass("primary", "sm")} disabled={busy === attendance.id} onClick={() => void updateAttendance(attendance.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button> : null}
+                  </div>
+                </div>
+              );
+              return (
+                <div className="grid gap-4">
+                  {groups.map(([label, items]) =>
+                    items.length ? (
+                      <div key={label}>
+                        <p className="mb-1.5 text-xs font-black uppercase tracking-[0.08em] text-workroom-muted">
+                          {label} <span className="text-workroom-ink">{items.length}</span>
+                        </p>
+                        <div className="border-y border-workroom-line bg-white">{items.map(renderRow)}</div>
+                      </div>
+                    ) : null,
+                  )}
+                  {!todayReservations.length ? (
+                    <div className="border-y border-workroom-line bg-white">
+                      <AdminEmpty>오늘 방문 예정자가 없습니다.</AdminEmpty>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
 
             <details className="mt-5 border-y border-workroom-line bg-white px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold">예약 없이 수기 입실 처리</summary>
