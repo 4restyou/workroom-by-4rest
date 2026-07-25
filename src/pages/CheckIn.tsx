@@ -7,7 +7,25 @@ import { supabase } from "../lib/supabase";
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { CheckInResult } from "../lib/types";
 
-type State = "checking" | "need-login" | "done";
+type State = "checking" | "need-login" | "prior-close" | "done";
+
+type PriorSession = { id: string; check_in_at: string };
+
+function kstDate(value: string | Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
+}
+function formatStamp(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+// datetime-local(KST) 문자열 변환.
+function toKstInput(value: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+function fromKstInput(value: string): string {
+  return new Date(`${value}:00+09:00`).toISOString();
+}
 
 export default function CheckIn() {
   const [params] = useSearchParams();
@@ -15,6 +33,23 @@ export default function CheckIn() {
   const token = params.get("t") ?? "";
   const [state, setState] = useState<State>("checking");
   const [result, setResult] = useState<CheckInResult | null>(null);
+  const [prior, setPrior] = useState<PriorSession | null>(null);
+  const [checkoutInput, setCheckoutInput] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function runCheckIn() {
+    if (!supabase) return;
+    setState("checking");
+    // 현재 위치는 출근 확인에만 사용하고 저장하지 않습니다. (매장 좌표 미설정 시 위치는 무시됨)
+    const geo = await getPosition();
+    const { data, error } = await supabase.rpc("attendance_check_in", {
+      p_token: token,
+      p_lat: geo.pos?.lat ?? null,
+      p_lng: geo.pos?.lng ?? null,
+    });
+    setResult(error ? { ok: false, message: "출근 처리 중 오류가 발생했습니다." } : ((data ?? { ok: false }) as CheckInResult));
+    setState("done");
+  }
 
   useEffect(() => {
     async function run() {
@@ -29,29 +64,64 @@ export default function CheckIn() {
         return;
       }
       const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session?.user) {
+      const user = sessionData.session?.user;
+      if (!user) {
         setState("need-login");
         return;
       }
-      // 현재 위치는 출근 확인에만 사용하고 저장하지 않습니다. (매장 좌표 미설정 시 위치는 무시됨)
-      const geo = await getPosition();
-      const { data, error } = await supabase.rpc("attendance_check_in", {
-        p_token: token,
-        p_lat: geo.pos?.lat ?? null,
-        p_lng: geo.pos?.lng ?? null,
-      });
-      if (error) {
-        setResult({ ok: false, message: "출근 처리 중 오류가 발생했습니다." });
-      } else {
-        setResult((data ?? { ok: false }) as CheckInResult);
+
+      // 이전 방문에서 퇴실 기록이 없는 세션이 있으면, 먼저 그 퇴실 시각을 받는다.
+      const today = kstDate(new Date());
+      const { data: openRows } = await supabase
+        .from("attendance")
+        .select("id,check_in_at,check_out_at")
+        .eq("profile_id", user.id)
+        .is("check_out_at", null)
+        .order("check_in_at", { ascending: false })
+        .limit(10);
+      const priorSession = (openRows ?? []).find((r) => kstDate(r.check_in_at as string) !== today) as PriorSession | undefined;
+      if (priorSession) {
+        setPrior(priorSession);
+        // 기본값: 입실 당일 22:00 (입실 이후여야 하므로 필요 시 사용자가 조정)
+        setCheckoutInput(`${kstDate(priorSession.check_in_at)}T22:00`);
+        setState("prior-close");
+        return;
       }
-      setState("done");
+
+      await runCheckIn();
     }
     void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  async function savePriorCheckout() {
+    if (!supabase || !prior || !checkoutInput) return;
+    setBusy(true);
+    const iso = fromKstInput(checkoutInput);
+    if (new Date(iso).getTime() <= new Date(prior.check_in_at).getTime()) {
+      setBusy(false);
+      setResult({ ok: false, message: "퇴실 시각은 입실 시각보다 늦어야 해요." });
+      setState("done");
+      return;
+    }
+    const { error } = await supabase.from("attendance").update({ check_out_at: iso }).eq("id", prior.id);
+    setBusy(false);
+    if (error) {
+      setResult({ ok: false, message: "퇴실 시각 저장에 실패했어요. 잠시 후 다시 시도해 주세요." });
+      setState("done");
+      return;
+    }
+    setPrior(null);
+    await runCheckIn();
+  }
+
+  async function skipPrior() {
+    setPrior(null);
+    await runCheckIn();
+  }
+
   const success = result?.ok && !result.already;
-  const title = state === "done" && success ? "출근 완료!" : "출근 체크인";
+  const title = state === "prior-close" ? "이전 퇴실 확인" : state === "done" && success ? "출근 완료!" : "출근 체크인";
 
   return (
     <main className="pb-16">
@@ -76,6 +146,34 @@ export default function CheckIn() {
               >
                 구글로 로그인하고 출근하기
               </button>
+            </>
+          ) : null}
+
+          {state === "prior-close" && prior ? (
+            <>
+              <div>
+                <p className="font-bold">지난 방문 퇴실 기록이 없어요.</p>
+                <p className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
+                  <b className="text-workroom-ink">{formatStamp(prior.check_in_at)} 입실</b> 후 퇴실이 기록되지 않았어요. 그날 몇 시에 나가셨는지 입력하면 정리하고 오늘 출근 도장을 찍어드려요.
+                </p>
+              </div>
+              <label className="grid gap-1 text-sm font-bold">
+                그날 퇴실 시각
+                <input
+                  type="datetime-local"
+                  value={checkoutInput}
+                  min={toKstInput(prior.check_in_at)}
+                  onChange={(e) => setCheckoutInput(e.target.value)}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button className={buttonClass("primary", "md")} disabled={busy || !checkoutInput} onClick={() => void savePriorCheckout()} type="button">
+                  {busy ? "처리 중…" : "입력하고 출근하기"}
+                </button>
+                <button className={buttonClass("secondary", "md")} disabled={busy} onClick={() => void skipPrior()} type="button">
+                  모르겠어요, 건너뛰기
+                </button>
+              </div>
             </>
           ) : null}
 
