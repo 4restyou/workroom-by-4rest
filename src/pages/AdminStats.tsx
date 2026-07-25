@@ -12,6 +12,15 @@ import type { Pass, PaymentStatus, Reservation, ReservationStatus } from "../lib
 type Period = "day" | "week" | "month";
 const periodLabels: Record<Period, string> = { day: "일별", week: "주별", month: "월별" };
 
+// 특정 날짜가 속한 달(±offset)의 전체 범위와 라벨.
+function monthOf(dateStr: string, offset = 0) {
+  const base = new Date(`${dateStr || new Date().toISOString().slice(0, 10)}T00:00:00`);
+  const first = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+  const last = new Date(base.getFullYear(), base.getMonth() + offset + 1, 0);
+  const value = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return { start: value(first), end: value(last), label: `${first.getFullYear()}년 ${first.getMonth() + 1}월` };
+}
+
 function monthRange(offset = 0) {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
@@ -102,7 +111,12 @@ export default function AdminStats() {
           <label className="grid gap-1 text-xs font-semibold text-workroom-muted">이용권<select value={passFilter} onChange={(event) => setPassFilter(event.target.value)}><option value="all">전체</option>{passes.map((pass) => <option key={pass.id} value={pass.name}>{pass.name}</option>)}</select></label>
           <label className="grid gap-1 text-xs font-semibold text-workroom-muted">예약 상태<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}><option value="all">전체</option><option value="pending">대기</option><option value="confirmed">확정</option><option value="completed">이용완료</option><option value="canceled">취소</option><option value="no_show">노쇼</option></select></label>
           <label className="grid gap-1 text-xs font-semibold text-workroom-muted">결제 상태<select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value as typeof paymentFilter)}><option value="all">전체</option><option value="paid">결제완료</option><option value="unpaid">미결제</option><option value="refunded">환불</option><option value="service">서비스</option></select></label>
-          <div className="flex items-end"><button className={buttonClass("accent", "sm", "h-[42px] w-full")} onClick={() => { const range = monthRange(); setStartDate(range.start); setEndDate(range.end); }} type="button">이번 달</button></div>
+          <div className="flex items-end gap-1.5 sm:col-span-2">
+            <button aria-label="이전 달" className={buttonClass("secondary", "sm", "h-[42px] px-3")} onClick={() => { const m = monthOf(startDate, -1); setStartDate(m.start); setEndDate(m.end); }} type="button">‹</button>
+            <div className="grid flex-1 h-[42px] place-items-center rounded-[6px] border border-workroom-ink bg-white text-sm font-bold tabular-nums">{monthOf(startDate).label}</div>
+            <button aria-label="다음 달" className={buttonClass("secondary", "sm", "h-[42px] px-3")} onClick={() => { const m = monthOf(startDate, 1); setStartDate(m.start); setEndDate(m.end); }} type="button">›</button>
+            <button className={buttonClass("accent", "sm", "h-[42px] shrink-0 px-3")} onClick={() => { const range = monthRange(); setStartDate(range.start); setEndDate(range.end); }} type="button">이번 달</button>
+          </div>
         </div>
 
         {isLoading ? <AdminEmpty>통계를 불러오는 중입니다.</AdminEmpty> : null}
