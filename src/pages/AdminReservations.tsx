@@ -190,6 +190,23 @@ export default function AdminReservations() {
       });
   }, [dateFilter, statusBaseReservations, statusFilter]);
 
+  // 특정 이용일 필터가 없을 때는 이용일(장기는 시작일)별로 묶어 헤더를 붙인다.
+  const groupedReservations = useMemo(() => {
+    if (dateFilter) return [{ key: "all", label: "", items: visibleReservations }];
+    const map = new Map<string, Reservation[]>();
+    for (const reservation of visibleReservations) {
+      const day = reservation.access_start_date ?? reservation.date;
+      const list = map.get(day) ?? [];
+      list.push(reservation);
+      map.set(day, list);
+    }
+    return Array.from(map.entries()).map(([day, items]) => ({
+      key: day,
+      label: formatDate(day),
+      items,
+    }));
+  }, [dateFilter, visibleReservations]);
+
   useEffect(() => {
     if (!visibleReservations.length) {
       setSelectedReservationId(null);
@@ -527,13 +544,22 @@ export default function AdminReservations() {
               <span className="text-sm font-bold text-workroom-muted">{visibleReservations.length}건</span>
             </div>
             <div className="overflow-hidden rounded-[6px] border border-workroom-line bg-white">
-              {visibleReservations.map((reservation) => (
-                <ReservationListItem
-                  isSelected={reservation.id === selectedReservationId}
-                  key={reservation.id}
-                  onSelect={() => { setSelectedReservationId(reservation.id); setMobileDetailOpen(true); }}
-                  reservation={reservation}
-                />
+              {groupedReservations.map((group) => (
+                <div key={group.key}>
+                  {group.label ? (
+                    <p className="sticky top-0 z-[1] border-b border-workroom-line bg-[#f3f0e8] px-4 py-1.5 text-xs font-black text-workroom-ink">
+                      {group.label} <span className="text-workroom-muted">· {group.items.length}건</span>
+                    </p>
+                  ) : null}
+                  {group.items.map((reservation) => (
+                    <ReservationListItem
+                      isSelected={reservation.id === selectedReservationId}
+                      key={reservation.id}
+                      onSelect={() => { setSelectedReservationId(reservation.id); setMobileDetailOpen(true); }}
+                      reservation={reservation}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           </section>
@@ -571,6 +597,14 @@ function ReservationListItem({
   const selectedClass = isSelected
     ? "bg-[#f3f0e8]"
     : "bg-white hover:bg-[#faf8f2]";
+  const barColor: Record<ReservationStatus, string> = {
+    pending: "bg-workroom-yellow",
+    confirmed: "bg-workroom-sky",
+    completed: "bg-workroom-ink",
+    canceled: "bg-workroom-line",
+    no_show: "bg-workroom-danger",
+  };
+  const dimmed = reservation.status === "canceled" || reservation.status === "no_show";
   const longTerm = isLongTermReservation(reservation);
   const periodStart = reservation.access_start_date ?? reservation.date;
   const periodEnd = reservation.access_end_date ?? reservation.date;
@@ -579,11 +613,12 @@ function ReservationListItem({
   return (
     <button
       aria-pressed={isSelected}
-      className={`group flex w-full items-center justify-between gap-3 border-b border-workroom-line px-4 py-3 text-left transition-colors last:border-b-0 ${selectedClass}`}
+      className={`group flex w-full items-center justify-between gap-3 border-b border-workroom-line py-3 pl-3 pr-4 text-left transition-colors last:border-b-0 ${selectedClass} ${dimmed ? "opacity-55" : ""}`}
       onClick={onSelect}
       type="button"
     >
-      <div className="min-w-0">
+      <span aria-hidden className={`-my-3 mr-1 w-1 self-stretch shrink-0 rounded-full ${barColor[reservation.status]}`} />
+      <div className="min-w-0 flex-1">
         <p className="truncate font-bold">{reservation.name}</p>
         <p className="mt-1 truncate text-xs font-medium text-workroom-muted">
           {longTerm
