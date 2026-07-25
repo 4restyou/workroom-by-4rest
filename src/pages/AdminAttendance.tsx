@@ -107,12 +107,19 @@ export default function AdminAttendance() {
 
   async function addAttendance(profileId: string, reservationId: string | null, name: string) {
     if (!supabase) return;
-    if (!window.confirm(`${name}님을 지금 입실 처리할까요?`)) return;
+    if (!window.confirm(`${name}님에게 오늘 출근 도장을 찍어줄까요?`)) return;
     setBusy(reservationId ?? "manual");
-    const { error: insertError } = await supabase.from("attendance").insert({ profile_id: profileId, reservation_id: reservationId });
+    // 하루 1회 규칙·쿠폰 발급까지 자동 출근과 동일하게 처리하는 RPC 경유.
+    const { data, error: rpcError } = await supabase.rpc("admin_attendance_stamp", { p_profile_id: profileId, p_reservation_id: reservationId });
+    const result = data as { ok?: boolean; message?: string; coupon?: boolean } | null;
     setBusy(null);
-    if (insertError) { setError(insertError.message); return; }
-    setManualQuery(""); setManualResults([]); setSuccess(`${name}님을 입실 처리했습니다.`); await load(true);
+    if (rpcError || !result?.ok) {
+      setError(rpcError?.message?.includes("function") ? "관리자 도장 기능이 아직 준비되지 않았습니다. 마이그레이션(0030) 적용을 확인해 주세요." : result?.message ?? rpcError?.message ?? "처리에 실패했습니다.");
+      return;
+    }
+    setManualQuery(""); setManualResults([]);
+    setSuccess(result.coupon ? `${name}님 도장 완료! 스탬프를 다 채워 쿠폰이 발급됐어요 🎉` : `${name}님 ${result.message ?? "도장을 찍었어요."}`);
+    await load(true);
   }
 
   async function updateAttendance(id: string, payload: { check_in_at?: string; check_out_at?: string | null }, message: string) {
