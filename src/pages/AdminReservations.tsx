@@ -30,7 +30,7 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
   service: "서비스",
 };
 const paymentStatusOptions: PaymentStatus[] = ["unpaid", "paid", "refunded", "service"];
-type ReservationView = "today" | "pending" | "longterm" | "all";
+type ReservationView = "today" | "upcoming" | "past" | "pending" | "longterm" | "all";
 
 type ReservationEdit = {
   status: ReservationStatus;
@@ -159,6 +159,16 @@ export default function AdminReservations() {
       .filter((reservation) => (viewMode === "longterm" ? isLongTermReservation(reservation) : true))
       .filter((reservation) => (viewMode === "today" ? reservation.status !== "canceled" && reservation.status !== "no_show" : true))
       .filter((reservation) => {
+        // 예정: 오늘 이후 진행 예정(대기·확정) / 지난: 오늘보다 이전에 끝난 예약
+        if (viewMode !== "upcoming" && viewMode !== "past") return true;
+        const today = todayValue();
+        const end = reservation.access_end_date ?? reservation.date;
+        if (viewMode === "upcoming") {
+          return end >= today && (reservation.status === "pending" || reservation.status === "confirmed");
+        }
+        return end < today;
+      })
+      .filter((reservation) => {
         if (!q) return true;
         const nameMatch = reservation.name.toLowerCase().includes(q);
         const phoneMatch = qDigits.length > 0 && reservation.phone.replace(/\D/g, "").includes(qDigits);
@@ -176,19 +186,26 @@ export default function AdminReservations() {
 
   const visibleReservations = useMemo(() => {
     const today = todayValue();
+    // 지난 예약은 최근이 위로, 나머지는 가까운 날짜가 위로.
+    const past = viewMode === "past";
     return statusBaseReservations
       .filter((reservation) => (statusFilter === "all" ? true : reservation.status === statusFilter))
       .sort((a, b) => {
-        const aPending = a.status === "pending" ? 0 : 1;
-        const bPending = b.status === "pending" ? 0 : 1;
-        if (aPending !== bPending) return aPending - bPending;
+        if (!past) {
+          const aPending = a.status === "pending" ? 0 : 1;
+          const bPending = b.status === "pending" ? 0 : 1;
+          if (aPending !== bPending) return aPending - bPending;
+        }
         if (dateFilter) return (a.start_time ?? "").localeCompare(b.start_time ?? "");
-        const aFuture = a.date >= today ? 0 : 1;
-        const bFuture = b.date >= today ? 0 : 1;
+        const aKey = `${a.access_start_date ?? a.date} ${a.start_time ?? ""}`;
+        const bKey = `${b.access_start_date ?? b.date} ${b.start_time ?? ""}`;
+        if (past) return bKey.localeCompare(aKey);
+        const aFuture = (a.access_end_date ?? a.date) >= today ? 0 : 1;
+        const bFuture = (b.access_end_date ?? b.date) >= today ? 0 : 1;
         if (aFuture !== bFuture) return aFuture - bFuture;
-        return `${a.date} ${a.start_time ?? ""}`.localeCompare(`${b.date} ${b.start_time ?? ""}`);
+        return aKey.localeCompare(bKey);
       });
-  }, [dateFilter, statusBaseReservations, statusFilter]);
+  }, [dateFilter, statusBaseReservations, statusFilter, viewMode]);
 
   // 특정 이용일 필터가 없을 때는 이용일(장기는 시작일)별로 묶어 헤더를 붙인다.
   const groupedReservations = useMemo(() => {
@@ -429,6 +446,9 @@ export default function AdminReservations() {
     if (next === "today") {
       setDateFilter(todayValue());
       setStatusFilter("all");
+    } else if (next === "upcoming" || next === "past") {
+      setDateFilter("");
+      setStatusFilter("all");
     } else if (next === "pending") {
       setDateFilter("");
       setStatusFilter("pending");
@@ -504,9 +524,11 @@ export default function AdminReservations() {
           <AdminTabs
             items={[
               { value: "today", label: "오늘 운영", count: reservations.filter((item) => !item.deleted_at && reservationCoversDate(item, todayValue()) && item.status !== "canceled" && item.status !== "no_show").length },
+              { value: "upcoming", label: "예정", count: reservations.filter((item) => !item.deleted_at && (item.access_end_date ?? item.date) >= todayValue() && (item.status === "pending" || item.status === "confirmed")).length },
               { value: "pending", label: "확인 대기", count: pendingCount },
               { value: "longterm", label: "장기 이용", count: reservations.filter((item) => !item.deleted_at && item.status === "confirmed" && isLongTermReservation(item)).length },
-              { value: "all", label: "전체·지난 예약" },
+              { value: "past", label: "지난 예약" },
+              { value: "all", label: "전체" },
             ]}
             onChange={changeView}
             value={viewMode}
