@@ -12,6 +12,9 @@ import type { Pass, PaymentStatus, Reservation, ReservationStatus } from "../lib
 type Period = "day" | "week" | "month";
 const periodLabels: Record<Period, string> = { day: "일별", week: "주별", month: "월별" };
 
+type AttendanceLite = { check_in_at: string; check_out_at: string | null };
+const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+
 // 특정 날짜가 속한 달(±offset)의 전체 범위와 라벨.
 function monthOf(dateStr: string, offset = 0) {
   const base = new Date(`${dateStr || new Date().toISOString().slice(0, 10)}T00:00:00`);
@@ -33,6 +36,7 @@ export default function AdminStats() {
   const navigate = useNavigate();
   const currentMonth = monthRange();
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceLite[]>([]);
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [period, setPeriod] = useState<Period>("day");
   const [startDate, setStartDate] = useState(currentMonth.start);
@@ -58,14 +62,16 @@ export default function AdminStats() {
   async function loadStats() {
     if (!supabase) return;
     setIsLoading(true); setError("");
-    const [reservationResult, passResult] = await Promise.all([
+    const [reservationResult, passResult, attendanceResult] = await Promise.all([
       supabase.from("reservations").select("*").order("date", { ascending: false }).limit(3000),
       supabase.from("passes").select("id,name,description,price,is_active,sort_order").order("sort_order", { ascending: true }),
+      supabase.from("attendance").select("check_in_at,check_out_at").order("check_in_at", { ascending: false }).limit(6000),
     ]);
     setIsLoading(false);
     if (reservationResult.error) { setError(reservationResult.error.message); return; }
     if (!passResult.error && passResult.data?.length) setPasses(passResult.data);
     setReservations((reservationResult.data ?? []) as Reservation[]);
+    if (!attendanceResult.error) setAttendance((attendanceResult.data ?? []) as AttendanceLite[]);
   }
 
   const priceByPassName = useMemo(() => new Map(passes.map((pass) => [pass.name, pass.price])), [passes]);
@@ -94,6 +100,43 @@ export default function AdminStats() {
     visible.forEach((item) => { const name = item.pass_name_snapshot || item.pass_type; const row = groups.get(name) ?? { name, count: 0, revenue: 0 }; row.count += 1; if (item.payment_status === "paid") row.revenue += reservationRevenue(item, priceByPassName); groups.set(name, row); });
     return Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
   }, [priceByPassName, visible]);
+
+  // 실제 입퇴실(attendance) 기준 이용 패턴 — 선택한 기간의 날짜 범위만 반영한다.
+  const usage = useMemo(() => {
+    const inRange = attendance.filter((row) => {
+      const d = kstDateStr(row.check_in_at);
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate);
+    });
+    const hours = new Array(24).fill(0) as number[];
+    const weekdays = new Array(7).fill(0) as number[];
+    const days = new Set<string>();
+    let durSum = 0;
+    let durCount = 0;
+    inRange.forEach((row) => {
+      hours[kstHour(row.check_in_at)] += 1;
+      const wd = kstWeekdayIndex(row.check_in_at);
+      if (wd >= 0) weekdays[wd] += 1;
+      days.add(kstDateStr(row.check_in_at));
+      if (row.check_out_at) {
+        const min = (new Date(row.check_out_at).getTime() - new Date(row.check_in_at).getTime()) / 60000;
+        if (min > 5 && min < 20 * 60) { durSum += min; durCount += 1; }
+      }
+    });
+    const totalVisits = inRange.length;
+    const activeDays = days.size;
+    const peakHour = hours.reduce((best, count, i) => (count > hours[best] ? i : best), 0);
+    const peakWd = weekdays.reduce((best, count, i) => (count > weekdays[best] ? i : best), 0);
+    let firstHour = hours.findIndex((c) => c > 0);
+    let lastHour = 23 - [...hours].reverse().findIndex((c) => c > 0);
+    if (firstHour < 0) { firstHour = 9; lastHour = 22; }
+    return {
+      hours, weekdays, totalVisits, activeDays,
+      peakHour, peakHourCount: hours[peakHour], peakWd, peakWdCount: weekdays[peakWd],
+      avgMin: durCount ? durSum / durCount : 0, durCount,
+      avgVisitsPerDay: activeDays ? totalVisits / activeDays : 0,
+      firstHour, lastHour, hasData: totalVisits > 0,
+    };
+  }, [attendance, startDate, endDate]);
 
   function exportStats() {
     downloadCsv(`workroom-stats-${startDate}-${endDate}.csv`, ["기간", "예약", "이용완료", "취소", "노쇼", "실결제매출"], grouped.map((item) => [item.key, item.count, item.completed, item.canceled, item.noShow, item.revenue]));
@@ -139,6 +182,57 @@ export default function AdminStats() {
             <div className="grid gap-3">{grouped.map((item) => <div className="grid grid-cols-[82px_1fr_auto] items-center gap-3 text-sm" key={item.key}><span className="text-xs font-semibold tabular-nums text-workroom-muted">{item.key}</span><div className="h-7 bg-workroom-background"><div className="h-full min-w-[2px] bg-workroom-yellow" style={{ width: `${Math.max(2, (item.revenue / maxRevenue) * 100)}%` }} /></div><span className="w-24 text-right text-xs font-semibold tabular-nums">{formatPrice(item.revenue)}</span></div>)}{!grouped.length ? <AdminEmpty>집계할 예약이 없습니다.</AdminEmpty> : null}</div>
           </section>
 
+          <section className="mt-7 border border-workroom-line bg-white p-4 sm:p-5">
+            <div className="mb-4"><h2 className="text-lg font-bold">이용 패턴</h2><p className="mt-0.5 text-xs text-workroom-muted">선택한 기간의 실제 입퇴실 기록 기준입니다. 평균 이용 시간은 퇴실이 기록된 방문만 포함해요.</p></div>
+            {usage.hasData ? (
+              <>
+                <div className="grid grid-cols-2 border-y border-workroom-line sm:grid-cols-4">
+                  <SecondaryStat label="총 입실" value={`${usage.totalVisits}회`} />
+                  <SecondaryStat label="평균 이용 시간" value={usage.durCount ? formatMinutes(usage.avgMin) : "—"} />
+                  <SecondaryStat label="붐비는 시간대" value={usage.peakHourCount ? `${usage.peakHour}시` : "—"} />
+                  <SecondaryStat label="붐비는 요일" value={usage.peakWdCount ? `${weekdayLabels[usage.peakWd]}요일` : "—"} />
+                </div>
+                <p className="mt-2 text-xs text-workroom-muted">
+                  이용일 {usage.activeDays}일 · 하루 평균 {usage.avgVisitsPerDay.toFixed(1)}회 입실
+                  {usage.durCount ? ` · 이용 시간 표본 ${usage.durCount}건` : " · 퇴실 기록이 없어 평균 이용 시간은 집계 불가"}
+                </p>
+
+                <div className="mt-5">
+                  <p className="mb-2 text-sm font-bold">시간대별 입실</p>
+                  <div className="grid gap-1.5">
+                    {Array.from({ length: usage.lastHour - usage.firstHour + 1 }, (_, i) => usage.firstHour + i).map((h) => {
+                      const count = usage.hours[h];
+                      const max = Math.max(...usage.hours, 1);
+                      return (
+                        <div className="grid grid-cols-[42px_1fr_36px] items-center gap-3 text-sm" key={h}>
+                          <span className="text-xs font-semibold tabular-nums text-workroom-muted">{h}시</span>
+                          <div className="h-6 bg-workroom-background"><div className={`h-full min-w-[2px] ${h === usage.peakHour && count ? "bg-workroom-ink" : "bg-workroom-yellow"}`} style={{ width: `${Math.max(2, (count / max) * 100)}%` }} /></div>
+                          <span className="text-right text-xs font-semibold tabular-nums">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <p className="mb-2 text-sm font-bold">요일별 입실</p>
+                  <div className="grid gap-1.5">
+                    {usage.weekdays.map((count, wd) => {
+                      const max = Math.max(...usage.weekdays, 1);
+                      return (
+                        <div className="grid grid-cols-[42px_1fr_36px] items-center gap-3 text-sm" key={wd}>
+                          <span className="text-xs font-semibold tabular-nums text-workroom-muted">{weekdayLabels[wd]}</span>
+                          <div className="h-6 bg-workroom-background"><div className={`h-full min-w-[2px] ${wd === usage.peakWd && count ? "bg-workroom-ink" : "bg-workroom-yellow"}`} style={{ width: `${Math.max(2, (count / max) * 100)}%` }} /></div>
+                          <span className="text-right text-xs font-semibold tabular-nums">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : <AdminEmpty>선택한 기간에 입퇴실 기록이 없습니다.</AdminEmpty>}
+          </section>
+
           <section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">이용권별</h2><Link className="text-sm font-semibold underline underline-offset-4" to="/admin/reservations">예약 보기</Link></div><div className="border-y border-workroom-line bg-white">{passStats.map((item) => <div className="admin-row grid grid-cols-[1fr_auto] gap-2 px-4 py-3 text-sm sm:grid-cols-[1fr_90px_150px]" key={item.name}><p className="font-semibold">{item.name}</p><p className="text-right tabular-nums text-workroom-muted">{item.count}건</p><p className="col-span-2 text-right font-semibold tabular-nums sm:col-span-1">{formatPrice(item.revenue)}</p></div>)}{!passStats.length ? <AdminEmpty>집계할 예약이 없습니다.</AdminEmpty> : null}</div></section>
         </> : null}
       </div>
@@ -156,3 +250,7 @@ function PrimaryStat({ change, label, value }: { change?: string; label: string;
 function SecondaryStat({ label, value }: { label: string; value: string }) { return <div className="border-b border-r border-workroom-line px-4 py-3 even:border-r-0 sm:border-b-0 sm:even:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-lg font-bold tabular-nums">{value}</p></div>; }
 function periodKey(dateValue: string, period: Period) { if (period === "month") return dateValue.slice(0, 7); if (period === "week") { const date = new Date(`${dateValue}T00:00:00`); return `${date.getFullYear()} W${String(getWeekNumber(date)).padStart(2, "0")}`; } return dateValue.slice(5); }
 function getWeekNumber(date: Date) { const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())); const day = target.getUTCDay() || 7; target.setUTCDate(target.getUTCDate() + 4 - day); const start = new Date(Date.UTC(target.getUTCFullYear(), 0, 1)); return Math.ceil(((target.getTime() - start.getTime()) / 86400000 + 1) / 7); }
+function kstDateStr(value: string) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value)); }
+function kstHour(value: string) { return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).format(new Date(value))); }
+function kstWeekdayIndex(value: string) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", weekday: "short" }).format(new Date(value))); }
+function formatMinutes(min: number) { const h = Math.floor(min / 60); const m = Math.round(min % 60); return h ? `${h}시간${m ? ` ${m}분` : ""}` : `${m}분`; }
