@@ -20,6 +20,22 @@ function hhmm(time: string | null): string {
   return time ? time.slice(0, 5) : "";
 }
 
+function kstDateOf(value: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
+}
+function formatStamp(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+// datetime-local(KST) 문자열 변환.
+function toKstInput(value: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+function fromKstInput(value: string): string {
+  return new Date(`${value}:00+09:00`).toISOString();
+}
+
 const statusLabel: Record<string, string> = {
   pending: "확정 대기",
   confirmed: "확정",
@@ -48,6 +64,10 @@ export default function MemberDashboard() {
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [geoState, setGeoState] = useState<GeoCheckInState>({ phase: "idle" });
+  // 지난 방문에서 퇴실 기록이 없는 세션(오늘이 아닌 날의 열린 세션).
+  const [priorOpen, setPriorOpen] = useState<{ id: string; check_in_at: string } | null>(null);
+  const [checkoutInput, setCheckoutInput] = useState("");
+  const [savingPrior, setSavingPrior] = useState(false);
 
   // 위치 기반 출근. silent=true(자동 시도)일 때는 실패해도 조용히 넘어간다 —
   // 예약이 없거나 매장 밖이면 배너만 남고 아무 일도 일어나지 않는다.
@@ -95,6 +115,26 @@ export default function MemberDashboard() {
     }
     setGeoState({ phase: "done", message: "퇴근 도장을 찍었어요. 오늘도 수고하셨어요!" });
     setData((current) => (current ? { ...current, openNow: false } : current));
+  }
+
+  // 지난 방문의 퇴실 시각을 입력받아 열린 세션을 닫는다(회원 RLS로 직접 갱신).
+  async function savePriorCheckout() {
+    if (!supabase || !priorOpen || !checkoutInput) return;
+    const iso = fromKstInput(checkoutInput);
+    if (new Date(iso).getTime() <= new Date(priorOpen.check_in_at).getTime()) {
+      setGeoState({ phase: "failed", message: "퇴실 시각은 입실 시각보다 늦어야 해요." });
+      return;
+    }
+    setSavingPrior(true);
+    const { error } = await supabase.from("attendance").update({ check_out_at: iso }).eq("id", priorOpen.id);
+    setSavingPrior(false);
+    if (error) {
+      setGeoState({ phase: "failed", message: "퇴실 시각 저장에 실패했어요. 잠시 후 다시 시도해 주세요." });
+      return;
+    }
+    setPriorOpen(null);
+    setGeoState({ phase: "done", message: "지난 방문 퇴실 기록을 정리했어요." });
+    setReloadKey((k) => k + 1);
   }
 
   // 위치 권한을 이미 허용해 둔 회원은 대시보드를 여는 것만으로 자동 출근을
@@ -154,6 +194,19 @@ export default function MemberDashboard() {
         const checkedInToday = todayRows.length > 0;
         const openNow = todayRows.some((r: { check_out_at: string | null }) => r.check_out_at === null);
 
+        // 오늘이 아닌 날에 열린 채로 남은 세션(퇴근 미기록) — 가장 오래된 것부터 정리.
+        const priorRows = (att ?? [])
+          .filter((r: { check_in_at: string; check_out_at: string | null }) => r.check_out_at === null && kst(r.check_in_at) !== today)
+          .sort((a: { check_in_at: string }, b: { check_in_at: string }) => a.check_in_at.localeCompare(b.check_in_at));
+        const prior = priorRows[0] as { id: string; check_in_at: string } | undefined;
+        if (prior) {
+          setPriorOpen({ id: prior.id, check_in_at: prior.check_in_at });
+          // 기본값: 입실 당일 저녁 6시(입실 이후여야 하므로 필요 시 조정).
+          setCheckoutInput(`${kstDateOf(prior.check_in_at)}T18:00`);
+        } else {
+          setPriorOpen(null);
+        }
+
         setFailed(false);
         setData({
           name: (profile?.full_name as string) || "회원",
@@ -190,6 +243,35 @@ export default function MemberDashboard() {
           {data ? `${data.name}님, 안녕하세요` : "안녕하세요"}
         </h1>
       </div>
+
+      {/* 지난 방문 퇴실 미기록 정리 — 안 닫힌 채 '근무 중'으로 남는 것을 막는다. */}
+      {priorOpen ? (
+        <div className={`${tintCard("danger")} mt-4 grid gap-3 px-4 py-4`}>
+          <div className="min-w-0">
+            <p className="text-base font-bold">지난 방문 퇴실 기록이 없어요</p>
+            <p className="mt-0.5 text-xs font-medium leading-5 text-workroom-muted">
+              <b className="text-workroom-ink">{formatStamp(priorOpen.check_in_at)} 입실</b> 후 퇴실이 기록되지 않아 아직 ‘근무 중’으로 남아 있어요. 그날 몇 시에 나가셨는지 입력하면 정리돼요.
+            </p>
+          </div>
+          <label className="grid gap-1 text-sm font-bold">
+            그날 퇴실 시각
+            <input
+              type="datetime-local"
+              value={checkoutInput}
+              min={toKstInput(priorOpen.check_in_at)}
+              onChange={(e) => setCheckoutInput(e.target.value)}
+            />
+          </label>
+          <button
+            className={buttonClass("primary", "md", "w-full sm:w-auto")}
+            disabled={savingPrior || !checkoutInput}
+            onClick={() => void savePriorCheckout()}
+            type="button"
+          >
+            {savingPrior ? "정리 중…" : "퇴실 시각 저장"}
+          </button>
+        </div>
+      ) : null}
 
       {/* 출근/퇴근 — 로그인한 회원에게 가장 먼저 보이는 한 번 탭 액션. */}
       {attState === "out" ? (
