@@ -2,15 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback } from "../components/AdminPage";
 import { defaultPasses } from "../lib/defaultPasses";
-import { downloadCsv } from "../lib/csv";
 import { formatPrice } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { buttonClass } from "../lib/ui";
 import type { Pass, PaymentStatus, Reservation, ReservationStatus } from "../lib/types";
 
-type Period = "day" | "week" | "month";
-const periodLabels: Record<Period, string> = { day: "일별", week: "주별", month: "월별" };
+type Period = "day" | "week" | "month" | "quarter" | "year";
+const periodLabels: Record<Period, string> = { day: "일별", week: "주별", month: "월별", quarter: "분기별", year: "연도별" };
 
 type AttendanceLite = { check_in_at: string; check_out_at: string | null };
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
@@ -45,6 +44,7 @@ export default function AdminStats() {
   const [paymentFilter, setPaymentFilter] = useState<"all" | PaymentStatus>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -138,14 +138,69 @@ export default function AdminStats() {
     };
   }, [attendance, startDate, endDate]);
 
-  function exportStats() {
-    downloadCsv(`workroom-stats-${startDate}-${endDate}.csv`, ["기간", "예약", "이용완료", "취소", "노쇼", "실결제매출"], grouped.map((item) => [item.key, item.count, item.completed, item.canceled, item.noShow, item.revenue]));
+  // 전체 통계를 여러 시트로 나눠 엑셀(.xlsx)로 저장. xlsx는 클릭 시 지연 로드.
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+      const rangeLabel = startDate || endDate ? `${startDate || "처음"} ~ ${endDate || "끝"}` : "전체 기간";
+      const wb = XLSX.utils.book_new();
+
+      const summarySheet = XLSX.utils.aoa_to_sheet([
+        ["WORKROOM 통계"],
+        ["기간", rangeLabel],
+        ["집계 단위", periodLabels[period]],
+        [],
+        ["매출·예약", ""],
+        ["실결제 매출", summary.revenue],
+        ["예약 건수", summary.total],
+        ["확정·완료", summary.confirmed + summary.completed],
+        ["노쇼", summary.noShow],
+        ["노쇼율(%)", summary.total ? Math.round((summary.noShow / summary.total) * 100) : 0],
+        ["미수금", summary.receivable],
+        ["환불", summary.refunded],
+        ["서비스 예약", summary.service],
+        [],
+        ["이용 패턴(실제 입퇴실)", ""],
+        ["총 입실(회)", usage.totalVisits],
+        ["평균 이용 시간(분)", usage.durCount ? Math.round(usage.avgMin) : ""],
+        ["이용일 수", usage.activeDays],
+        ["하루 평균 입실(회)", Number(usage.avgVisitsPerDay.toFixed(1))],
+        ["붐비는 시간대", usage.peakHourCount ? `${usage.peakHour}시` : ""],
+        ["붐비는 요일", usage.peakWdCount ? `${weekdayLabels[usage.peakWd]}요일` : ""],
+      ]);
+      XLSX.utils.book_append_sheet(wb, summarySheet, "요약");
+
+      const periodSheet = XLSX.utils.aoa_to_sheet([
+        ["기간", "예약", "이용완료", "취소", "노쇼", "실결제매출"],
+        ...grouped.map((item) => [item.key, item.count, item.completed, item.canceled, item.noShow, item.revenue]),
+      ]);
+      XLSX.utils.book_append_sheet(wb, periodSheet, `기간별(${periodLabels[period]})`);
+
+      const passSheet = XLSX.utils.aoa_to_sheet([
+        ["이용권", "건수", "실결제매출"],
+        ...passStats.map((item) => [item.name, item.count, item.revenue]),
+      ]);
+      XLSX.utils.book_append_sheet(wb, passSheet, "이용권별");
+
+      const hourSheet = XLSX.utils.aoa_to_sheet([["시간대", "입실수"], ...usage.hours.map((count, h) => [`${h}시`, count])]);
+      XLSX.utils.book_append_sheet(wb, hourSheet, "시간대별");
+
+      const wdSheet = XLSX.utils.aoa_to_sheet([["요일", "입실수"], ...usage.weekdays.map((count, wd) => [weekdayLabels[wd], count])]);
+      XLSX.utils.book_append_sheet(wb, wdSheet, "요일별");
+
+      XLSX.writeFile(wb, `workroom-통계_${startDate || "all"}_${endDate || "all"}.xlsx`);
+    } catch {
+      setError("엑셀 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   const maxRevenue = Math.max(...grouped.map((item) => item.revenue), 1);
 
   return (
-    <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadStats()} type="button">새로고침</button><button className={buttonClass("secondary", "md")} disabled={!grouped.length} onClick={exportStats} type="button">CSV 저장</button></>} description="서비스 예약은 매출과 미수금에서 제외됩니다. 금액은 예약 이용일을 기준으로 집계합니다." title="매출·통계">
+    <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadStats()} type="button">새로고침</button><button className={buttonClass("primary", "md")} disabled={exporting || !grouped.length} onClick={() => void exportExcel()} type="button">{exporting ? "저장 중…" : "엑셀 저장"}</button></>} description="서비스 예약은 매출과 미수금에서 제외됩니다. 금액은 예약 이용일을 기준으로 집계합니다." title="매출·통계">
       <div className="admin-compact">
         <AdminFeedback error={error} />
         <div className="mb-5 grid gap-3 border-y border-workroom-line bg-white p-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -159,6 +214,12 @@ export default function AdminStats() {
             <div className="grid flex-1 h-[42px] place-items-center rounded-[6px] border border-workroom-ink bg-white text-sm font-bold tabular-nums">{monthOf(startDate).label}</div>
             <button aria-label="다음 달" className={buttonClass("secondary", "sm", "h-[42px] px-3")} onClick={() => { const m = monthOf(startDate, 1); setStartDate(m.start); setEndDate(m.end); }} type="button">›</button>
             <button className={buttonClass("accent", "sm", "h-[42px] shrink-0 px-3")} onClick={() => { const range = monthRange(); setStartDate(range.start); setEndDate(range.end); }} type="button">이번 달</button>
+          </div>
+          <div className="flex items-end gap-1.5 sm:col-span-2 lg:col-span-6">
+            <span className="hidden self-center text-xs font-semibold text-workroom-muted sm:inline">빠른 기간</span>
+            <button className={buttonClass("secondary", "sm", "h-[38px] px-3")} onClick={() => { const y = new Date().getFullYear(); setStartDate(`${y}-01-01`); setEndDate(`${y}-12-31`); setPeriod("month"); }} type="button">올해</button>
+            <button className={buttonClass("secondary", "sm", "h-[38px] px-3")} onClick={() => { const y = new Date().getFullYear(); setStartDate(`${y - 1}-01-01`); setEndDate(`${y - 1}-12-31`); setPeriod("month"); }} type="button">작년</button>
+            <button className={buttonClass("secondary", "sm", "h-[38px] px-3")} onClick={() => { setStartDate(""); setEndDate(""); setPeriod("year"); }} type="button">전체 기간</button>
           </div>
         </div>
 
@@ -248,7 +309,13 @@ function reservationRevenue(item: Reservation, prices: Map<string, number>) { re
 function changeRate(current: number, previous: number) { if (!previous) return current ? "이전 기간보다 증가" : "변화 없음"; const rate = Math.round(((current - previous) / previous) * 100); return rate === 0 ? "이전 기간과 같음" : `이전 기간보다 ${Math.abs(rate)}% ${rate > 0 ? "증가" : "감소"}`; }
 function PrimaryStat({ change, label, value }: { change?: string; label: string; value: string }) { return <div className="border-b border-workroom-line px-4 py-4 last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{change ? <p className="mt-1 text-xs font-medium text-workroom-muted">{change}</p> : null}</div>; }
 function SecondaryStat({ label, value }: { label: string; value: string }) { return <div className="border-b border-r border-workroom-line px-4 py-3 even:border-r-0 sm:border-b-0 sm:even:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-lg font-bold tabular-nums">{value}</p></div>; }
-function periodKey(dateValue: string, period: Period) { if (period === "month") return dateValue.slice(0, 7); if (period === "week") { const date = new Date(`${dateValue}T00:00:00`); return `${date.getFullYear()} W${String(getWeekNumber(date)).padStart(2, "0")}`; } return dateValue.slice(5); }
+function periodKey(dateValue: string, period: Period) {
+  if (period === "year") return dateValue.slice(0, 4);
+  if (period === "quarter") return `${dateValue.slice(0, 4)} Q${Math.ceil(Number(dateValue.slice(5, 7)) / 3)}`;
+  if (period === "month") return dateValue.slice(0, 7);
+  if (period === "week") { const date = new Date(`${dateValue}T00:00:00`); return `${date.getFullYear()} W${String(getWeekNumber(date)).padStart(2, "0")}`; }
+  return dateValue.slice(5);
+}
 function getWeekNumber(date: Date) { const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())); const day = target.getUTCDay() || 7; target.setUTCDate(target.getUTCDate() + 4 - day); const start = new Date(Date.UTC(target.getUTCFullYear(), 0, 1)); return Math.ceil(((target.getTime() - start.getTime()) / 86400000 + 1) / 7); }
 function kstDateStr(value: string) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value)); }
 function kstHour(value: string) { return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).format(new Date(value))); }

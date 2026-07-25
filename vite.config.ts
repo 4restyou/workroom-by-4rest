@@ -32,7 +32,9 @@ export default defineConfig({
         // Pretendard dynamic subset loads per-glyph on demand, so they're handled
         // by runtime caching instead of bloating the install-time precache.
         globPatterns: ["**/*.{js,css,html,svg}"],
-        globIgnores: ["**/woff2-dynamic-subset/**"],
+        // The xlsx export chunk (~430KB) is admin-only and lazy-loaded on click,
+        // so keep it out of the install-time precache; it's runtime-cached below.
+        globIgnores: ["**/woff2-dynamic-subset/**", "**/xlsx-*.js"],
         navigateFallback: "/index.html",
         // Don't let the SW intercept Supabase/auth/API or admin deep links.
         navigateFallbackDenylist: [/^\/admin/, /\/auth\//, /supabase/],
@@ -45,6 +47,15 @@ export default defineConfig({
             options: {
               cacheName: "workroom-assets",
               expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            // Lazy-loaded xlsx export chunk: cache once an admin actually fetches it.
+            urlPattern: ({ url }) => /\/assets\/xlsx-.*\.js$/.test(url.pathname),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "workroom-lazy",
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
         ],
