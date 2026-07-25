@@ -34,6 +34,9 @@ function kstDate(value: string | Date) {
 function dateTime(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
+function timeOnly(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
 function currentMinute() {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
@@ -206,6 +209,12 @@ export default function AdminAttendance() {
                   <div>
                     <p className="text-sm font-semibold">{reservation.name} · {reservation.people}명</p>
                     <p className="mt-0.5 text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}{reservation.phone ? ` · ${reservation.phone}` : ""}</p>
+                    {attendance ? (
+                      <p className="mt-1 text-xs font-bold tabular-nums text-workroom-ink">
+                        {timeOnly(attendance.check_in_at)} 입실
+                        {attendance.check_out_at ? ` · ${timeOnly(attendance.check_out_at)} 퇴실` : " · 이용 중"}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2 sm:justify-end">
                     <span className={badge(tone)}>{state}</span>
