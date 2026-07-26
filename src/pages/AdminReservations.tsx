@@ -1141,8 +1141,8 @@ function ReservationCard({
         </div>
       ) : null}
 
-      <details className="mt-5 border-t border-workroom-line pt-4">
-        <summary className="cursor-pointer text-sm font-semibold text-workroom-muted">상태·결제 기록 직접 수정</summary>
+      <div className="mt-5 border-t border-workroom-line pt-4">
+        <p className="text-sm font-semibold text-workroom-muted">상태·결제 기록 직접 수정</p>
       <div className="mt-4 grid gap-3">
         <label className="grid gap-2 text-sm font-bold">
           상태 변경
@@ -1205,7 +1205,7 @@ function ReservationCard({
           <button className={buttonClass("secondary", "sm", "border-red-400")} onClick={onPortoneRefund} type="button">PG 환불 실행</button>
         ) : null}
       </div>
-      </details>
+      </div>
 
       <details className="mt-5 border-t border-workroom-line pt-4">
         <summary className="cursor-pointer text-sm font-semibold text-workroom-muted">문자·결제·변경 이력</summary>
