@@ -61,6 +61,10 @@ export default function AdminAttendance() {
   const [busy, setBusy] = useState<string | null>(null);
   const [manualQuery, setManualQuery] = useState("");
   const [manualResults, setManualResults] = useState<MemberOption[]>([]);
+  const [couponQuery, setCouponQuery] = useState("");
+  const [couponResults, setCouponResults] = useState<MemberOption[]>([]);
+  const [couponTarget, setCouponTarget] = useState<MemberOption | null>(null);
+  const [couponLabel, setCouponLabel] = useState("");
 
   async function load(silent = false) {
     if (!supabase) return;
@@ -106,6 +110,34 @@ export default function AdminAttendance() {
     if (q.length < 2) { setManualResults([]); return; }
     const { data } = await supabase.from("profiles").select("id,full_name,phone").eq("role", "user").or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`).limit(8);
     setManualResults((data ?? []) as MemberOption[]);
+  }
+
+  async function searchCouponMembers(query: string) {
+    if (!supabase) return;
+    const q = query.trim();
+    setCouponQuery(query);
+    setCouponTarget(null);
+    if (q.length < 2) { setCouponResults([]); return; }
+    const { data } = await supabase.from("profiles").select("id,full_name,phone").eq("role", "user").or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`).limit(8);
+    setCouponResults((data ?? []) as MemberOption[]);
+  }
+
+  async function issueCoupon() {
+    if (!supabase || !couponTarget) return;
+    const name = couponTarget.full_name || "회원";
+    const label = couponLabel.trim() || "보상";
+    if (!window.confirm(`${name}님에게 '${label}' 쿠폰을 발급할까요?`)) return;
+    setBusy("coupon");
+    const { data, error: rpcError } = await supabase.rpc("admin_issue_coupon", { p_profile_id: couponTarget.id, p_label: couponLabel.trim() || null });
+    const result = data as { ok?: boolean; message?: string; label?: string } | null;
+    setBusy(null);
+    if (rpcError || !result?.ok) {
+      setError(rpcError?.message?.includes("function") ? "쿠폰 발급 기능이 아직 준비되지 않았습니다. 마이그레이션(0031) 적용을 확인해 주세요." : result?.message ?? rpcError?.message ?? "쿠폰 발급에 실패했습니다.");
+      return;
+    }
+    setSuccess(`${name}님에게 '${result.label ?? label}' 쿠폰을 발급했어요 🎫`);
+    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel("");
+    await load(true);
   }
 
   async function addAttendance(profileId: string, reservationId: string | null, name: string) {
@@ -258,6 +290,30 @@ export default function AdminAttendance() {
 
         {!isLoading && view === "coupons" ? (
           <div className="grid gap-6">
+            <section className="border border-workroom-line bg-white p-4">
+              <h2 className="text-base font-bold">쿠폰 직접 발급</h2>
+              <p className="mt-0.5 text-xs text-workroom-muted">스탬프와 상관없이 회원에게 쿠폰을 바로 지급합니다. (예: 사과·이벤트·선물)</p>
+              <div className="mt-3 grid gap-2">
+                {couponTarget ? (
+                  <div className="flex items-center justify-between gap-2 border border-workroom-line px-3 py-2">
+                    <span className="text-sm font-semibold">{couponTarget.full_name || "이름 미입력"}{couponTarget.phone ? <span className="ml-1 text-xs font-medium text-workroom-muted">{couponTarget.phone}</span> : null}</span>
+                    <button className="text-xs font-semibold text-workroom-muted underline" onClick={() => { setCouponTarget(null); setCouponQuery(""); }} type="button">회원 변경</button>
+                  </div>
+                ) : (
+                  <>
+                    <input placeholder="회원 이름 또는 연락처로 검색" value={couponQuery} onChange={(event) => void searchCouponMembers(event.target.value)} />
+                    {couponResults.map((member) => (
+                      <button className="flex items-center justify-between border-b border-workroom-line px-2 py-3 text-left last:border-0" key={member.id} onClick={() => { setCouponTarget(member); setCouponResults([]); }} type="button">
+                        <span className="font-semibold">{member.full_name || "이름 미입력"}</span>
+                        <span className="text-xs text-workroom-muted">{member.phone || ""}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+                <input placeholder="쿠폰 이름 (비워두면 기본 보상명)" value={couponLabel} onChange={(event) => setCouponLabel(event.target.value)} />
+                <button className={buttonClass("primary", "md")} disabled={!couponTarget || busy === "coupon"} onClick={() => void issueCoupon()} type="button">{busy === "coupon" ? "발급 중…" : "쿠폰 발급"}</button>
+              </div>
+            </section>
             <section><h2 className="mb-2 text-base font-bold">사용 가능 {pendingCoupons.length}장</h2><div className="border-y border-workroom-line bg-white">{pendingCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "used")} />)}{!pendingCoupons.length ? <AdminEmpty>사용 가능한 쿠폰이 없습니다.</AdminEmpty> : null}</div></section>
             <details><summary className="cursor-pointer text-sm font-semibold text-workroom-muted">사용 완료 {usedCoupons.length}장</summary><div className="mt-2 border-y border-workroom-line bg-white">{usedCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "issued")} />)}</div></details>
           </div>
