@@ -61,6 +61,21 @@ function isReservationStatus(value: string | null): value is ReservationStatus {
   return Boolean(value && statusOptions.includes(value as ReservationStatus));
 }
 
+function addDaysStr(dateStr: string, days: number): string {
+  if (!dateStr) return dateStr;
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+// 이용권 이름에서 기간(주)을 유추: "2주" → 2, 월권 → 4, 주간권 → 1.
+function passPeriodWeeks(name: string): number {
+  const m = name.match(/(\d+)\s*주/);
+  if (m) return Number(m[1]);
+  if (name.includes("월권") || name.includes("월간")) return 4;
+  if (name.includes("주간")) return 1;
+  return 4;
+}
+
 export default function AdminReservations() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -69,6 +84,8 @@ export default function AdminReservations() {
   const dateParam = searchParams.get("date");
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
+  // 영업 요일(휴무가 아닌 요일). 월권·주간권 기본 이용 요일에서 휴무일을 제외한다.
+  const [openWeekdays, setOpenWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [showCreate, setShowCreate] = useState(false);
   const [dateFilter, setDateFilter] = useState(dateParam ?? (reservationParam || statusParam ? "" : todayValue()));
   const [query, setQuery] = useState("");
@@ -116,9 +133,10 @@ export default function AdminReservations() {
     setIsLoading(true);
     setError("");
 
-    const [{ data, error: loadError }, { data: passRows }] = await Promise.all([
+    const [{ data, error: loadError }, { data: passRows }, { data: hourRows }] = await Promise.all([
       supabase.from("reservations").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
       supabase.from("passes").select("id,name,description,price,seat_type_id,is_active,sort_order").eq("is_active", true).order("sort_order"),
+      supabase.from("business_hours").select("weekday,is_closed"),
     ]);
 
     setIsLoading(false);
@@ -130,6 +148,11 @@ export default function AdminReservations() {
 
     setReservations(data ?? []);
     setPasses((passRows ?? []) as Pass[]);
+    if (hourRows?.length) {
+      const closed = new Set((hourRows as { weekday: number; is_closed: boolean }[]).filter((h) => h.is_closed).map((h) => h.weekday));
+      const open = [0, 1, 2, 3, 4, 5, 6].filter((d) => !closed.has(d));
+      setOpenWeekdays(open.length ? open : [0, 1, 2, 3, 4, 5, 6]);
+    }
   }
 
   async function createManualReservation(payload: ReservationInsert) {
@@ -492,6 +515,7 @@ export default function AdminReservations() {
       paymentLogs={paymentLogs}
       smsLogs={smsLogs}
       passes={passes}
+      openWeekdays={openWeekdays}
       isArchived={Boolean(selectedReservation.deleted_at)}
       key={selectedReservation.id}
       reservation={selectedReservation}
@@ -779,6 +803,7 @@ function ReservationCard({
   paymentLogs,
   smsLogs,
   passes,
+  openWeekdays,
   isArchived,
   reservation,
   inquiries,
@@ -794,6 +819,7 @@ function ReservationCard({
   paymentLogs: ReservationPaymentLog[];
   smsLogs: ReservationSmsLog[];
   passes: Pass[];
+  openWeekdays: number[];
   isArchived: boolean;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
@@ -823,7 +849,7 @@ function ReservationCard({
   const [accessDraft, setAccessDraft] = useState({
     start: reservation.access_start_date ?? reservation.date,
     end: reservation.access_end_date ?? reservation.date,
-    weekdays: reservation.access_weekdays ?? [0, 1, 2, 3, 4, 5, 6],
+    weekdays: reservation.access_weekdays ?? openWeekdays,
     pausedFrom: reservation.access_paused_from ?? "",
     pausedUntil: reservation.access_paused_until ?? "",
   });
@@ -848,11 +874,11 @@ function ReservationCard({
     setAccessDraft({
       start: reservation.access_start_date ?? reservation.date,
       end: reservation.access_end_date ?? reservation.date,
-      weekdays: reservation.access_weekdays ?? [0, 1, 2, 3, 4, 5, 6],
+      weekdays: reservation.access_weekdays ?? openWeekdays,
       pausedFrom: reservation.access_paused_from ?? "",
       pausedUntil: reservation.access_paused_until ?? "",
     });
-  }, [reservation]);
+  }, [reservation, openWeekdays]);
 
   function save() {
     const selectedPass = passes.find((pass) => pass.name === bookingDraft.pass_type);
@@ -1033,12 +1059,15 @@ function ReservationCard({
       {isLongTermReservation(reservation) ? (
         <details className="mt-3 rounded-card border border-workroom-line bg-white p-4" open>
           <summary className="cursor-pointer text-sm font-black">주간권·월권 이용기간</summary>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <p className="mt-2 text-xs font-medium text-workroom-muted">
+            {bookingDraft.pass_type}은 <b className="text-workroom-ink">{passPeriodWeeks(bookingDraft.pass_type)}주({passPeriodWeeks(bookingDraft.pass_type) * 7}일)</b> 기준이에요. 시작일이나 종료일 한쪽을 바꾸면 나머지가 자동으로 맞춰져요.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용 시작일
-              <input type="date" value={accessDraft.start} onChange={(event) => setAccessDraft((current) => ({ ...current, start: event.target.value }))} />
+              <input type="date" value={accessDraft.start} onChange={(event) => { const start = event.target.value; setAccessDraft((current) => ({ ...current, start, end: start ? addDaysStr(start, passPeriodWeeks(bookingDraft.pass_type) * 7 - 1) : current.end })); }} />
             </label>
             <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용 종료일
-              <input min={accessDraft.start} type="date" value={accessDraft.end} onChange={(event) => setAccessDraft((current) => ({ ...current, end: event.target.value }))} />
+              <input min={accessDraft.start} type="date" value={accessDraft.end} onChange={(event) => { const end = event.target.value; setAccessDraft((current) => ({ ...current, end, start: end ? addDaysStr(end, -(passPeriodWeeks(bookingDraft.pass_type) * 7 - 1)) : current.start })); }} />
             </label>
           </div>
           <fieldset className="mt-3">
