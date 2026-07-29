@@ -41,6 +41,7 @@ const groups: Group[] = [
       {
         q: "결제는 어떻게 하나요?",
         a: [
+          SITE.booking.paymentTestNotice,
           SITE.booking.confirmationLabel,
           SITE.booking.onlinePayment,
           SITE.booking.onsitePayment,

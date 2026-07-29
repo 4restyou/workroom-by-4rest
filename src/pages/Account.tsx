@@ -7,6 +7,7 @@ import AddressSearchField from "../components/AddressSearchField";
 import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, todayValue } from "../lib/format";
 import { canPayOnline, canSubscribe, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
 import { ensureCurrentProfile } from "../lib/profiles";
+import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Attendance, BusinessDateException, BusinessHour, Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
@@ -521,6 +522,7 @@ export default function Account() {
 
             {activeTab === "reservations" && profile.role !== "admin" ? (
               <>
+              <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>{SITE.booking.paymentTestNotice}</p>
               <MemberReservationDashboard attendance={attendance} businessHours={businessHours} dateExceptions={dateExceptions} now={now} reservations={reservations} />
               {subscriptions.some((sub) => sub.status !== "canceled") ? (
                 <section className={`${card} p-5`}>

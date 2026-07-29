@@ -721,6 +721,9 @@ export default function Reserve() {
               </div>
               <fieldset className="grid gap-2">
                 <legend className="mb-1 text-sm font-bold">결제 방법</legend>
+                <p className="rounded-card border border-workroom-ink bg-workroom-yellow/50 p-3 text-xs font-bold leading-5">
+                  {SITE.booking.paymentTestNotice}
+                </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label
                     className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 ${
