@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
-import { confirmPayment } from "../lib/portone";
+import { confirmBillingIssue, confirmPayment } from "../lib/portone";
 import { buttonClass, tintCard } from "../lib/ui";
 
 // PortOne 결제창의 모바일 리디렉션 복귀 지점. SDK가 paymentId(성공) 또는
@@ -17,10 +17,20 @@ export default function PaymentPortone() {
     async function run() {
       const code = searchParams.get("code");
       const paymentId = searchParams.get("paymentId");
+      const billingKey = searchParams.get("billingKey");
+      const res = searchParams.get("res");
       if (code) {
         if (!active) return;
         setState("failed");
         setMessage(searchParams.get("message") ?? "결제가 완료되지 않았습니다.");
+        return;
+      }
+      // 정기결제(빌링키) 리디렉션 복귀: billingKey + 예약 id로 첫 결제·구독 등록.
+      if (billingKey && res) {
+        const result = await confirmBillingIssue(res, billingKey);
+        if (!active) return;
+        setState(result.ok ? "done" : "failed");
+        setMessage(result.message);
         return;
       }
       if (!paymentId) {

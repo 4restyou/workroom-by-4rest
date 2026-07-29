@@ -5,7 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import AddressSearchField from "../components/AddressSearchField";
 import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, todayValue } from "../lib/format";
-import { canPayOnline, payReservation } from "../lib/portone";
+import { canPayOnline, canSubscribe, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
@@ -39,6 +39,15 @@ const reservationStatusCardClass: Record<ReservationStatus, string> = {
   no_show: "border-workroom-ink bg-workroom-danger/70",
 };
 
+type SubscriptionRow = {
+  id: string;
+  pass_name: string;
+  amount: number;
+  status: "active" | "paused" | "canceled";
+  next_charge_at: string | null;
+  method_label: string | null;
+};
+
 const reservationStatusMessage: Record<ReservationStatus, string> = {
   pending: "운영자 확인을 기다리고 있습니다.",
   confirmed: "예약이 확정되었습니다.",
@@ -53,6 +62,7 @@ export default function Account() {
   const tabParam = searchParams.get("tab");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionRow[]>([]);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
@@ -73,6 +83,15 @@ export default function Account() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const loadSubscriptions = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from("subscriptions")
+      .select("id,pass_name,amount,status,next_charge_at,method_label")
+      .order("created_at", { ascending: false });
+    setSubscriptions((data ?? []) as SubscriptionRow[]);
+  }, []);
 
   useEffect(() => {
     async function loadAccount() {
@@ -114,6 +133,7 @@ export default function Account() {
 
           if (reservationResult.error) throw reservationResult.error;
           setReservations((reservationResult.data ?? []) as Reservation[]);
+          void loadSubscriptions();
           setInquiries((inquiryResult.data ?? []) as ReservationInquiry[]);
           setAttendance((attendanceResult.data ?? []) as Attendance[]);
           setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
@@ -127,7 +147,21 @@ export default function Account() {
     }
 
     void loadAccount();
-  }, [navigate]);
+  }, [navigate, loadSubscriptions]);
+
+  async function cancelSub(id: string) {
+    if (!window.confirm("정기결제를 해지할까요? 이번 이용기간까지는 그대로 이용할 수 있어요.")) return;
+    setError("");
+    setActionBusy(`cancelsub-${id}`);
+    const result = await cancelSubscription(id);
+    setActionBusy(null);
+    if (result.ok) {
+      setSuccess(result.message);
+      void loadSubscriptions();
+    } else {
+      setError(result.message);
+    }
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
@@ -214,6 +248,25 @@ export default function Account() {
           current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "paid" as const, status: "confirmed" as const } : item)),
         );
         setSuccess(result.message);
+      } else {
+        setError(result.message);
+      }
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function subscribeNow(reservation: Reservation) {
+    setError("");
+    setActionBusy(`sub-${reservation.id}`);
+    try {
+      const result = await subscribeMonthly(reservation);
+      if (result.ok) {
+        setReservations((current) =>
+          current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "paid" as const, status: "confirmed" as const } : item)),
+        );
+        setSuccess(result.message);
+        void loadSubscriptions();
       } else {
         setError(result.message);
       }
@@ -469,6 +522,35 @@ export default function Account() {
             {activeTab === "reservations" && profile.role !== "admin" ? (
               <>
               <MemberReservationDashboard attendance={attendance} businessHours={businessHours} dateExceptions={dateExceptions} now={now} reservations={reservations} />
+              {subscriptions.some((sub) => sub.status !== "canceled") ? (
+                <section className={`${card} p-5`}>
+                  <h2 className="text-xl font-bold">정기결제</h2>
+                  <div className="mt-4 grid gap-3">
+                    {subscriptions.filter((sub) => sub.status !== "canceled").map((sub) => (
+                      <div className={`${cardFlat} flex flex-wrap items-center justify-between gap-3 px-4 py-3`} key={sub.id}>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold">
+                            {sub.pass_name} · 매월 {formatPrice(sub.amount)}
+                            {sub.status === "paused" ? <span className={badge("danger", "ml-2")}>결제 실패·정지</span> : <span className={badge("mint", "ml-2")}>이용 중</span>}
+                          </p>
+                          <p className="mt-0.5 text-xs font-medium text-workroom-muted">
+                            {sub.method_label ? `${sub.method_label} · ` : ""}
+                            {sub.next_charge_at ? `다음 결제 ${sub.next_charge_at}` : "다음 결제 예정 없음"}
+                          </p>
+                        </div>
+                        <button
+                          className={buttonClass("secondary", "sm")}
+                          disabled={actionBusy === `cancelsub-${sub.id}`}
+                          onClick={() => void cancelSub(sub.id)}
+                          type="button"
+                        >
+                          {actionBusy === `cancelsub-${sub.id}` ? "해지 중…" : "정기결제 해지"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
               <section className={`${card} p-5`}>
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-bold">전체 예약 내역</h2>
@@ -518,6 +600,28 @@ export default function Account() {
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
+                              ) : canSubscribe(reservation) ? (
+                                <div className="grid gap-2">
+                                  <button
+                                    className={buttonClass("accent", "md", "w-full sm:w-auto")}
+                                    disabled={actionBusy === `sub-${reservation.id}`}
+                                    onClick={() => void subscribeNow(reservation)}
+                                    type="button"
+                                  >
+                                    {actionBusy === `sub-${reservation.id}` ? "카드 등록 중…" : `정기결제 등록 · 매월 ${formatPrice(reservation.price_at_booking ?? 0)}`}
+                                  </button>
+                                  <button
+                                    className={buttonClass("secondary", "sm", "w-full sm:w-auto")}
+                                    disabled={actionBusy === `pay-${reservation.id}`}
+                                    onClick={() => void payNow(reservation)}
+                                    type="button"
+                                  >
+                                    {actionBusy === `pay-${reservation.id}` ? "결제 진행 중…" : "이번 회차만 결제"}
+                                  </button>
+                                  <p className="text-xs font-medium text-workroom-muted">
+                                    정기결제는 카드가 등록되고 첫 회차가 바로 결제돼요. 이후 4주마다 자동 결제되며 언제든 해지할 수 있어요.
+                                  </p>
+                                </div>
                               ) : canPayOnline(reservation) ? (
                                 <div className="grid gap-2">
                                   <button

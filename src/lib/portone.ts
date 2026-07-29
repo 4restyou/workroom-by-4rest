@@ -71,6 +71,70 @@ export async function confirmPayment(paymentId: string): Promise<PayResult> {
   return { ok: true, message: result.message ?? "결제가 완료되었습니다." };
 }
 
+// ── 월권 정기결제(빌링키) ─────────────────────────────────────────────
+// 월권 예약에 한해 카드 빌링키를 발급받아 서버에 전달하면, 서버가 첫 주기를
+// 즉시 청구하고 매 주기 자동 청구한다.
+export function canSubscribe(reservation: Reservation): boolean {
+  const name = reservation.pass_name_snapshot || reservation.pass_type;
+  return (
+    hasPortoneConfig &&
+    name.includes("월권") &&
+    (reservation.status === "pending" || reservation.status === "confirmed") &&
+    reservation.payment_status !== "paid" &&
+    reservation.payment_status !== "refunded" &&
+    reservation.payment_status !== "service" &&
+    (reservation.price_at_booking ?? 0) > 0
+  );
+}
+
+export async function subscribeMonthly(reservation: Reservation): Promise<PayResult> {
+  if (!STORE_ID || !CHANNEL_KEY) return { ok: false, message: "정기결제가 아직 준비되지 않았습니다." };
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
+
+  const passName = reservation.pass_name_snapshot || reservation.pass_type;
+  const issueId = `wrbk-${reservation.id.slice(0, 8)}-${Date.now()}`;
+
+  const response = await PortOne.requestIssueBillingKey({
+    storeId: STORE_ID,
+    channelKey: CHANNEL_KEY,
+    billingKeyMethod: "CARD",
+    issueId,
+    issueName: `WORKROOM ${passName} 정기결제`,
+    // 모바일 리디렉션 복귀 시 예약 id를 알 수 있도록 쿼리에 실어 보낸다.
+    redirectUrl: `${window.location.origin}/payment/portone?res=${reservation.id}`,
+    customer: {
+      fullName: reservation.name,
+      phoneNumber: reservation.phone,
+      ...(reservation.email ? { email: reservation.email } : {}),
+    },
+  });
+
+  if (!response) return { ok: false, message: "정기결제 창을 여는 데 실패했습니다." };
+  if (response.code !== undefined) return { ok: false, message: response.message ?? "정기결제 등록이 취소되었습니다." };
+  if (!response.billingKey) return { ok: false, message: "카드 등록에 실패했습니다." };
+
+  return confirmBillingIssue(reservation.id, response.billingKey);
+}
+
+// 빌링키를 서버로 보내 첫 결제·구독 등록. 모바일 리디렉션 복귀 페이지에서도 재사용.
+export async function confirmBillingIssue(reservationId: string, billingKey: string): Promise<PayResult> {
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
+  const { data, error } = await supabase.functions.invoke("portone-billing", {
+    body: { type: "issue", reservationId, billingKey },
+  });
+  const result = data as { ok?: boolean; message?: string } | null;
+  if (error || !result?.ok) return { ok: false, message: result?.message ?? "정기결제 등록에 실패했습니다." };
+  return { ok: true, message: result.message ?? "정기결제가 등록되었습니다." };
+}
+
+export async function cancelSubscription(subscriptionId: string): Promise<PayResult> {
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다." };
+  const { data, error } = await supabase.rpc("cancel_subscription", { p_id: subscriptionId });
+  const result = data as { ok?: boolean; message?: string } | null;
+  if (error || !result?.ok) return { ok: false, message: result?.message ?? "해지에 실패했습니다." };
+  return { ok: true, message: result.message ?? "정기결제를 해지했어요." };
+}
+
 // 관리자 환불.
 export async function refundReservationPayment(reservationId: string, reason: string): Promise<PayResult> {
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다." };
