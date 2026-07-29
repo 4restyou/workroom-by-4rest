@@ -2,12 +2,16 @@ import * as PortOne from "@portone/browser-sdk/v2";
 import { supabase } from "./supabase";
 import type { Reservation } from "./types";
 
-// PortOne(V2) 결제. 환경 변수 두 개가 모두 설정된 경우에만 활성화되며,
-// 없으면 결제 버튼이 숨겨지고 안내 문구만 표시된다.
+// PortOne(V2) 결제. 일반(단건) 결제와 정기결제(빌링)는 PortOne에서 서로 다른
+// 채널이라 채널 키를 각각 둔다. 해당 키가 있는 결제 수단만 버튼이 노출된다.
+//   VITE_PORTONE_CHANNEL_KEY          - 일반(단건) 카드결제 채널 (예: KCP 일반결제)
+//   VITE_PORTONE_BILLING_CHANNEL_KEY  - 정기결제(빌링) 채널 (예: KCP 정기과금)
 const STORE_ID = import.meta.env.VITE_PORTONE_STORE_ID as string | undefined;
 const CHANNEL_KEY = import.meta.env.VITE_PORTONE_CHANNEL_KEY as string | undefined;
+const BILLING_CHANNEL_KEY = import.meta.env.VITE_PORTONE_BILLING_CHANNEL_KEY as string | undefined;
 
 export const hasPortoneConfig = Boolean(STORE_ID && CHANNEL_KEY);
+export const hasBillingConfig = Boolean(STORE_ID && BILLING_CHANNEL_KEY);
 
 export function canPayOnline(reservation: Reservation): boolean {
   return (
@@ -77,7 +81,7 @@ export async function confirmPayment(paymentId: string): Promise<PayResult> {
 export function canSubscribe(reservation: Reservation): boolean {
   const name = reservation.pass_name_snapshot || reservation.pass_type;
   return (
-    hasPortoneConfig &&
+    hasBillingConfig &&
     name.includes("월권") &&
     (reservation.status === "pending" || reservation.status === "confirmed") &&
     reservation.payment_status !== "paid" &&
@@ -88,7 +92,7 @@ export function canSubscribe(reservation: Reservation): boolean {
 }
 
 export async function subscribeMonthly(reservation: Reservation): Promise<PayResult> {
-  if (!STORE_ID || !CHANNEL_KEY) return { ok: false, message: "정기결제가 아직 준비되지 않았습니다." };
+  if (!STORE_ID || !BILLING_CHANNEL_KEY) return { ok: false, message: "정기결제가 아직 준비되지 않았습니다." };
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
 
   const passName = reservation.pass_name_snapshot || reservation.pass_type;
@@ -96,7 +100,7 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
 
   const response = await PortOne.requestIssueBillingKey({
     storeId: STORE_ID,
-    channelKey: CHANNEL_KEY,
+    channelKey: BILLING_CHANNEL_KEY,
     billingKeyMethod: "CARD",
     issueId,
     issueName: `WORKROOM ${passName} 정기결제`,
