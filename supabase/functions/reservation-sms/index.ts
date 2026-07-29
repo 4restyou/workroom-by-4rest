@@ -45,7 +45,11 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://work-room.kr";
 const DOOR_PASSWORD = Deno.env.get("DOOR_PASSWORD") ?? "";
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "예약 시간 전까지 취소 가능, 예약 시간 이후 환불 불가 (자세한 사항은 홈페이지)";
-const ONLINE_PAYMENT_NOTICE = "예약현황에서 카드 결제를 완료하면 예약이 바로 확정됩니다.";
+// 온라인 결제(PG) 정식 오픈 여부. src/lib/site.ts 의 onlinePaymentLive와 함께 맞춰준다.
+const ONLINE_PAYMENT_LIVE = false;
+const ONLINE_PAYMENT_NOTICE = ONLINE_PAYMENT_LIVE
+  ? "예약현황에서 카드 결제를 완료하면 예약이 바로 확정됩니다."
+  : "온라인 결제는 준비 중입니다. 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다. 확정되면 다시 안내드려요.";
 const ONSITE_PAYMENT_NOTICE = "현장 결제 예약은 운영자가 확인한 뒤 확정해 드립니다.";
 
 const STATUS_MESSAGE: Record<string, string> = {

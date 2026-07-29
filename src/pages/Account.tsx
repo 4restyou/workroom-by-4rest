@@ -522,7 +522,7 @@ export default function Account() {
 
             {activeTab === "reservations" && profile.role !== "admin" ? (
               <>
-              <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>{SITE.booking.paymentTestNotice}</p>
+              {!SITE.booking.onlinePaymentLive ? <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>{SITE.booking.paymentTestNotice}</p> : null}
               <MemberReservationDashboard attendance={attendance} businessHours={businessHours} dateExceptions={dateExceptions} now={now} reservations={reservations} />
               {subscriptions.some((sub) => sub.status !== "canceled") ? (
                 <section className={`${card} p-5`}>
@@ -577,7 +577,9 @@ export default function Account() {
                           </div>
                           <p className="mt-3 text-sm font-bold text-workroom-muted">
                             {reservation.status === "pending" && reservation.payment_preference === "online"
-                              ? "카드 결제를 완료하면 예약이 바로 확정됩니다."
+                              ? SITE.booking.onlinePaymentLive
+                                ? "카드 결제를 완료하면 예약이 바로 확정됩니다."
+                                : "운영자 확인 후 결제 링크를 보내드리거나 현장에서 결제하면 확정됩니다."
                               : reservationStatusMessage[reservation.status]}
                           </p>
 

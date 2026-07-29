@@ -521,8 +521,12 @@ export default function Reserve() {
       <Section eyebrow="Reserve" title="예약" accent="yellow">
         <div className="mb-6 grid gap-3 border-y border-workroom-ink py-4 text-sm font-bold leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
-            <p>회원 전용 예약 · 온라인 결제 완료 시 예약이 바로 확정됩니다.</p>
-            <p className="mt-1 font-medium text-workroom-muted">예약 신청 후 카드 결제 → 자동확정·확정 문자 발송 · 현장 결제와 예외 예약은 관리자 확인 · 예약은 오늘부터 2개월 이내</p>
+            <p>회원 전용 예약{SITE.booking.onlinePaymentLive ? " · 온라인 결제 완료 시 예약이 바로 확정됩니다." : " · 신청 후 운영자 확인을 거쳐 확정됩니다."}</p>
+            <p className="mt-1 font-medium text-workroom-muted">
+              {SITE.booking.onlinePaymentLive
+                ? "예약 신청 후 카드 결제 → 자동확정·확정 문자 발송 · 현장 결제와 예외 예약은 관리자 확인 · 예약은 오늘부터 2개월 이내"
+                : "예약 신청 후 관리자가 결제 링크를 보내드리거나 현장에서 결제(카드·현금) · 예약은 오늘부터 2개월 이내"}
+            </p>
             {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
           </div>
           <span className={badge("yellow")}>MEMBER ONLY</span>
@@ -721,9 +725,11 @@ export default function Reserve() {
               </div>
               <fieldset className="grid gap-2">
                 <legend className="mb-1 text-sm font-bold">결제 방법</legend>
-                <p className="rounded-card border border-workroom-ink bg-workroom-yellow/50 p-3 text-xs font-bold leading-5">
-                  {SITE.booking.paymentTestNotice}
-                </p>
+                {!SITE.booking.onlinePaymentLive ? (
+                  <p className="rounded-card border border-workroom-ink bg-workroom-yellow/50 p-3 text-xs font-bold leading-5">
+                    {SITE.booking.paymentTestNotice}
+                  </p>
+                ) : null}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label
                     className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 ${
@@ -738,8 +744,12 @@ export default function Reserve() {
                       type="radio"
                     />
                     <span>
-                      <span className="block font-bold">온라인 카드 결제</span>
-                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">예약 신청 직후 결제하며, 결제가 완료되면 예약도 바로 확정됩니다.</span>
+                      <span className="block font-bold">{SITE.booking.onlinePaymentLive ? "온라인 카드 결제" : "카드 결제 (링크·현장)"}</span>
+                      <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">
+                        {SITE.booking.onlinePaymentLive
+                          ? "예약 신청 직후 결제하며, 결제가 완료되면 예약도 바로 확정됩니다."
+                          : "예약 후 관리자가 결제 링크를 보내드리거나 현장에서 카드로 결제합니다."}
+                      </span>
                     </span>
                   </label>
                   <label
@@ -834,9 +844,9 @@ export default function Reserve() {
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
               {submittedReservation?.reservation.payment_status === "paid"
                 ? "결제가 완료되어 예약이 바로 확정되었습니다. 확정 문자도 함께 발송됩니다."
-                : submittedReservation?.paymentPreference === "online" && (submittedReservation.price ?? 0) > 0
+                : SITE.booking.onlinePaymentLive && submittedReservation?.paymentPreference === "online" && (submittedReservation.price ?? 0) > 0
                   ? "아래에서 결제하면 예약이 바로 확정됩니다."
-                  : "현장 결제나 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정합니다."}
+                  : "예약 신청이 접수되었습니다. 운영자 확인 후 결제 링크를 보내드리거나 현장에서 결제(카드·현금)로 확정됩니다."}
             </p>
 
             {submittedReservation ? (

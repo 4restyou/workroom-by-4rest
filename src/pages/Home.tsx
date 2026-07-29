@@ -42,7 +42,7 @@ const features: { title: string; body: string; icon: FeatureIcon; accent: TintCo
 ];
 
 const guideItems: [string, string][] = [
-  ["결제", "온라인 예약은 신청 후 카드 결제가 완료되면 바로 확정됩니다. 현장 결제와 별도 확인이 필요한 예약은 운영자가 확인합니다."],
+  ["결제", `${SITE.booking.onlinePayment} ${SITE.booking.onsitePayment}`],
   ["취소", "예약 시작 시간 전까지 예약현황에서 직접 취소할 수 있습니다."],
   ["예약 기간", "예약은 이용일 기준 오늘부터 최대 2개월 이내까지 가능합니다."],
   ["연장", "이용 종료 후 15분까지는 유예되며, 이후 1시간 추가 요금이 적용됩니다."],

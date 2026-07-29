@@ -1,3 +1,8 @@
+// 온라인 결제(PG) 정식 오픈 여부. 결제 시스템이 완료되면 true로 바꾸면
+// 예약·안내·FAQ의 '예약 직후 카드 결제/자동 확정' 문구가 한 번에 되살아난다.
+// (문자 안내는 supabase/functions/reservation-sms 의 ONLINE_PAYMENT_LIVE도 함께 변경)
+const onlinePaymentLive: boolean = false;
+
 // Single source of truth for business / contact info used across the site.
 export const SITE = {
   name: "WORKROOM by 4REST",
@@ -7,12 +12,19 @@ export const SITE = {
   hoursLabel: "08:00–다음 날 01:00",
   booking: {
     memberOnly: true,
-    confirmationLabel: "온라인 결제 예약은 결제 완료 즉시 자동 확정됩니다.",
-    onlinePayment: "예약 신청 직후 카드로 결제할 수 있으며, 결제가 완료되면 확정 문자도 자동 발송됩니다.",
+    onlinePaymentLive,
+    confirmationLabel: onlinePaymentLive
+      ? "온라인 결제 예약은 결제 완료 즉시 자동 확정됩니다."
+      : "예약은 신청 후 운영자 확인을 거쳐 확정됩니다.",
+    onlinePayment: onlinePaymentLive
+      ? "예약 신청 직후 카드로 결제할 수 있으며, 결제가 완료되면 확정 문자도 자동 발송됩니다."
+      : "카드 결제는 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
     onsitePayment: "현장 결제(카드·현금)와 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정합니다.",
     advanceLimitLabel: "예약은 이용일 기준 오늘부터 최대 2개월 이내까지 가능합니다.",
-    recurringNotice: "월권(자유석·지정석)은 정기결제로 이용할 수 있습니다. 정기결제 신청·해지는 문의해 주세요.",
-    // 온라인 결제(PG) 테스트 기간 안내. 정식 오픈 시 이 문구를 제거한다.
+    recurringNotice: onlinePaymentLive
+      ? "월권(자유석·지정석)은 정기결제로 이용할 수 있습니다. 정기결제 신청·해지는 문의해 주세요."
+      : "월권(자유석·지정석) 정기결제는 준비 중입니다. 현재는 문의 후 결제 링크 또는 현장 결제로 진행됩니다.",
+    // 온라인 결제(PG) 테스트 기간 안내. onlinePaymentLive를 true로 바꾸면 숨겨진다.
     paymentTestNotice: "현재 온라인 결제는 시스템 테스트 중입니다. 카드 결제는 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
   },
   business: {

@@ -14,7 +14,9 @@ const groups: Group[] = [
         q: "예약은 어떻게 하나요?",
         a: [
           "홈페이지에서 로그인한 뒤, ‘예약하기’에서 이용권·날짜·시간을 선택해 신청합니다.",
-          "온라인 결제 예약은 신청 후 바로 결제할 수 있으며, 결제가 완료되면 자동으로 예약이 확정되고 확정 문자가 발송됩니다.",
+          SITE.booking.onlinePaymentLive
+            ? "온라인 결제 예약은 신청 후 바로 결제할 수 있으며, 결제가 완료되면 자동으로 예약이 확정되고 확정 문자가 발송됩니다."
+            : "예약 신청 후 운영자가 확인해 확정하며, 카드 결제는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
           "현장 결제나 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정합니다.",
         ],
       },
@@ -41,7 +43,7 @@ const groups: Group[] = [
       {
         q: "결제는 어떻게 하나요?",
         a: [
-          SITE.booking.paymentTestNotice,
+          ...(SITE.booking.onlinePaymentLive ? [] : [SITE.booking.paymentTestNotice]),
           SITE.booking.confirmationLabel,
           SITE.booking.onlinePayment,
           SITE.booking.onsitePayment,
