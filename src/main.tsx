@@ -26,9 +26,7 @@ const CheckIn = lazy(() => import("./pages/CheckIn"));
 const Directory = lazy(() => import("./pages/Directory"));
 const DirectoryEdit = lazy(() => import("./pages/DirectoryEdit"));
 const Faq = lazy(() => import("./pages/Faq"));
-const PaymentFail = lazy(() => import("./pages/PaymentFail"));
 const PaymentPortone = lazy(() => import("./pages/PaymentPortone"));
-const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Reserve = lazy(() => import("./pages/Reserve"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -57,8 +55,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="terms" element={<Terms />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="payment/portone" element={<PaymentPortone />} />
-          <Route path="payment/success" element={<PaymentSuccess />} />
-          <Route path="payment/fail" element={<PaymentFail />} />
           <Route path="admin" element={<AdminLogin />} />
           <Route element={<RequireAdmin />}>
             <Route path="admin/dashboard" element={<AdminHome />} />

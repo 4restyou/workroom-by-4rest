@@ -1186,9 +1186,12 @@ function ReservationCard({
           관리자 메모
           <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
-        <button className={buttonClass("primary", "lg")} onClick={save} type="button">
-          변경사항 저장
-        </button>
+        {/* 상세가 길어 어디서 수정하든 바로 저장할 수 있도록 하단에 고정한다. */}
+        <div className="sticky bottom-0 -mx-4 border-t border-workroom-line bg-white px-4 py-3 sm:-mx-5 sm:px-5">
+          <button className={buttonClass("primary", "lg", "w-full")} onClick={save} type="button">
+            변경사항 저장
+          </button>
+        </div>
         {isArchived ? (
           <p className={`${tintCard("yellow")} p-3 text-sm font-bold`}>이 예약은 보관 처리되어 진행 예약 목록에서 숨겨져 있습니다.</p>
         ) : (
