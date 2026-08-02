@@ -9,3 +9,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# 보안 헤더. Content-Security-Policy는 넣지 않는다 — 결제창이 PG사·카드사 등
+# 예측 불가한 다수 도메인을 iframe/스크립트로 띄우기 때문에 잘못된 CSP는 실결제를
+# 깨뜨린다. 결제 안정화 이후 report-only로 먼저 관측한 뒤 도입할 것.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # 출근 체크인에 위치 정보를 쓰므로 geolocation은 자기 출처에 한해 허용한다.
+    Permissions-Policy = "geolocation=(self), camera=(), microphone=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
