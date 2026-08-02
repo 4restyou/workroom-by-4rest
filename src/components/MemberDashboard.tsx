@@ -53,6 +53,11 @@ type DashData = {
   openNow: boolean;
 };
 
+// 서버(RPC) 메시지는 운영 용어(입실/퇴실)를 쓰므로 회원 화면에서는 출근/퇴근으로 맞춘다.
+function memberWording(message: string): string {
+  return message.replace(/입실/g, "출근").replace(/퇴실/g, "퇴근");
+}
+
 type GeoCheckInState =
   | { phase: "idle" }
   | { phase: "busy" }
@@ -91,7 +96,7 @@ export default function MemberDashboard() {
     const { data: rpcData, error } = await supabase.rpc("attendance_check_in_geo", { p_lat: geo.pos.lat, p_lng: geo.pos.lng });
     const result = rpcData as { ok?: boolean; already?: boolean; message?: string; coupon?: boolean } | null;
     if (error || !result?.ok) {
-      setGeoState(silent ? { phase: "idle" } : { phase: "failed", message: result?.message ?? "지금은 출근 처리를 할 수 없어요." });
+      setGeoState(silent ? { phase: "idle" } : { phase: "failed", message: memberWording(result?.message ?? "지금은 출근 처리를 할 수 없어요.") });
       return;
     }
     setGeoState({
@@ -110,7 +115,7 @@ export default function MemberDashboard() {
     const { data: rpcData, error } = await supabase.rpc("attendance_check_out");
     const result = rpcData as { ok?: boolean; message?: string } | null;
     if (error || !result?.ok) {
-      setGeoState({ phase: "failed", message: result?.message ?? "퇴근 처리에 실패했어요." });
+      setGeoState({ phase: "failed", message: memberWording(result?.message ?? "퇴근 처리에 실패했어요.") });
       return;
     }
     setGeoState({ phase: "done", message: "퇴근 도장을 찍었어요. 오늘도 수고하셨어요!" });
@@ -122,18 +127,18 @@ export default function MemberDashboard() {
     if (!supabase || !priorOpen || !checkoutInput) return;
     const iso = fromKstInput(checkoutInput);
     if (new Date(iso).getTime() <= new Date(priorOpen.check_in_at).getTime()) {
-      setGeoState({ phase: "failed", message: "퇴실 시각은 입실 시각보다 늦어야 해요." });
+      setGeoState({ phase: "failed", message: "퇴근 시각은 출근 시각보다 늦어야 해요." });
       return;
     }
     setSavingPrior(true);
     const { error } = await supabase.from("attendance").update({ check_out_at: iso }).eq("id", priorOpen.id);
     setSavingPrior(false);
     if (error) {
-      setGeoState({ phase: "failed", message: "퇴실 시각 저장에 실패했어요. 잠시 후 다시 시도해 주세요." });
+      setGeoState({ phase: "failed", message: "퇴근 시각 저장에 실패했어요. 잠시 후 다시 시도해 주세요." });
       return;
     }
     setPriorOpen(null);
-    setGeoState({ phase: "done", message: "지난 방문 퇴실 기록을 정리했어요." });
+    setGeoState({ phase: "done", message: "지난 방문 퇴근 기록을 정리했어요." });
     setReloadKey((k) => k + 1);
   }
 
@@ -234,6 +239,9 @@ export default function MemberDashboard() {
   // 출근 상태: 미출근 → 출근하기, 이용 중 → 퇴근하기, 퇴근 완료 → 오늘 이용 완료.
   const attState = data ? (!data.checkedInToday ? "out" : data.openNow ? "in" : "done") : null;
   const busy = geoState.phase === "busy";
+  // 출근/퇴근 결과 메시지는 카드 안 설명 줄을 대체한다(카드가 쌓이지 않도록).
+  const statusNote = geoState.phase === "done" || geoState.phase === "failed" ? geoState.message : null;
+  const statusFailed = geoState.phase === "failed";
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6 sm:pb-12 sm:pt-16">
@@ -248,13 +256,13 @@ export default function MemberDashboard() {
       {priorOpen ? (
         <div className={`${tintCard("danger")} mt-4 grid gap-3 px-4 py-4`}>
           <div className="min-w-0">
-            <p className="text-base font-bold">지난 방문 퇴실 기록이 없어요</p>
+            <p className="text-base font-bold">지난 방문 퇴근 기록이 없어요</p>
             <p className="mt-0.5 text-xs font-medium leading-5 text-workroom-muted">
-              <b className="text-workroom-ink">{formatStamp(priorOpen.check_in_at)} 입실</b> 후 퇴실이 기록되지 않아 아직 ‘근무 중’으로 남아 있어요. 그날 몇 시에 나가셨는지 입력하면 정리돼요.
+              <b className="text-workroom-ink">{formatStamp(priorOpen.check_in_at)} 출근</b> 후 퇴근이 기록되지 않아 아직 ‘이용 중’으로 남아 있어요. 그날 몇 시에 나가셨는지 입력하면 정리돼요.
             </p>
           </div>
           <label className="grid gap-1 text-sm font-bold">
-            그날 퇴실 시각
+            그날 퇴근 시각
             <input
               type="datetime-local"
               value={checkoutInput}
@@ -268,18 +276,19 @@ export default function MemberDashboard() {
             onClick={() => void savePriorCheckout()}
             type="button"
           >
-            {savingPrior ? "정리 중…" : "퇴실 시각 저장"}
+            {savingPrior ? "정리 중…" : "퇴근 시각 저장"}
           </button>
         </div>
       ) : null}
 
-      {/* 출근/퇴근 — 로그인한 회원에게 가장 먼저 보이는 한 번 탭 액션. */}
+      {/* 출근/퇴근 — 로그인한 회원에게 가장 먼저 보이는 한 번 탭 액션.
+          결과 메시지는 별도 카드로 쌓지 않고 이 카드 안 설명 줄을 대체한다. */}
       {attState === "out" ? (
         <div className={`${tintCard("sky")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-4`}>
           <div className="min-w-0">
             <p className="text-base font-bold">아직 출근 전이에요</p>
-            <p className="mt-0.5 text-xs font-medium leading-5 text-workroom-muted">
-              워크룸에 도착했다면 출근 도장을 찍어주세요. 위치는 확인에만 쓰고 저장하지 않아요.
+            <p className={`mt-0.5 text-xs leading-5 ${statusNote ? (statusFailed ? "font-bold text-red-700" : "font-bold text-workroom-ink") : "font-medium text-workroom-muted"}`}>
+              {statusNote ?? "워크룸에 도착했다면 출근 도장을 찍어주세요. 위치는 확인에만 쓰고 저장하지 않아요."}
             </p>
           </div>
           <button className={buttonClass("primary", "lg")} disabled={busy} onClick={() => void geoCheckIn(false)} type="button">
@@ -292,7 +301,9 @@ export default function MemberDashboard() {
             <p className="flex items-center gap-1.5 text-base font-bold">
               <CheckIcon className="h-4 w-4" /> 지금 이용 중이에요
             </p>
-            <p className="mt-0.5 text-xs font-medium leading-5 text-workroom-muted">자리를 비우거나 나가실 때 퇴근 도장을 찍어주세요.</p>
+            <p className={`mt-0.5 text-xs leading-5 ${statusNote ? (statusFailed ? "font-bold text-red-700" : "font-bold text-workroom-ink") : "font-medium text-workroom-muted"}`}>
+              {statusNote ?? "자리를 비우거나 나가실 때 퇴근 도장을 찍어주세요."}
+            </p>
           </div>
           <button className={buttonClass("primary", "lg")} disabled={busy} onClick={() => void checkOut()} type="button">
             {busy ? "처리 중…" : "퇴근하기"}
@@ -301,15 +312,8 @@ export default function MemberDashboard() {
       ) : attState === "done" ? (
         <div className={`${tintCard("yellow")} mt-4 flex items-center gap-2 px-4 py-3`}>
           <CheckIcon className="h-4 w-4" />
-          <p className="text-sm font-bold">오늘 이용을 완료했어요. 수고하셨어요!</p>
+          <p className="text-sm font-bold">{statusNote ?? "오늘 이용을 완료했어요. 수고하셨어요!"}</p>
         </div>
-      ) : null}
-
-      {geoState.phase === "done" ? (
-        <p className={`${tintCard("mint")} mt-3 px-4 py-3 text-sm font-bold`}>{geoState.message}</p>
-      ) : null}
-      {geoState.phase === "failed" ? (
-        <p className={`${tintCard("danger")} mt-3 px-4 py-3 text-sm font-bold`}>{geoState.message}</p>
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-[1.4fr_1fr]">

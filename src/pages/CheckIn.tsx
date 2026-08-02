@@ -11,6 +11,11 @@ type State = "checking" | "need-login" | "prior-close" | "done";
 
 type PriorSession = { id: string; check_in_at: string };
 
+// 서버(RPC) 메시지는 운영 용어(입실/퇴실)를 쓰므로 회원 화면에서는 출근/퇴근으로 맞춘다.
+function memberWording(message: string): string {
+  return message.replace(/입실/g, "출근").replace(/퇴실/g, "퇴근");
+}
+
 function kstDate(value: string | Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
 }
@@ -100,14 +105,14 @@ export default function CheckIn() {
     const iso = fromKstInput(checkoutInput);
     if (new Date(iso).getTime() <= new Date(prior.check_in_at).getTime()) {
       setBusy(false);
-      setResult({ ok: false, message: "퇴실 시각은 입실 시각보다 늦어야 해요." });
+      setResult({ ok: false, message: "퇴근 시각은 출근 시각보다 늦어야 해요." });
       setState("done");
       return;
     }
     const { error } = await supabase.from("attendance").update({ check_out_at: iso }).eq("id", prior.id);
     setBusy(false);
     if (error) {
-      setResult({ ok: false, message: "퇴실 시각 저장에 실패했어요. 잠시 후 다시 시도해 주세요." });
+      setResult({ ok: false, message: "퇴근 시각 저장에 실패했어요. 잠시 후 다시 시도해 주세요." });
       setState("done");
       return;
     }
@@ -121,7 +126,7 @@ export default function CheckIn() {
   }
 
   const success = result?.ok && !result.already;
-  const title = state === "prior-close" ? "이전 퇴실 확인" : state === "done" && success ? "출근 완료!" : "출근 체크인";
+  const title = state === "prior-close" ? "이전 퇴근 확인" : state === "done" && success ? "출근 완료!" : "출근 체크인";
 
   return (
     <main className="pb-16">
@@ -152,13 +157,13 @@ export default function CheckIn() {
           {state === "prior-close" && prior ? (
             <>
               <div>
-                <p className="font-bold">지난 방문 퇴실 기록이 없어요.</p>
+                <p className="font-bold">지난 방문 퇴근 기록이 없어요.</p>
                 <p className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
-                  <b className="text-workroom-ink">{formatStamp(prior.check_in_at)} 입실</b> 후 퇴실이 기록되지 않았어요. 그날 몇 시에 나가셨는지 입력하면 정리하고 오늘 출근 도장을 찍어드려요.
+                  <b className="text-workroom-ink">{formatStamp(prior.check_in_at)} 출근</b> 후 퇴근이 기록되지 않았어요. 그날 몇 시에 나가셨는지 입력하면 정리하고 오늘 출근 도장을 찍어드려요.
                 </p>
               </div>
               <label className="grid gap-1 text-sm font-bold">
-                그날 퇴실 시각
+                그날 퇴근 시각
                 <input
                   type="datetime-local"
                   value={checkoutInput}
@@ -190,9 +195,9 @@ export default function CheckIn() {
                   ) : null}
                 </div>
               ) : result.already ? (
-                <p className={`${tintCard("mint")} p-3 text-sm font-bold`}>{result.message ?? "오늘은 이미 출근했어요."}</p>
+                <p className={`${tintCard("mint")} p-3 text-sm font-bold`}>{memberWording(result.message ?? "오늘은 이미 출근했어요.")}</p>
               ) : (
-                <p className={`${tintCard("danger")} p-3 text-sm font-bold`}>{result.message ?? "출근에 실패했어요."}</p>
+                <p className={`${tintCard("danger")} p-3 text-sm font-bold`}>{memberWording(result.message ?? "출근에 실패했어요.")}</p>
               )}
 
               <div className="flex flex-wrap gap-2">

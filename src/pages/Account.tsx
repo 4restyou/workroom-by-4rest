@@ -186,6 +186,16 @@ export default function Account() {
     });
   }, [reservations]);
 
+  // 진행 중 예약만 펼쳐 두고, 지난 이용은 접어서 페이지가 길어지지 않게 한다.
+  const activeReservations = useMemo(
+    () => orderedReservations.filter((item) => item.status === "pending" || item.status === "confirmed"),
+    [orderedReservations],
+  );
+  const pastReservations = useMemo(
+    () => orderedReservations.filter((item) => item.status !== "pending" && item.status !== "confirmed"),
+    [orderedReservations],
+  );
+
   const updateField = useCallback((name: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [name]: value }));
   }, []);
@@ -564,7 +574,8 @@ export default function Account() {
                 </div>
                 <div className="mt-4 grid gap-3">
                   {reservations.length ? (
-                    orderedReservations.map((reservation) => {
+                    (() => {
+                    const renderReservation = (reservation: Reservation) => {
                       const active = reservation.status === "pending" || reservation.status === "confirmed";
                       return (
                         <article className={`${cardFlat} ${reservationStatusCardClass[reservation.status]} border p-4`} key={reservation.id}>
@@ -792,7 +803,25 @@ export default function Account() {
                           ) : null}
                         </article>
                       );
-                    })
+                    };
+                    return (
+                      <>
+                        {activeReservations.length ? (
+                          activeReservations.map(renderReservation)
+                        ) : (
+                          <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>진행 중인 예약이 없습니다.</p>
+                        )}
+                        {pastReservations.length ? (
+                          <details className={`${cardFlat} px-4 py-3`}>
+                            <summary className="cursor-pointer text-sm font-bold text-workroom-muted">
+                              지난 이용 {pastReservations.length}건 보기
+                            </summary>
+                            <div className="mt-3 grid gap-3">{pastReservations.map(renderReservation)}</div>
+                          </details>
+                        ) : null}
+                      </>
+                    );
+                    })()
                   ) : (
                     <p className={`${cardFlat} px-4 py-3 text-sm font-medium text-workroom-muted`}>아직 예약 내역이 없습니다.</p>
                   )}
