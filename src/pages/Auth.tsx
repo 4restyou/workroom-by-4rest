@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import { authErrorMessage, passwordValidationMessage } from "../lib/auth";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
@@ -16,6 +16,9 @@ const modeTitle: Record<AuthMode, string> = {
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // 로그인 벽에서 넘어온 경우 원래 가려던 곳으로 돌려보낸다.
+  const nextPath = searchParams.get("next");
   const [mode, setMode] = useState<AuthMode>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -51,7 +54,7 @@ export default function Auth() {
     setMessage("");
     setIsGoogleSubmitting(true);
     try {
-      await signInWithGoogle("/");
+      await signInWithGoogle(nextPath && nextPath.startsWith("/") ? nextPath : "/");
     } catch (loginError) {
       setError(authErrorMessage(loginError, "구글 로그인을 시작하지 못했습니다."));
       setIsGoogleSubmitting(false);
@@ -138,7 +141,8 @@ export default function Auth() {
       return;
     }
 
-    navigate("/", { replace: true });
+    const next = searchParams.get("next");
+    navigate(next && next.startsWith("/") ? next : "/", { replace: true });
   }
 
   return (

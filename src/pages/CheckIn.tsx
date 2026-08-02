@@ -151,6 +151,12 @@ export default function CheckIn() {
               >
                 구글로 로그인하고 출근하기
               </button>
+              {/* 이메일 회원이 문 앞에서 막히지 않도록 대체 경로. */}
+              <p className="text-sm font-medium">
+                <Link className="underline underline-offset-4" to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`}>
+                  이메일로 로그인
+                </Link>
+              </p>
             </>
           ) : null}
 

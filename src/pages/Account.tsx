@@ -85,6 +85,9 @@ export default function Account() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // 프로필 미완성으로 중단된 흐름이 있으면(예: 예약) 버튼 문구로 알려 준다.
+  const pendingNext = searchParams.get("next");
+
   const loadSubscriptions = useCallback(async () => {
     if (!supabase) return;
     const { data } = await supabase
@@ -388,7 +391,9 @@ export default function Account() {
     setForm((current) => ({ ...current, address: (savedProfile as Profile).address ?? "" }));
     setDetailAddress("");
     if (isCompletingSignup) {
-      navigate("/", { replace: true });
+      // 프로필 때문에 중단됐던 흐름(예약 등)이 있으면 그리로 돌아간다.
+      const next = searchParams.get("next");
+      navigate(next && next.startsWith("/") ? next : "/", { replace: true });
       return;
     }
     setSuccess("내정보를 저장했습니다.");
@@ -498,7 +503,7 @@ export default function Account() {
                 </label>
                 {success ? <p className={`${tintCard("mint")} p-3 text-sm font-bold`}>{success}</p> : null}
                 <button className={buttonClass("primary", "lg")} disabled={isSaving} type="submit">
-                  {isSaving ? "저장 중…" : "내정보 저장"}
+                  {isSaving ? "저장 중…" : pendingNext ? "저장하고 예약 계속하기" : "내정보 저장"}
                 </button>
 
                 {profile.role !== "admin" ? (

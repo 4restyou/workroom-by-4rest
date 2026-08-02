@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import Skeleton from "../components/Skeleton";
 import StampCard from "../components/StampCard";
+import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Attendance, Coupon } from "../lib/types";
@@ -81,6 +82,32 @@ export default function Attendance() {
     [records],
   );
 
+  // 출근부 탭에서도 바로 출근할 수 있어야 한다(탭 이름과 동작이 어긋나지 않도록).
+  async function checkIn() {
+    if (!supabase) return;
+    setBusy(true);
+    setError("");
+    const geo = await getPosition();
+    if (!geo.pos) {
+      setBusy(false);
+      setError(
+        geo.denied
+          ? "위치 권한이 꺼져 있어요. 설정에서 위치 접근을 허용하거나 매장의 QR로 출근해 주세요."
+          : "위치를 확인하지 못했어요. 잠시 후 다시 시도하거나 매장의 QR로 출근해 주세요.",
+      );
+      return;
+    }
+    const { data, error: rpcError } = await supabase.rpc("attendance_check_in_geo", { p_lat: geo.pos.lat, p_lng: geo.pos.lng });
+    const result = data as { ok?: boolean; message?: string } | null;
+    if (rpcError || !result?.ok) {
+      setBusy(false);
+      setError((result?.message ?? "지금은 출근 처리를 할 수 없어요.").replace(/입실/g, "출근").replace(/퇴실/g, "퇴근"));
+      return;
+    }
+    await load();
+    setBusy(false);
+  }
+
   async function checkOut() {
     if (!supabase) return;
     setBusy(true);
@@ -141,9 +168,15 @@ export default function Attendance() {
                   </button>
                 </div>
               ) : (
-                <p className="text-sm font-medium leading-6 text-workroom-muted">
-                  매장의 QR을 찍으면 출근 도장이 찍혀요. (오늘 확정된 예약이 있어야 출근할 수 있어요.)
-                </p>
+                <div className="grid gap-2">
+                  <p className="text-sm font-medium leading-6 text-workroom-muted">
+                    워크룸에 도착했다면 위치 확인으로 바로 출근할 수 있어요. 매장의 QR을 찍어도 됩니다.
+                    <span className="mt-0.5 block text-xs">오늘 확정된 예약이 있어야 출근할 수 있어요.</span>
+                  </p>
+                  <button className={buttonClass("primary", "lg", "w-full sm:w-auto")} disabled={busy} onClick={() => void checkIn()} type="button">
+                    {busy ? "확인 중…" : "출근하기"}
+                  </button>
+                </div>
               )}
             </div>
 

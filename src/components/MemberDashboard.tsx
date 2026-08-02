@@ -73,13 +73,19 @@ export default function MemberDashboard() {
   const [priorOpen, setPriorOpen] = useState<{ id: string; check_in_at: string } | null>(null);
   const [checkoutInput, setCheckoutInput] = useState("");
   const [savingPrior, setSavingPrior] = useState(false);
+  // 실내에서는 위치 확인이 오래 걸린다. 기다리는 동안 상황과 대안을 알려 준다.
+  const [waitedLong, setWaitedLong] = useState(false);
 
   // 위치 기반 출근. silent=true(자동 시도)일 때는 실패해도 조용히 넘어간다 —
   // 예약이 없거나 매장 밖이면 배너만 남고 아무 일도 일어나지 않는다.
   async function geoCheckIn(silent: boolean) {
     if (!supabase) return;
     setGeoState({ phase: "busy" });
+    setWaitedLong(false);
+    const slowTimer = window.setTimeout(() => setWaitedLong(true), 6000);
     const geo = await getPosition();
+    window.clearTimeout(slowTimer);
+    setWaitedLong(false);
     if (!geo.pos) {
       setGeoState(
         silent
@@ -270,14 +276,20 @@ export default function MemberDashboard() {
               onChange={(e) => setCheckoutInput(e.target.value)}
             />
           </label>
-          <button
-            className={buttonClass("primary", "md", "w-full sm:w-auto")}
-            disabled={savingPrior || !checkoutInput}
-            onClick={() => void savePriorCheckout()}
-            type="button"
-          >
-            {savingPrior ? "정리 중…" : "퇴근 시각 저장"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={buttonClass("primary", "md")}
+              disabled={savingPrior || !checkoutInput}
+              onClick={() => void savePriorCheckout()}
+              type="button"
+            >
+              {savingPrior ? "정리 중…" : "퇴근 시각 저장"}
+            </button>
+            {/* 기억나지 않을 수 있으므로 닫을 방법을 남긴다(QR 화면과 동일). */}
+            <button className={buttonClass("secondary", "md")} disabled={savingPrior} onClick={() => setPriorOpen(null)} type="button">
+              나중에
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -287,9 +299,19 @@ export default function MemberDashboard() {
         <div className={`${tintCard("sky")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-4`}>
           <div className="min-w-0">
             <p className="text-base font-bold">아직 출근 전이에요</p>
-            <p className={`mt-0.5 text-xs leading-5 ${statusNote ? (statusFailed ? "font-bold text-red-700" : "font-bold text-workroom-ink") : "font-medium text-workroom-muted"}`}>
-              {statusNote ?? "워크룸에 도착했다면 출근 도장을 찍어주세요. 위치는 확인에만 쓰고 저장하지 않아요."}
+            <p
+              aria-live="polite"
+              className={`mt-0.5 text-xs leading-5 ${statusNote ? (statusFailed ? "font-bold text-red-700" : "font-bold text-workroom-ink") : "font-medium text-workroom-muted"}`}
+            >
+              {busy && waitedLong
+                ? "실내에서는 위치 확인이 오래 걸릴 수 있어요. 잠시만 기다리거나 매장의 QR로 출근해 주세요."
+                : statusNote ?? "워크룸에 도착했다면 출근 도장을 찍어주세요. 위치는 확인에만 쓰고 저장하지 않아요."}
             </p>
+            {busy && waitedLong ? (
+              <Link className="mt-1 inline-block text-xs font-bold underline underline-offset-4" to="/attendance">
+                QR로 출근하기 →
+              </Link>
+            ) : null}
           </div>
           <button className={buttonClass("primary", "lg")} disabled={busy} onClick={() => void geoCheckIn(false)} type="button">
             {busy ? "확인 중…" : "출근하기"}
@@ -301,7 +323,10 @@ export default function MemberDashboard() {
             <p className="flex items-center gap-1.5 text-base font-bold">
               <CheckIcon className="h-4 w-4" /> 지금 이용 중이에요
             </p>
-            <p className={`mt-0.5 text-xs leading-5 ${statusNote ? (statusFailed ? "font-bold text-red-700" : "font-bold text-workroom-ink") : "font-medium text-workroom-muted"}`}>
+            <p
+              aria-live="polite"
+              className={`mt-0.5 text-xs leading-5 ${statusNote ? (statusFailed ? "font-bold text-red-700" : "font-bold text-workroom-ink") : "font-medium text-workroom-muted"}`}
+            >
               {statusNote ?? "자리를 비우거나 나가실 때 퇴근 도장을 찍어주세요."}
             </p>
           </div>

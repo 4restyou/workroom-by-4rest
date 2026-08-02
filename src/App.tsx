@@ -65,13 +65,18 @@ export default function App() {
       if (!active || !profile || profile.role === "admin") return;
 
       const incomplete = !profile.full_name || !profile.phone || !profile.consented_at;
-      if (incomplete) navigate("/account?tab=profile", { replace: true });
+      if (incomplete) {
+        // 하려던 일(예: 예약)을 기억해 두고, 회원정보 저장 후 그 자리로 돌려보낸다.
+        const next = `${location.pathname}${location.search}`;
+        const query = next && next !== "/" ? `&next=${encodeURIComponent(next)}` : "";
+        navigate(`/account?tab=profile${query}`, { replace: true });
+      }
     }
     void checkOnboarding();
     return () => {
       active = false;
     };
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.search, navigate]);
 
   return (
     <div className="flex min-h-screen flex-col bg-workroom-background text-workroom-text">

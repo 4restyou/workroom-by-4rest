@@ -585,6 +585,15 @@ export default function Reserve() {
             <button className={buttonClass("primary", "lg", "mt-5 w-full sm:w-auto")} onClick={loginToReserve} type="button">
               구글로 로그인하고 예약하기
             </button>
+            {/* 이메일로 가입한 회원도 여기서 막히지 않도록 다른 경로를 남겨 둔다. */}
+            <p className="mt-3 text-sm font-medium">
+              <Link className="underline underline-offset-4" to={`/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`}>
+                이메일로 로그인 / 회원가입
+              </Link>
+            </p>
+            <p className="mt-4 text-xs font-medium text-workroom-muted">
+              <a className="underline underline-offset-4" href="/#pricing">이용권·가격 먼저 보기 →</a>
+            </p>
           </div>
         ) : needsProfile ? (
           <div className={`${card} p-6 text-center`}>
@@ -592,7 +601,10 @@ export default function Reserve() {
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
               이름·연락처와 개인정보 수집·이용 동의를 마치면 예약할 수 있어요. 처음 한 번만 입력하면 됩니다.
             </p>
-            <Link className={buttonClass("primary", "lg", "mt-5 w-full sm:w-auto")} to="/account?tab=profile">
+            <Link
+              className={buttonClass("primary", "lg", "mt-5 w-full sm:w-auto")}
+              to={`/account?tab=profile&next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`}
+            >
               회원정보 입력하러 가기
             </Link>
           </div>

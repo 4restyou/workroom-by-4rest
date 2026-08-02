@@ -105,6 +105,9 @@ export default function Home() {
   const viewSiteAsAdmin = new URLSearchParams(location.search).has("site");
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [viewerRole, setViewerRole] = useState<"guest" | "user" | "admin" | null>(null);
+  // 로그인한 회원에게는 첫 방문용 소개(공간 소개·기능·활용 사례·예약 방법·마감 CTA)를
+  // 매번 다시 보여주지 않는다. 이용권·이용 안내·오시는 길·멤버 공간은 계속 필요하므로 유지.
+  const showMarketing = viewerRole !== "user";
   const [activePhoto, setActivePhoto] = useState(0);
   const photoScrollerRef = useRef<HTMLDivElement>(null);
   // Carousel coordination: while we drive a smooth scroll ourselves, onScroll
@@ -367,6 +370,7 @@ export default function Home() {
         </section>
       )}
 
+{showMarketing ? (
       <Section id="space" eyebrow="About" title="조용히 머물 수 있는 작업 공간" accent="mint">
         <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
           <p>
@@ -377,7 +381,9 @@ export default function Home() {
           </p>
         </div>
       </Section>
+      ) : null}
 
+{showMarketing ? (
       <Section eyebrow="Features" title="이용할 수 있는 것" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map((feature) => (
@@ -385,6 +391,7 @@ export default function Home() {
           ))}
         </div>
       </Section>
+      ) : null}
 
       <Section id="pricing" eyebrow="Plans / Pricing" title="이용권 안내" accent="yellow">
         <div className="grid gap-3">
@@ -418,6 +425,7 @@ export default function Home() {
         </dl>
       </Section>
 
+{showMarketing ? (
       <Section eyebrow="Use cases" title="이런 경우에 이용하기 좋아요" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <article className={`${tintCard("mint")} p-5`}>
@@ -447,7 +455,9 @@ export default function Home() {
           이용안내 더 보기
         </Link>
       </Section>
+      ) : null}
 
+{showMarketing ? (
       <Section eyebrow="How to use" title="예약 방법" accent="coral">
         <ol className="grid gap-3 sm:grid-cols-4">
           {["원하는 이용권을 선택합니다.", "날짜와 시간을 선택합니다.", "예약 신청을 남깁니다.", "전화 또는 문자 안내 후 확정됩니다."].map(
@@ -465,6 +475,7 @@ export default function Home() {
           당일 이용은 좌석이 남아 있을 경우 예약할 수 있습니다.
         </p>
       </Section>
+      ) : null}
 
       <Section eyebrow="Location" title="충장로5가, 금남로5가역 근처" accent="mint">
         <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
@@ -534,6 +545,7 @@ export default function Home() {
         </div>
       </Section>
 
+{showMarketing ? (
       <section className="mx-auto max-w-5xl px-4 pb-12 pt-4">
         <div className={`${tintCard("ink")} p-6 sm:flex sm:items-center sm:justify-between sm:gap-6`}>
           <div>
@@ -545,6 +557,7 @@ export default function Home() {
           </Link>
         </div>
       </section>
+      ) : null}
     </main>
   );
 }
