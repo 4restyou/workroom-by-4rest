@@ -178,8 +178,11 @@ Deno.serve(async (request) => {
     const row = payload.record;
 
     if (payload.type === "INSERT" && row) {
+      // 온라인 즉시결제(정식 오픈)면 곧바로 '확정' 문자가 가므로 '접수' 문자는 생략한다.
+      // 현장결제·테스트(결제링크 안내) 상황에서는 접수 문자를 그대로 보낸다.
+      const skipReceivedSms = ONLINE_PAYMENT_LIVE && row.payment_preference !== "onsite";
       // Member-facing: booking received + how payment works.
-      if (row.phone) {
+      if (row.phone && !skipReceivedSms) {
         await sendSms(
           row.phone,
           `[WORKROOM] 예약 신청이 접수되었습니다.\n${reservationLine(row)}\n${paymentNotice(row)}\n문의: 010-4931-3298\n${SITE_URL}`,
