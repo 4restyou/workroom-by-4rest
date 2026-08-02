@@ -4,8 +4,9 @@ import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import AddressSearchField from "../components/AddressSearchField";
-import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, todayValue } from "../lib/format";
+import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { canPayOnline, canSubscribe, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
+import { readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
@@ -240,12 +241,39 @@ export default function Account() {
   async function saveEdit(reservation: Reservation) {
     if (!supabase) return;
     setError("");
+
+    // 저장 전에 기본 검증 — 서버 트리거까지 가기 전에 흔한 실수를 잡는다.
+    if (!editDraft.date || !editDraft.start_time || !editDraft.end_time) {
+      setError("날짜와 시간을 모두 입력해 주세요.");
+      return;
+    }
+    if (editDraft.date < todayValue()) {
+      setError("지난 날짜로는 변경할 수 없습니다.");
+      return;
+    }
+    if (editDraft.date > maxBookingDateValue()) {
+      setError("예약은 오늘부터 최대 2개월 이내까지 가능합니다.");
+      return;
+    }
+    const passName = reservation.pass_name_snapshot || reservation.pass_type;
+    const requiredHours = passDurationHours(passName);
+    if (requiredHours) {
+      const [sh, sm] = editDraft.start_time.slice(0, 5).split(":").map(Number);
+      const [eh, em] = editDraft.end_time.slice(0, 5).split(":").map(Number);
+      let span = eh * 60 + em - (sh * 60 + sm);
+      if (span <= 0) span += 24 * 60;
+      if (span !== requiredHours * 60) {
+        setError(`${passName}은 ${requiredHours}시간 이용권이라 시작·종료 시간 간격이 ${requiredHours}시간이어야 해요.`);
+        return;
+      }
+    }
+
     setActionBusy(reservation.id);
     const patch = { date: editDraft.date, start_time: editDraft.start_time, end_time: editDraft.end_time, status: "pending" as const };
     const { error: editError } = await supabase.from("reservations").update(patch).eq("id", reservation.id);
     setActionBusy(null);
     if (editError) {
-      setError(editError.message);
+      setError(readableReservationError(editError));
       return;
     }
     setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, ...patch } : item)));

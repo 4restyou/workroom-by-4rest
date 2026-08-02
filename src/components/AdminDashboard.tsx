@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminPage, { AdminEmpty } from "./AdminPage";
-import { formatDate, formatTimeRange, todayValue } from "../lib/format";
+import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { badge, buttonClass } from "../lib/ui";
@@ -150,7 +150,30 @@ export default function AdminDashboard() {
       .sort((a, b) => `${a.date}${a.start_time ?? ""}`.localeCompare(`${b.date}${b.start_time ?? ""}`))
       .slice(0, 5);
 
-    return { actions, activePeople, attendanceByReservation, longTerm, next, todaySchedule, upcoming };
+    // 온라인 결제 오픈 전에는 '받아야 할 돈'을 놓치기 쉬우므로 오늘치를 모아 보여준다.
+    const unpaidToday = todaySchedule.filter((reservation) => (reservation.payment_status ?? "unpaid") === "unpaid" && (reservation.price_at_booking ?? 0) > 0);
+    const unpaidTodayAmount = unpaidToday.reduce((sum, reservation) => sum + (reservation.price_at_booking ?? 0), 0);
+    // 이용 시간이 끝났는데 아직 미수인 건은 바로 처리해야 한다.
+    unpaidToday.forEach((reservation) => {
+      let end = timeMinutes(reservation.end_time);
+      const start = timeMinutes(reservation.start_time);
+      if (start !== null && end !== null && end <= start) end += 24 * 60;
+      const adjustedMinute = minute < 8 ? minute + 24 * 60 : minute;
+      if (end !== null && adjustedMinute > end) {
+        actions.push({
+          key: `unpaid-${reservation.id}`,
+          title: `${reservation.name} · 결제 미확인`,
+          detail: `${formatTimeRange(reservation.start_time, reservation.end_time)} 이용 · ${formatPrice(reservation.price_at_booking ?? 0)}`,
+          to: `/admin/reservations?reservation=${reservation.id}`,
+          urgent: true,
+        });
+      }
+    });
+
+    // 급한 항목이 조용한 대기 항목에 묻히지 않도록 정렬한다.
+    actions.sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)));
+
+    return { actions, activePeople, attendanceByReservation, longTerm, next, todaySchedule, upcoming, unpaidToday, unpaidTodayAmount };
   }, [data]);
 
   return (
@@ -162,10 +185,11 @@ export default function AdminDashboard() {
       <div className="admin-compact">
         {loadError ? <p className="mb-4 border border-red-400 bg-workroom-danger/30 px-4 py-3 text-sm font-semibold">{loadError}</p> : null}
 
-        <section className="grid border-y border-workroom-line bg-white sm:grid-cols-4">
+        <section className="grid border-y border-workroom-line bg-white sm:grid-cols-3 lg:grid-cols-5">
           <SummaryCell label="현재 이용 / 정원" value={data ? `${summary.activePeople} / ${data.capacity || "-"}명` : "-"} />
           <SummaryCell label="오늘 예약" value={data ? `${summary.todaySchedule.length}건` : "-"} />
           <SummaryCell label="장기 이용" value={data ? `${summary.longTerm.length}명` : "-"} />
+          <SummaryCell label="오늘 받을 돈" value={data ? (summary.unpaidToday.length ? `${formatPrice(summary.unpaidTodayAmount)} · ${summary.unpaidToday.length}건` : "없음") : "-"} />
           <SummaryCell label="다음 방문" value={data ? (summary.next ? `${summary.next.start_time?.slice(0, 5)} ${summary.next.name}` : "예정 없음") : "-"} />
         </section>
 
@@ -188,6 +212,13 @@ export default function AdminDashboard() {
                   <span className="shrink-0 text-sm font-semibold">확인</span>
                 </Link>
               ))}
+              {/* 잘라낸 항목이 있으면 숨겼다는 사실을 알린다(개수만 맞고 목록은 짧던 문제). */}
+              {summary.actions.length > 12 ? (
+                <Link className="admin-row flex items-center justify-between gap-4 px-4 py-3 text-sm font-semibold hover:bg-workroom-background" to="/admin/reservations?status=pending">
+                  <span>외 {summary.actions.length - 12}건 더 있습니다</span>
+                  <span className="shrink-0">전체 보기</span>
+                </Link>
+              ) : null}
             </div>
           ) : data ? <AdminEmpty>지금 바로 처리할 항목이 없습니다.</AdminEmpty> : <AdminEmpty>운영 현황을 불러오는 중입니다.</AdminEmpty>}
         </section>

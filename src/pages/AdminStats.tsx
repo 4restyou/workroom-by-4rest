@@ -63,7 +63,7 @@ export default function AdminStats() {
     if (!supabase) return;
     setIsLoading(true); setError("");
     const [reservationResult, passResult, attendanceResult] = await Promise.all([
-      supabase.from("reservations").select("*").order("date", { ascending: false }).limit(3000),
+      supabase.from("reservations").select("*").is("deleted_at", null).order("date", { ascending: false }).limit(3000),
       supabase.from("passes").select("id,name,description,price,is_active,sort_order").order("sort_order", { ascending: true }),
       supabase.from("attendance").select("check_in_at,check_out_at").order("check_in_at", { ascending: false }).limit(6000),
     ]);

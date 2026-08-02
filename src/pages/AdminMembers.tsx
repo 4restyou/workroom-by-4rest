@@ -43,7 +43,7 @@ export default function AdminMembers() {
     setIsLoading(true); setError("");
     const [memberResult, reservationResult, attendanceResult, couponResult] = await Promise.all([
       supabase.from("profiles").select("*").eq("role", "user").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("reservations").select("*").order("date", { ascending: false }).limit(2000),
+      supabase.from("reservations").select("*").is("deleted_at", null).order("date", { ascending: false }).limit(2000),
       supabase.from("attendance").select("*").order("check_in_at", { ascending: false }).limit(1500),
       supabase.from("coupons").select("*").order("issued_at", { ascending: false }).limit(1000),
     ]);

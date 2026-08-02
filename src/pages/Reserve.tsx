@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Calendar from "../components/Calendar";
 import Section from "../components/Section";
@@ -19,7 +19,7 @@ import { maxBookingDateValue,
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, payReservation } from "../lib/portone";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
-import { addDaysStr, isLongTermPassName, passPeriodWeeks } from "../lib/reservations";
+import { addDaysStr, isLongTermPassName, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
 import type { BusinessDateException, BusinessHour, Pass, Profile, Reservation, ReservationInsert } from "../lib/types";
@@ -85,6 +85,7 @@ export default function Reserve() {
   const [authChecked, setAuthChecked] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [fullDates, setFullDates] = useState<Set<string>>(new Set());
+  const successPanelRef = useRef<HTMLDivElement>(null);
   // 시간대별 잔여 좌석을 미리 계산하기 위해 월간 예약 원본도 들고 있는다.
   const [monthRows, setMonthRows] = useState<IntervalInput[]>([]);
   const [seatCapacities, setSeatCapacities] = useState<Record<string, number>>({});
@@ -208,6 +209,17 @@ export default function Reserve() {
     ] as [string, string | undefined][]
   ).filter((item): item is [string, string] => Boolean(item[1] && item[1].trim()));
 
+  // 완료 시트: Esc로 닫고, 열릴 때 패널로 포커스를 옮긴다.
+  useEffect(() => {
+    if (!success) return;
+    successPanelRef.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setSuccess(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [success]);
+
   const selectedSeatTypeId = passes.find((pass) => pass.name === form.pass_type)?.seat_type_id ?? null;
 
   // 시작 시간별 잔여 좌석 — 마감된 시간대를 미리 막아, 마지막 단계에서야
@@ -261,25 +273,27 @@ export default function Reserve() {
   const today = todayValue();
   const maxBookable = maxBookingDateValue();
 
-  function isDateDisabled(date: string) {
-    if (date < today) return true;
-    if (date > maxBookable) return true;
+  // 선택할 수 없는 이유를 함께 돌려준다 — 회색 처리만 하면 왜 안 되는지 알 수 없다.
+  function dateDisabledReason(date: string): string | null {
+    if (date < today) return "지난 날짜";
+    if (date > maxBookable) return "2개월 이후";
     const exception = dateExceptions[date];
-    if (exception?.is_closed) return true;
+    if (exception?.is_closed) return "휴무일";
     const weekday = new Date(`${date}T00:00:00`).getDay();
     const hours = exception ?? hoursByWeekday[weekday];
-    if (!exception && hours?.is_closed) return true;
+    if (!exception && hours?.is_closed) return "휴무일";
     if (selectedDuration) {
       const open = hours?.open_time?.slice(0, 5) ?? "08:00";
       const close = hours?.close_time?.slice(0, 5) ?? "01:00";
-      if (!startTimesForDate(date, open, close, selectedDuration).length) return true;
+      if (!startTimesForDate(date, open, close, selectedDuration).length) return "이용 가능한 시간 없음";
     }
-    return fullDates.has(date);
+    return fullDates.has(date) ? "예약 마감" : null;
   }
 
-  function isDateFull(date: string) {
-    return fullDates.has(date);
+  function isDateDisabled(date: string) {
+    return dateDisabledReason(date) !== null;
   }
+
 
   function updateField(name: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -693,7 +707,7 @@ export default function Reserve() {
                   onSelect={(date) => selectDate(date)}
                   onMonthChange={setCalendarMonth}
                   isDisabled={isDateDisabled}
-                  isFull={isDateFull}
+                  disabledReason={dateDisabledReason}
                 />
               </div>
               <div className="grid content-start gap-4">
@@ -920,12 +934,20 @@ export default function Reserve() {
       </Section>
 
       {success ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+          onClick={(event) => { if (event.target === event.currentTarget) setSuccess(false); }}
+        >
           <div
+            aria-labelledby="reserve-success-title"
+            aria-modal="true"
             className={`${card} animate-sheet-up max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-b-none rounded-t-card p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:rounded-card sm:pb-6`}
+            ref={successPanelRef}
+            role="dialog"
+            tabIndex={-1}
           >
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-pill bg-workroom-line sm:hidden" />
-            <p className="text-2xl font-bold">
+            <p className="text-2xl font-bold" id="reserve-success-title">
               {submittedReservation?.reservation.payment_status === "paid" ? "예약이 확정되었습니다 🎉" : "예약 신청이 접수되었습니다"}
             </p>
             <p className="mt-2 text-sm font-medium leading-6 text-workroom-muted">
@@ -981,18 +1003,6 @@ export default function Reserve() {
             {paymentMessage ? <p className={`${tintCard("mint")} mt-4 p-3 text-sm font-bold`}>{paymentMessage}</p> : null}
             {paymentError ? <p className={`${tintCard("danger")} mt-4 p-3 text-sm font-bold`}>{paymentError}</p> : null}
 
-            {noticeItems.length ? (
-              <div className="mt-5 grid gap-3">
-                <p className="text-sm font-bold">이용 전 꼭 확인해 주세요</p>
-                {noticeItems.map(([title, body]) => (
-                  <div className={`${tintCard("mint")} p-3`} key={title}>
-                    <p className="text-sm font-bold">{title}</p>
-                    <p className="mt-1 text-sm font-medium leading-6">{body}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
             {submittedReservation && canPayOnline(submittedReservation.reservation) ? (
               <button
                 className={buttonClass("accent", "lg", "mt-6 w-full")}
@@ -1012,6 +1022,21 @@ export default function Reserve() {
             <button className={buttonClass("secondary", "md", "mt-2 w-full")} onClick={() => setSuccess(false)} type="button">
               닫기
             </button>
+
+            {/* 안내는 접어 둔다 — 펼쳐 두면 다음 행동(예약현황·닫기)이 화면 밖으로 밀린다. */}
+            {noticeItems.length ? (
+              <details className="mt-5">
+                <summary className="cursor-pointer text-sm font-bold">이용 안내 {noticeItems.length}가지</summary>
+                <div className="mt-3 grid gap-3">
+                  {noticeItems.map(([title, body]) => (
+                    <div className={`${tintCard("mint")} p-3`} key={title}>
+                      <p className="text-sm font-bold">{title}</p>
+                      <p className="mt-1 text-sm font-medium leading-6">{body}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1063,13 +1088,6 @@ function getPassGroup(passName: string): PassOption["group"] {
   return "문의";
 }
 
-function readableReservationError(error: { code?: string; message?: string }) {
-  const message = error.message?.trim() ?? "";
-  const customerFacingMessage = ["예약", "운영 시간", "휴무일", "좌석", "종료 시간"].some((word) => message.includes(word));
-  if (customerFacingMessage) return message;
-  if (error.code === "42501") return "로그인 정보가 만료되었습니다. 다시 로그인한 뒤 예약해 주세요.";
-  return "예약 신청 중 문제가 생겼습니다. 입력 내용을 다시 확인하거나 잠시 후 다시 시도해 주세요.";
-}
 
 function startTimesForDate(date: string, open: string, close: string, durationHours: number) {
   let earliestMinute: number | undefined;

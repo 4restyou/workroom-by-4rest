@@ -57,3 +57,13 @@ export function addDaysStr(dateStr: string, days: number): string {
   date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+
+// Supabase/트리거 오류를 회원이 읽을 수 있는 문구로 바꾼다. 고객 안내용으로
+// 작성된 트리거 메시지는 그대로 쓰고, 그 외 DB 원문은 노출하지 않는다.
+export function readableReservationError(error: { code?: string; message?: string }) {
+  const message = error.message?.trim() ?? "";
+  const customerFacing = ["예약", "운영 시간", "휴무일", "좌석", "종료 시간"].some((word) => message.includes(word));
+  if (customerFacing) return message;
+  if (error.code === "42501") return "로그인 정보가 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.";
+  return "처리 중 문제가 생겼습니다. 입력 내용을 확인하거나 잠시 후 다시 시도해 주세요.";
+}

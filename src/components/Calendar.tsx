@@ -10,10 +10,11 @@ type CalendarProps = {
   onSelect: (date: string) => void;
   onMonthChange: (month: Date) => void;
   isDisabled: (date: string) => boolean;
-  isFull?: (date: string) => boolean;
+  // 비활성 사유(휴무일·예약 마감·2개월 이후 등)를 라벨/툴팁으로 노출한다.
+  disabledReason?: (date: string) => string | null;
 };
 
-export default function Calendar({ month, selected, minMonth, maxMonth, onSelect, onMonthChange, isDisabled, isFull }: CalendarProps) {
+export default function Calendar({ month, selected, minMonth, maxMonth, onSelect, onMonthChange, isDisabled, disabledReason }: CalendarProps) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const startWeekday = new Date(year, monthIndex, 1).getDay();
@@ -67,15 +68,18 @@ export default function Calendar({ month, selected, minMonth, maxMonth, onSelect
           if (day === null) return <div key={`blank-${index}`} />;
           const dateStr = formatDateInputValue(new Date(year, monthIndex, day));
           const disabled = isDisabled(dateStr);
-          const full = Boolean(isFull?.(dateStr));
+          const reason = disabled ? disabledReason?.(dateStr) ?? null : null;
           const isSelected = selected === dateStr;
 
           return (
             <button
               key={dateStr}
               type="button"
+              aria-label={`${monthIndex + 1}월 ${day}일${reason ? ` · ${reason}` : ""}`}
+              aria-pressed={isSelected}
               disabled={disabled}
               onClick={() => onSelect(dateStr)}
+              title={reason ?? undefined}
               className={`relative grid h-11 place-items-center rounded-[5px] border text-sm font-bold transition ${
                 isSelected
                   ? "border-workroom-ink bg-workroom-yellow"
@@ -85,8 +89,10 @@ export default function Calendar({ month, selected, minMonth, maxMonth, onSelect
               }`}
             >
               {day}
-              {full && !isSelected ? (
-                <span className="absolute bottom-0.5 text-[8px] font-black leading-none text-red-500">마감</span>
+              {reason === "예약 마감" && !isSelected ? (
+                <span className="absolute bottom-0.5 text-[9px] font-black leading-none text-red-600">마감</span>
+              ) : reason === "휴무일" && !isSelected ? (
+                <span className="absolute bottom-0.5 text-[9px] font-black leading-none text-workroom-muted">휴무</span>
               ) : null}
             </button>
           );
