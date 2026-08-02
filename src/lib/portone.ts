@@ -1,4 +1,5 @@
 import * as PortOne from "@portone/browser-sdk/v2";
+import { SITE } from "./site";
 import { supabase } from "./supabase";
 import type { Reservation } from "./types";
 
@@ -15,6 +16,9 @@ export const hasBillingConfig = Boolean(STORE_ID && BILLING_CHANNEL_KEY);
 
 export function canPayOnline(reservation: Reservation): boolean {
   return (
+    // 결제 정식 오픈 전에는 키가 설정돼 있어도 결제 버튼을 노출하지 않는다.
+    // (안내 문구는 '관리자 결제 링크·현장 결제'인데 버튼만 뜨면 서로 모순된다)
+    SITE.booking.onlinePaymentLive &&
     hasPortoneConfig &&
     (reservation.status === "pending" || reservation.status === "confirmed") &&
     reservation.payment_preference === "online" &&
@@ -85,6 +89,7 @@ export async function confirmPayment(paymentId: string): Promise<PayResult> {
 export function canSubscribe(reservation: Reservation): boolean {
   const name = reservation.pass_name_snapshot || reservation.pass_type;
   return (
+    SITE.booking.onlinePaymentLive &&
     hasBillingConfig &&
     name.includes("월권") &&
     (reservation.status === "pending" || reservation.status === "confirmed") &&

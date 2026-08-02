@@ -80,7 +80,6 @@ export default function Privacy() {
             </section>
           ))}
           <p className="text-xs font-medium leading-6 text-workroom-muted">
-            본 방침은 일반적인 기준으로 작성된 예시이며, 실제 운영 정책에 맞게 운영자가 수정해 사용할 수 있습니다.
           </p>
         </div>
         <Link className="mt-6 inline-block text-sm font-bold text-workroom-muted underline underline-offset-4 transition-colors hover:text-workroom-ink" to="/">
