@@ -245,7 +245,7 @@ export default function AdminSettings() {
 
   async function deletePass(id: string, name: string) {
     if (!supabase) return;
-    if (!window.confirm(`'${name}' 이용권을 삭제할까요? 삭제 후에는 되돌릴 수 없습니다.`)) return;
+    if (!window.confirm(`'${name}' 이용권을 삭제할까요?\n\n삭제하면 되돌릴 수 없고 지난 예약의 연결도 끊어집니다.\n더 이상 판매만 중단하려면 삭제 대신 '노출' 체크를 해제하세요.`)) return;
     const { error: deleteError } = await supabase.from("passes").delete().eq("id", id);
     if (deleteError) {
       setError(deleteError.message);
@@ -286,6 +286,18 @@ export default function AdminSettings() {
   }
 
   const hasChanges = Boolean(savedSnapshot && savedSnapshot !== settingsSnapshot(seatTypes, passes, businessHours, settings));
+
+  // 이름·가격·운영시간 같은 항목은 '변경사항 저장'을 눌러야 반영되므로,
+  // 저장하지 않고 화면을 벗어나려 하면 먼저 알린다.
+  useEffect(() => {
+    if (!hasChanges) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasChanges]);
 
   return (
     <AdminPage
@@ -341,7 +353,7 @@ export default function AdminSettings() {
                 <input min={0} type="number" value={newSeatCapacity} onChange={(event) => setNewSeatCapacity(event.target.value)} />
               </label>
               <button className={buttonClass("primary", "md", "sm:h-12")} type="submit">
-                좌석 추가
+                좌석 추가 (즉시 적용)
               </button>
             </form>
           </section>
@@ -408,7 +420,7 @@ export default function AdminSettings() {
                 </select>
               </label>
               <button className={buttonClass("primary", "md", "sm:h-12")} type="submit">
-                이용권 추가
+                이용권 추가 (즉시 적용)
               </button>
             </form>
           </section>
@@ -440,7 +452,7 @@ export default function AdminSettings() {
               <label className="grid gap-1 text-xs font-bold text-workroom-muted">종료<input disabled={newException.is_closed} required={!newException.is_closed} type="time" value={newException.close_time.slice(0, 5)} onChange={(event) => setNewException((current) => ({ ...current, close_time: event.target.value }))} /></label>
               <label className="flex h-12 items-center gap-2 text-sm font-bold"><input checked={newException.is_closed} className="h-5 w-5" type="checkbox" onChange={(event) => setNewException((current) => ({ ...current, is_closed: event.target.checked }))} />휴무</label>
               <label className="grid gap-1 text-xs font-bold text-workroom-muted">메모<input placeholder="예: 공사, 공휴일" value={newException.note ?? ""} onChange={(event) => setNewException((current) => ({ ...current, note: event.target.value }))} /></label>
-              <button className={buttonClass("primary", "md", "lg:h-12")} type="submit">저장</button>
+              <button className={buttonClass("primary", "md", "lg:h-12")} type="submit">저장 (즉시 적용)</button>
             </form>
             <div className="mt-3 grid gap-2">
               {dateExceptions.map((exception) => (
@@ -599,7 +611,7 @@ export default function AdminSettings() {
           </section>
           ) : null}
         </div>
-        {hasChanges ? <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-20 mt-5 flex items-center justify-between gap-3 border border-workroom-ink bg-workroom-yellow px-4 py-3 sm:bottom-4"><p className="text-sm font-semibold">저장하지 않은 변경사항이 있습니다.</p><button className={buttonClass("primary", "sm")} disabled={isSaving} onClick={saveAll} type="button">저장</button></div> : null}
+        {hasChanges ? <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-20 mt-5 flex items-center justify-between gap-3 border border-workroom-ink bg-workroom-yellow px-4 py-3 sm:bottom-4"><p className="text-sm font-semibold">저장하지 않은 변경사항이 있습니다. <span className="font-medium">(이름·가격·정원·운영시간·안내 문구)</span></p><button className={buttonClass("primary", "sm")} disabled={isSaving} onClick={saveAll} type="button">저장</button></div> : null}
       </div>
     </AdminPage>
   );
@@ -648,7 +660,12 @@ export default function AdminSettings() {
       setError(tokenError.message);
       return;
     }
-    setSettings((current) => ({ ...current, attendance_qr_token: token }));
+    // 이미 DB에 반영된 값이므로 저장 기준도 함께 갱신한다(가짜 '미저장' 표시 방지).
+    setSettings((current) => {
+      const next = { ...current, attendance_qr_token: token };
+      setSavedSnapshot(settingsSnapshot(seatTypes, passes, businessHours, next));
+      return next;
+    });
   }
 
   function updateSeatType<K extends keyof SeatType>(index: number, key: K, value: SeatType[K]) {

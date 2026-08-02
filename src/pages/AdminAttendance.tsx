@@ -252,8 +252,8 @@ export default function AdminAttendance() {
                   </div>
                   <div className="flex items-center gap-2 sm:justify-end">
                     <span className={badge(tone)}>{state}</span>
-                    {!attendance && reservation.status === "confirmed" && reservation.profile_id ? <button className={buttonClass("primary", "sm")} disabled={busy === reservation.id} onClick={() => void addAttendance(reservation.profile_id!, reservation.id, reservation.name)} type="button">입실</button> : null}
-                    {attendance && !attendance.check_out_at ? <button className={buttonClass("primary", "sm")} disabled={busy === attendance.id} onClick={() => void updateAttendance(attendance.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button> : null}
+                    {!attendance && reservation.status === "confirmed" && reservation.profile_id ? <button className={buttonClass("primary", "sm", "min-h-[44px] px-5")} disabled={busy === reservation.id} onClick={() => void addAttendance(reservation.profile_id!, reservation.id, reservation.name)} type="button">입실</button> : null}
+                    {attendance && !attendance.check_out_at ? <button className={buttonClass("primary", "sm", "min-h-[44px] px-5")} disabled={busy === attendance.id} onClick={() => void updateAttendance(attendance.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button> : null}
                   </div>
                 </div>
               );
@@ -298,7 +298,7 @@ export default function AdminAttendance() {
                         <div className="flex items-center gap-2">
                           <span className={badge(row.check_out_at ? "sky" : "ink")}>{row.check_out_at ? "퇴실" : "이용 중"}</span>
                           {!row.check_out_at ? (
-                            <button className={buttonClass("primary", "sm")} disabled={busy === row.id} onClick={() => void updateAttendance(row.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button>
+                            <button className={buttonClass("primary", "sm", "min-h-[44px] px-5")} disabled={busy === row.id} onClick={() => void updateAttendance(row.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button>
                           ) : null}
                         </div>
                       </div>

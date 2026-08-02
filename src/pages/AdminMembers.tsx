@@ -7,6 +7,7 @@ import { formatDate, formatTimeRange, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
+import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { badge, buttonClass } from "../lib/ui";
 import type { Attendance, Coupon, Profile, Reservation } from "../lib/types";
 
@@ -20,6 +21,7 @@ export default function AdminMembers() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  useOverlayBackClose(mobileDetailOpen, () => setMobileDetailOpen(false));
   const [query, setQuery] = useState("");
   const [view, setView] = useState<MemberView>("all");
   const [isLoading, setIsLoading] = useState(true);

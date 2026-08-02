@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Section from "../components/Section";
+import { CAUTION_ITEMS, FIT_ITEMS, GUIDE_ITEMS } from "../lib/guide";
 import { SITE } from "../lib/site";
 import { buttonClass, card, tintCard } from "../lib/ui";
 
@@ -80,20 +81,17 @@ const groups: Group[] = [
       {
         q: "어떤 이용에 적합한가요?",
         a: [
-          "노트북 작업, 공부, 글쓰기처럼 조용한 시간이 필요한 이용에 적합합니다.",
+          ...FIT_ITEMS,
           "상반신 증명사진 촬영은 유료이며, 호리존 사용 시 관리자에게 문의해 주세요.",
-          "2~4명 정도의 짧은 회의나 협업은 예약 전 요청사항에 남겨 주세요.",
-          "냄새가 적은 간단한 음식과 음료는 가능합니다. (샌드위치, 음료 등)",
-          "오후 5시 30분부터 7시까지는 릴렉스타임으로, 메인 음악 소리가 평소보다 커질 수 있습니다.",
         ],
       },
       {
         q: "어떤 이용은 어렵나요?",
-        a: [
-          "큰 소리의 모임, 파티, 장시간 통화 중심 이용은 어렵습니다.",
-          "강한 냄새가 나는 음식, 주변을 많이 어지럽히는 작업, 큰 장비 반입 촬영은 사전 확인이 필요합니다.",
-          "상업 촬영이나 큰 장비 반입은 예약 전에 먼저 문의해 주세요.",
-        ],
+        a: [...CAUTION_ITEMS, "상업 촬영이나 큰 장비 반입은 예약 전에 먼저 문의해 주세요."],
+      },
+      {
+        q: "이용 수칙을 알려주세요",
+        a: GUIDE_ITEMS.map(([title, body]) => `${title} · ${body}`),
       },
       {
         q: "어떤 공간인가요?",

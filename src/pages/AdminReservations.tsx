@@ -8,6 +8,7 @@ import { getCurrentProfile } from "../lib/profiles";
 import { refundReservationPayment } from "../lib/portone";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
+import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import type {
   PaymentStatus,
   Pass,
@@ -93,6 +94,7 @@ export default function AdminReservations() {
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [viewMode, setViewMode] = useState<ReservationView>(statusParam === "pending" ? "pending" : reservationParam ? "all" : "today");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(reservationParam));
+  useOverlayBackClose(mobileDetailOpen, () => setMobileDetailOpen(false));
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [auditLogs, setAuditLogs] = useState<ReservationAuditLog[]>([]);

@@ -6,6 +6,7 @@ import MemberDashboard from "../components/MemberDashboard";
 import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
+import { CAUTION_ITEMS, FIT_ITEMS, GUIDE_ITEMS } from "../lib/guide";
 import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { badge, buttonClass, card, pressable, tintCard, type TintColor } from "../lib/ui";
@@ -39,30 +40,6 @@ const features: { title: string; body: string; icon: FeatureIcon; accent: TintCo
     icon: "coffee",
     accent: "sky",
   },
-];
-
-const guideItems: [string, string][] = [
-  ["결제", `${SITE.booking.onlinePayment} ${SITE.booking.onsitePayment}`],
-  ["취소", "예약 시작 시간 전까지 예약현황에서 직접 취소할 수 있습니다."],
-  ["예약 기간", "예약은 이용일 기준 오늘부터 최대 2개월 이내까지 가능합니다."],
-  ["연장", "이용 종료 후 15분까지는 유예되며, 이후 1시간 추가 요금이 적용됩니다."],
-  ["소리", "통화는 조용히, 음악과 영상은 반드시 이어폰이나 헤드폰으로 이용합니다."],
-  ["음식", "냄새가 적은 간단한 음식과 음료는 가능합니다. (샌드위치, 음료 등)"],
-  ["증명사진", "상반신 증명사진 촬영은 유료로 이용할 수 있습니다."],
-  ["릴렉스타임", "오후 5시 30분부터 7시까지는 릴렉스타임으로, 메인 음악 소리가 평소보다 커질 수 있습니다."],
-  ["동반", "함께 이용하는 분은 별도 좌석 예약이 필요합니다."],
-];
-
-const fitItems = [
-  "노트북 작업, 공부, 글쓰기처럼 조용한 시간이 필요한 경우",
-  "상반신 증명사진, 간단한 프로필 사진, 작은 제품 촬영",
-  "2~4명이 하는 짧은 회의나 가벼운 협업",
-];
-
-const cautionItems = [
-  "큰 소리가 나는 모임, 파티, 장시간 통화",
-  "냄새가 강한 음식이나 공간을 많이 어지럽히는 작업",
-  "사전 협의 없는 상업 촬영, 장비 반입이 큰 촬영",
 ];
 
 const heroPhotos = [
@@ -416,7 +393,7 @@ export default function Home() {
 
       <Section eyebrow="Guide" title="이용 전 확인해 주세요" accent="sky">
         <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
-          {guideItems.map(([title, body]) => (
+          {GUIDE_ITEMS.map(([title, body]) => (
             <div className="border-t-2 border-workroom-ink pt-3" key={title}>
               <dt className="text-base font-bold">{title}</dt>
               <dd className="mt-1.5 text-sm font-medium leading-6 text-workroom-muted">{body}</dd>
@@ -431,7 +408,7 @@ export default function Home() {
           <article className={`${tintCard("mint")} p-5`}>
             <h3 className="text-xl font-bold">추천하는 이용</h3>
             <ul className="mt-4 grid gap-3">
-              {fitItems.map((item) => (
+              {FIT_ITEMS.map((item) => (
                 <li className="flex gap-2.5 text-sm font-bold leading-6" key={item}>
                   <CheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{item}</span>
@@ -442,7 +419,7 @@ export default function Home() {
           <article className={`${tintCard("yellow")} p-5`}>
             <h3 className="text-xl font-bold">예약 전 문의가 필요한 이용</h3>
             <ul className="mt-4 grid gap-3">
-              {cautionItems.map((item) => (
+              {CAUTION_ITEMS.map((item) => (
                 <li className="flex gap-2.5 text-sm font-bold leading-6" key={item}>
                   <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{item}</span>
