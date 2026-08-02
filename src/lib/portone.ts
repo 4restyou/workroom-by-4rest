@@ -74,9 +74,8 @@ export async function confirmPayment(paymentId: string): Promise<PayResult> {
     body: { type: "confirm", paymentId },
   });
   const result = data as { ok?: boolean; message?: string } | null;
-  if (error || !result?.ok) {
-    return { ok: false, message: result?.message ?? "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요." };
-  }
+  if (error) return { ok: false, message: await invokeErrorMessage(error, "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요.") };
+  if (!result?.ok) return { ok: false, message: result?.message ?? "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요." };
   return { ok: true, message: result.message ?? "결제가 완료되었습니다." };
 }
 
@@ -130,6 +129,21 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
   return confirmBillingIssue(reservation.id, response.billingKey);
 }
 
+// supabase functions.invoke는 비-200 응답을 error로 처리하며 본문(JSON) 메시지를
+// error.context(Response)에 담는다. 서버가 보낸 실제 사유를 꺼내 온다.
+async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const ctx = (error as { context?: Response } | null)?.context;
+  if (ctx && typeof ctx.json === "function") {
+    try {
+      const body = (await ctx.json()) as { message?: string } | null;
+      if (body?.message) return body.message;
+    } catch {
+      /* 본문이 JSON이 아니면 fallback */
+    }
+  }
+  return error instanceof Error ? `${fallback} (${error.message})` : fallback;
+}
+
 // 빌링키를 서버로 보내 첫 결제·구독 등록. 모바일 리디렉션 복귀 페이지에서도 재사용.
 export async function confirmBillingIssue(reservationId: string, billingKey: string): Promise<PayResult> {
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
@@ -137,7 +151,8 @@ export async function confirmBillingIssue(reservationId: string, billingKey: str
     body: { type: "issue", reservationId, billingKey },
   });
   const result = data as { ok?: boolean; message?: string } | null;
-  if (error || !result?.ok) return { ok: false, message: result?.message ?? "정기결제 등록에 실패했습니다." };
+  if (error) return { ok: false, message: await invokeErrorMessage(error, "정기결제 등록에 실패했습니다.") };
+  if (!result?.ok) return { ok: false, message: result?.message ?? "정기결제 등록에 실패했습니다." };
   return { ok: true, message: result.message ?? "정기결제가 등록되었습니다." };
 }
 
