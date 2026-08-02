@@ -36,3 +36,24 @@ export function reservationEndTime(reservation: Reservation, date = reservation.
   if (end <= start) timestamp.setDate(timestamp.getDate() + 1);
   return timestamp.getTime();
 }
+
+// 이용권 이름으로 장기 이용권 여부·기간(주)을 판정한다. 예약 생성 시 이용 기간을
+// 계산하는 데 쓰고, 관리자 화면의 기간 자동 계산과 같은 규칙을 공유한다.
+export function isLongTermPassName(name: string) {
+  return name.includes("주간") || name.includes("월권") || name.includes("월간");
+}
+
+export function passPeriodWeeks(name: string): number {
+  const matched = name.match(/(\d+)\s*주/);
+  if (matched) return Number(matched[1]);
+  if (name.includes("월권") || name.includes("월간")) return 4;
+  if (name.includes("주간")) return 1;
+  return 4;
+}
+
+export function addDaysStr(dateStr: string, days: number): string {
+  if (!dateStr) return dateStr;
+  const date = new Date(`${dateStr}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}

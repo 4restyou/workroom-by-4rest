@@ -4,7 +4,7 @@ import Calendar from "../components/Calendar";
 import Section from "../components/Section";
 import { trackEvent } from "../lib/analytics";
 import { defaultPasses } from "../lib/defaultPasses";
-import { computeFullDates, type IntervalInput } from "../lib/availability";
+import { computeFullDates, peakConcurrentInWindow, toMinutes, type IntervalInput } from "../lib/availability";
 import { maxBookingDateValue,
   formatDate,
   formatDateInputValue,
@@ -19,6 +19,7 @@ import { maxBookingDateValue,
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, payReservation } from "../lib/portone";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
+import { addDaysStr, isLongTermPassName, passPeriodWeeks } from "../lib/reservations";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
 import type { BusinessDateException, BusinessHour, Pass, Profile, Reservation, ReservationInsert } from "../lib/types";
@@ -84,6 +85,8 @@ export default function Reserve() {
   const [authChecked, setAuthChecked] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [fullDates, setFullDates] = useState<Set<string>>(new Set());
+  // 시간대별 잔여 좌석을 미리 계산하기 위해 월간 예약 원본도 들고 있는다.
+  const [monthRows, setMonthRows] = useState<IntervalInput[]>([]);
   const [seatCapacities, setSeatCapacities] = useState<Record<string, number>>({});
   const [step, setStep] = useState(1); // wizard: 1 이용권 · 2 날짜·시간 · 3 정보·확인
 
@@ -180,6 +183,11 @@ export default function Reserve() {
   const closeHHMM = selectedHours?.close_time.slice(0, 5);
   // 자정을 넘겨 마감하는 날(예: 08:00–다음 날 01:00)은 종료가 시작보다 이른
   // 표기(01:00 < 08:00)가 정상이다. 단순 비교 검증은 이 경우를 건너뛴다.
+  // 휴무 요일을 뺀 영업 요일 — 장기 이용권의 이용 가능 요일 기본값.
+  const openWeekdays = useMemo(() => {
+    const open = [0, 1, 2, 3, 4, 5, 6].filter((day) => !hoursByWeekday[day]?.is_closed);
+    return open.length ? open : [0, 1, 2, 3, 4, 5, 6];
+  }, [hoursByWeekday]);
   const isOvernightWindow = Boolean(openHHMM && closeHHMM && closeHHMM <= openHHMM);
   const isClosedDay = selectedHours?.is_closed ?? false;
   const selectedDuration = passDurationHours(form.pass_type);
@@ -202,15 +210,33 @@ export default function Reserve() {
 
   const selectedSeatTypeId = passes.find((pass) => pass.name === form.pass_type)?.seat_type_id ?? null;
 
+  // 시작 시간별 잔여 좌석 — 마감된 시간대를 미리 막아, 마지막 단계에서야
+  // "잔여 좌석 부족"으로 되돌아가는 일을 없앤다.
+  const slotRemaining = useMemo(() => {
+    const map = new Map<string, number>();
+    const capacity = selectedSeatTypeId ? seatCapacities[selectedSeatTypeId] ?? 0 : 0;
+    if (!capacity || !selectedDuration || !form.date) return map;
+    for (const time of selectableStartTimes) {
+      const start = toMinutes(time);
+      const end = start + selectedDuration * 60;
+      const peak = peakConcurrentInWindow(monthRows, form.date, start, end);
+      map.set(time, Math.max(0, capacity - peak));
+    }
+    return map;
+  }, [form.date, monthRows, seatCapacities, selectableStartTimes, selectedDuration, selectedSeatTypeId]);
+
+
   useEffect(() => {
     async function loadAvailability() {
       if (!hasSupabaseConfig || !supabase || !selectedSeatTypeId) {
         setFullDates(new Set());
+        setMonthRows([]);
         return;
       }
       const capacity = seatCapacities[selectedSeatTypeId];
       if (!capacity) {
         setFullDates(new Set());
+        setMonthRows([]);
         return;
       }
       const monthStart = formatDateInputValue(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1));
@@ -224,7 +250,9 @@ export default function Reserve() {
         .gte("date", monthStart)
         .lte("date", monthEnd);
 
-      setFullDates(computeFullDates((data ?? []) as IntervalInput[], capacity));
+      const rows = (data ?? []) as IntervalInput[];
+      setMonthRows(rows);
+      setFullDates(computeFullDates(rows, capacity));
     }
 
     void loadAvailability();
@@ -431,7 +459,8 @@ export default function Reserve() {
 
       const capacity = capacityRows?.[0];
       if (capacity && !capacity.available) {
-        setError(`선택한 시간대의 잔여 좌석이 부족합니다. 현재 잔여 ${capacity.remaining}석입니다.`);
+        setError(`선택한 시간대의 잔여 좌석이 부족합니다. 현재 잔여 ${capacity.remaining}석입니다. 다른 시간을 선택해 주세요.`);
+        goToStep(2);
         return;
       }
     }
@@ -455,6 +484,15 @@ export default function Reserve() {
       people,
       message: form.message.trim(),
       status: "pending",
+      // 주간권·월권은 하루가 아니라 기간 이용권이다. 시작일 기준으로 이용 기간을
+      // 계산해 넣어야 회원 화면의 이용기간 표시와 출근(입실) 판정이 맞는다.
+      ...(isLongTermPassName(form.pass_type)
+        ? {
+            access_start_date: form.date,
+            access_end_date: addDaysStr(form.date, passPeriodWeeks(form.pass_type) * 7 - 1),
+            access_weekdays: openWeekdays,
+          }
+        : {}),
     };
 
     setIsSubmitting(true);
@@ -652,19 +690,36 @@ export default function Reserve() {
                     <legend className="text-sm font-bold">시작 시간</legend>
                     {selectableStartTimes.length ? (
                       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                        {selectableStartTimes.map((time) => (
-                          <button
-                            aria-pressed={form.start_time === time}
-                            className={`rounded-[5px] border px-3 py-3 text-sm font-bold ${
-                              form.start_time === time ? "border-workroom-ink bg-workroom-yellow" : "border-workroom-line bg-white hover:border-workroom-ink"
-                            }`}
-                            key={time}
-                            onClick={() => updateStartTime(time)}
-                            type="button"
-                          >
-                            {time}
-                          </button>
-                        ))}
+                        {selectableStartTimes.map((time) => {
+                          const remaining = slotRemaining.get(time);
+                          const people = Number(form.people) || 1;
+                          const soldOut = remaining !== undefined && remaining < people;
+                          const few = !soldOut && remaining !== undefined && remaining <= 2;
+                          return (
+                            <button
+                              aria-pressed={form.start_time === time}
+                              aria-label={soldOut ? `${time} 마감` : remaining !== undefined ? `${time} 잔여 ${remaining}석` : time}
+                              className={`grid gap-0.5 rounded-[5px] border px-3 py-2.5 text-sm font-bold ${
+                                soldOut
+                                  ? "cursor-not-allowed border-workroom-line bg-workroom-background text-workroom-muted line-through"
+                                  : form.start_time === time
+                                    ? "border-workroom-ink bg-workroom-yellow"
+                                    : "border-workroom-line bg-white hover:border-workroom-ink"
+                              }`}
+                              disabled={soldOut}
+                              key={time}
+                              onClick={() => updateStartTime(time)}
+                              type="button"
+                            >
+                              <span>{time}</span>
+                              {soldOut ? (
+                                <span className="text-[10px] font-bold text-workroom-muted">마감</span>
+                              ) : few ? (
+                                <span className="text-[10px] font-bold text-red-600">{remaining}석 남음</span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className={`${tintCard("danger")} p-3 text-sm font-bold`}>이 날짜에는 예약 가능한 3시간 구간이 없습니다.</p>
@@ -793,12 +848,24 @@ export default function Reserve() {
               <dl className="mt-3 grid grid-cols-[64px_1fr] gap-x-3 gap-y-2 text-sm">
                 <dt className="font-bold text-workroom-muted">이용권</dt>
                 <dd className="font-bold">{form.pass_type || "-"}</dd>
-                <dt className="font-bold text-workroom-muted">날짜</dt>
-                <dd className="font-bold">{form.date ? formatDate(form.date) : "-"}</dd>
-                <dt className="font-bold text-workroom-muted">시간</dt>
-                <dd className="font-bold">
-                  {form.start_time} - {form.end_time}
-                </dd>
+                {isLongTermPassName(form.pass_type) ? (
+                  <>
+                    <dt className="font-bold text-workroom-muted">이용 기간</dt>
+                    <dd className="font-bold">
+                      {form.date ? `${formatDate(form.date)} ~ ${formatDate(addDaysStr(form.date, passPeriodWeeks(form.pass_type) * 7 - 1))}` : "-"}
+                      <span className="ml-1 font-medium text-workroom-muted">({passPeriodWeeks(form.pass_type)}주)</span>
+                    </dd>
+                  </>
+                ) : (
+                  <>
+                    <dt className="font-bold text-workroom-muted">날짜</dt>
+                    <dd className="font-bold">{form.date ? formatDate(form.date) : "-"}</dd>
+                    <dt className="font-bold text-workroom-muted">시간</dt>
+                    <dd className="font-bold">
+                      {form.start_time} - {form.end_time}
+                    </dd>
+                  </>
+                )}
                 <dt className="font-bold text-workroom-muted">금액</dt>
                 <dd className="font-bold">{selectedPassInfo?.price ? formatPrice(selectedPassInfo.price) : "확인 후 안내"}</dd>
                 {SITE.booking.onlinePaymentLive ? (
@@ -863,12 +930,24 @@ export default function Reserve() {
                 <dl className="mt-3 grid grid-cols-[74px_1fr] gap-x-3 gap-y-2 text-sm">
                   <dt className="font-bold text-workroom-muted">이용권</dt>
                   <dd className="font-bold">{submittedReservation.passName}</dd>
-                  <dt className="font-bold text-workroom-muted">날짜</dt>
-                  <dd className="font-bold">{formatDate(submittedReservation.date)}</dd>
-                  <dt className="font-bold text-workroom-muted">시간</dt>
-                  <dd className="font-bold">
-                    {submittedReservation.startTime} - {submittedReservation.endTime}
-                  </dd>
+                  {isLongTermPassName(submittedReservation.passName) ? (
+                    <>
+                      <dt className="font-bold text-workroom-muted">이용 기간</dt>
+                      <dd className="font-bold">
+                        {formatDate(submittedReservation.date)} ~ {formatDate(addDaysStr(submittedReservation.date, passPeriodWeeks(submittedReservation.passName) * 7 - 1))}
+                        <span className="ml-1 font-medium text-workroom-muted">({passPeriodWeeks(submittedReservation.passName)}주)</span>
+                      </dd>
+                    </>
+                  ) : (
+                    <>
+                      <dt className="font-bold text-workroom-muted">날짜</dt>
+                      <dd className="font-bold">{formatDate(submittedReservation.date)}</dd>
+                      <dt className="font-bold text-workroom-muted">시간</dt>
+                      <dd className="font-bold">
+                        {submittedReservation.startTime} - {submittedReservation.endTime}
+                      </dd>
+                    </>
+                  )}
                   <dt className="font-bold text-workroom-muted">인원</dt>
                   <dd className="font-bold">{submittedReservation.people}명</dd>
                   <dt className="font-bold text-workroom-muted">예약자</dt>

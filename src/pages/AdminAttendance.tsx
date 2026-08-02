@@ -195,6 +195,8 @@ export default function AdminAttendance() {
   const todayReservations = useMemo(() => reservations.filter((item) => reservationCoversDate(item, today) && (item.status === "confirmed" || item.status === "pending")), [reservations, today]);
   const todayAttendanceByReservation = new Map(todays.filter((item) => item.reservation_id).map((item) => [item.reservation_id as string, item]));
   const activeCount = todays.filter((row) => !row.check_out_at).length;
+  // 예약과 연결되지 않은 오늘 입실(워크인·수기 도장).
+  const walkIns = todays.filter((row) => !row.reservation_id);
   const pendingCoupons = coupons.filter((coupon) => coupon.status === "issued");
   const usedCoupons = coupons.filter((coupon) => coupon.status === "used");
 
@@ -275,6 +277,50 @@ export default function AdminAttendance() {
                 </div>
               );
             })()}
+
+            {/* 예약 없이 찍은 워크인은 예약 기준 목록에 안 잡히므로 따로 보여준다.
+                오늘 기록도 여기서 바로 정정·삭제할 수 있어야 실수를 되돌릴 수 있다. */}
+            {walkIns.length ? (
+              <div className="mt-5">
+                <p className="mb-1.5 text-xs font-black uppercase tracking-[0.08em] text-workroom-muted">
+                  예약 없는 입실 <span className="text-workroom-ink">{walkIns.length}</span>
+                </p>
+                <div className="grid gap-2">
+                  {walkIns.map((row) => (
+                    <div className="border border-workroom-line bg-white px-4 py-3" key={row.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">{row.profile?.full_name || "이름 미입력"}</p>
+                          <p className="mt-0.5 text-xs font-bold tabular-nums text-workroom-ink">
+                            {timeOnly(row.check_in_at)} 입실{row.check_out_at ? ` · ${timeOnly(row.check_out_at)} 퇴실` : " · 이용 중"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={badge(row.check_out_at ? "sky" : "ink")}>{row.check_out_at ? "퇴실" : "이용 중"}</span>
+                          {!row.check_out_at ? (
+                            <button className={buttonClass("primary", "sm")} disabled={busy === row.id} onClick={() => void updateAttendance(row.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <details className="mt-5 border-y border-workroom-line bg-white px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold">오늘 기록 정정·삭제</summary>
+              <p className="mt-2 text-xs text-workroom-muted">잘못 찍은 입·퇴실을 바로잡거나 삭제할 수 있습니다.</p>
+              <div className="mt-3 grid gap-2">
+                {todays.length ? (
+                  todays.map((row) => (
+                    <AttendanceCard busy={busy === row.id} key={row.id} onDelete={() => void deleteAttendance(row.id)} onSave={(payload) => void updateAttendance(row.id, payload, "출석 시간을 정정했습니다.")} row={row} />
+                  ))
+                ) : (
+                  <p className="text-sm text-workroom-muted">오늘 입실 기록이 없습니다.</p>
+                )}
+              </div>
+            </details>
 
             <details className="mt-5 border-y border-workroom-line bg-white px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold">예약 없이 수기 입실 처리</summary>

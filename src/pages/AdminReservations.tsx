@@ -420,20 +420,26 @@ export default function AdminReservations() {
 
   async function archiveReservation(id: string) {
     if (!supabase) return;
-    const confirmed = window.confirm("예약을 보관 처리할까요? 목록에서는 숨겨지고 상태는 취소로 바뀝니다.");
+    const target = reservations.find((item) => item.id === id);
+    // 상태가 바뀔 때만 고객에게 문자가 나간다(DB 트리거). 이미 끝난 예약은
+    // 상태를 건드리지 않고 숨기기만 해서 엉뚱한 '취소' 문자를 막는다.
+    const willCancel = target?.status === "pending" || target?.status === "confirmed";
+    const confirmed = window.confirm(
+      willCancel
+        ? "예약을 보관 처리할까요? 목록에서 숨겨지고 상태가 취소로 바뀌며, 고객에게 취소 문자가 발송됩니다."
+        : "예약을 보관 처리할까요? 목록에서만 숨겨지고 상태는 그대로 유지됩니다.",
+    );
     if (!confirmed) return;
 
-    const { error: archiveError } = await supabase
-      .from("reservations")
-      .update({ status: "canceled", deleted_at: new Date().toISOString() })
-      .eq("id", id);
+    const deletedAt = new Date().toISOString();
+    const patch = willCancel ? { status: "canceled" as const, deleted_at: deletedAt } : { deleted_at: deletedAt };
+    const { error: archiveError } = await supabase.from("reservations").update(patch).eq("id", id);
     if (archiveError) {
       setError(archiveError.message);
       return;
     }
-    const deletedAt = new Date().toISOString();
     setReservations((current) =>
-      current.map((reservation) => (reservation.id === id ? { ...reservation, status: "canceled", deleted_at: deletedAt } : reservation)),
+      current.map((reservation) => (reservation.id === id ? { ...reservation, ...patch } : reservation)),
     );
     setArchiveFilter("archived");
     setSelectedReservationId(id);
@@ -623,7 +629,11 @@ export default function AdminReservations() {
               <p className="text-sm font-semibold">예약 상세</p>
               <span className="w-[70px]" />
             </div>
-            <div className="mx-auto max-w-2xl p-3 pb-24">{reservationCard}</div>
+            <div className="mx-auto max-w-2xl p-3 pb-24">
+              {/* 오버레이가 화면을 덮으므로 피드백도 안에서 한 번 더 보여준다. */}
+              <AdminFeedback error={error} success={success} />
+              {reservationCard}
+            </div>
           </div>
         ) : null}
       </div>
@@ -881,6 +891,12 @@ function ReservationCard({
   }, [reservation, openWeekdays]);
 
   function save() {
+    // 상태가 바뀌면 DB 트리거가 고객에게 문자를 보내므로 한 번 더 확인받는다.
+    if (status !== reservation.status) {
+      const label = statusLabel[status] ?? status;
+      const notifies = status === "confirmed" || status === "canceled" || status === "no_show";
+      if (!window.confirm(`예약 상태를 '${label}'(으)로 바꿀까요?${notifies ? " 고객에게 안내 문자가 발송됩니다." : ""}`)) return;
+    }
     const selectedPass = passes.find((pass) => pass.name === bookingDraft.pass_type);
     const longTerm = bookingDraft.pass_type.includes("주간권") || bookingDraft.pass_type.includes("월권");
     onSave({
@@ -965,31 +981,43 @@ function ReservationCard({
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
+          {/* 결제 여부와 무관하게 '확정'이 가장 앞에 온다 — 미결제 확정이 정상 흐름이며,
+              결제 완료 처리와 섞이면 받지 않은 돈이 매출로 잡힌다. */}
+          {reservation.status === "pending" ? (
             <button
               className={buttonClass("accent", "sm")}
               onClick={() => {
-                if (window.confirm(`${reservation.name}님의 외부·현장 결제를 완료 처리할까요? 예약도 함께 확정됩니다.`)) {
-                  onPatch({ payment_status: "paid", payment_method: reservation.payment_preference === "onsite" ? "현장결제" : "외부결제", status: "confirmed" });
-                }
+                if (window.confirm(`${reservation.name}님 예약을 확정할까요? 고객에게 확정 문자가 발송됩니다.`)) onPatch({ status: "confirmed" });
               }}
               type="button"
             >
-              외부·현장 결제 완료
+              예약 확정{reservation.payment_status === "unpaid" ? " (결제 전)" : ""}
             </button>
           ) : null}
           {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
             <button
               className={buttonClass("secondary", "sm")}
-              onClick={() => onPatch({ payment_status: "service", payment_method: "서비스", status: "confirmed" })}
+              onClick={() => {
+                if (window.confirm(`${reservation.name}님의 결제를 받은 것으로 처리할까요? 매출에 반영되고 예약도 확정됩니다.`)) {
+                  onPatch({ payment_status: "paid", payment_method: reservation.payment_preference === "onsite" ? "현장결제" : "외부결제", status: "confirmed" });
+                }
+              }}
+              type="button"
+            >
+              결제 받음 · 확정
+            </button>
+          ) : null}
+          {reservation.payment_status === "unpaid" && reservation.status !== "canceled" ? (
+            <button
+              className={buttonClass("secondary", "sm")}
+              onClick={() => {
+                if (window.confirm(`${reservation.name}님 예약을 무료(서비스)로 확정할까요? 요금이 청구되지 않고 확정 문자가 발송됩니다.`)) {
+                  onPatch({ payment_status: "service", payment_method: "서비스", status: "confirmed" });
+                }
+              }}
               type="button"
             >
               서비스로 확정
-            </button>
-          ) : null}
-          {reservation.status === "pending" && (reservation.payment_status === "paid" || reservation.payment_status === "service") ? (
-            <button className={buttonClass("accent", "sm")} onClick={() => onPatch({ status: "confirmed" })} type="button">
-              예약 확정
             </button>
           ) : null}
           {reservation.status === "confirmed" ? (
@@ -1202,7 +1230,7 @@ function ReservationCard({
       </div>
       <div className="mt-3 flex flex-wrap gap-2 border-t border-workroom-line pt-3">
         {reservation.status === "pending" || reservation.status === "confirmed" ? (
-          <button className={buttonClass("secondary", "sm", "border-red-400")} onClick={() => { if (window.confirm(`${reservation.name}님 예약을 노쇼로 처리할까요?`)) onPatch({ status: "no_show" }); }} type="button">노쇼 처리</button>
+          <button className={buttonClass("secondary", "sm", "border-red-400")} onClick={() => { if (window.confirm(`${reservation.name}님 예약을 노쇼로 처리할까요? 고객에게 노쇼 안내 문자가 발송됩니다.`)) onPatch({ status: "no_show" }); }} type="button">노쇼 처리</button>
         ) : null}
         {reservation.payment_status === "paid" && reservation.payment_key && (reservation.payment_method ?? "").includes("포트원") ? (
           <button className={buttonClass("secondary", "sm", "border-red-400")} onClick={onPortoneRefund} type="button">PG 환불 실행</button>

@@ -58,3 +58,25 @@ export function computeFullDates(rows: IntervalInput[], capacity: number): Set<s
   });
   return full;
 }
+
+// 특정 날짜의 [start, end) 구간과 겹치는 예약들의 최대 동시 인원.
+// 시간대별 잔여 좌석을 미리 보여줄 때 사용한다(제출 시 서버 검증과 같은 기준).
+export function peakConcurrentInWindow(
+  rows: IntervalInput[],
+  date: string,
+  windowStart: number,
+  windowEnd: number,
+): number {
+  const intervals: { start: number; end: number; people: number }[] = [];
+  for (const row of rows) {
+    if (row.status && !ACTIVE_STATUSES.has(row.status)) continue;
+    if (row.date !== date || !row.start_time || !row.end_time) continue;
+    const start = toMinutes(row.start_time);
+    let end = toMinutes(row.end_time);
+    if (end <= start) end += 24 * 60;
+    // 창과 겹치지 않으면 제외.
+    if (end <= windowStart || start >= windowEnd) continue;
+    intervals.push({ start, end, people: row.people ?? 1 });
+  }
+  return peakConcurrent(intervals);
+}

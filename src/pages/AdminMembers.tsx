@@ -124,7 +124,7 @@ export default function AdminMembers() {
           <div className="hidden xl:block">{detail ?? <AdminEmpty>회원 목록에서 확인할 회원을 선택해 주세요.</AdminEmpty>}</div>
         </div> : null}
 
-        {mobileDetailOpen && selectedMember ? <div className="fixed inset-0 z-[70] overflow-y-auto bg-workroom-background xl:hidden"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-workroom-ink bg-workroom-background px-4 py-3"><button className={buttonClass("secondary", "sm")} onClick={() => setMobileDetailOpen(false)} type="button">← 목록</button><p className="text-sm font-semibold">회원 상세</p><span className="w-[70px]" /></div><div className="mx-auto max-w-2xl p-3 pb-24">{detail}</div></div> : null}
+        {mobileDetailOpen && selectedMember ? <div className="fixed inset-0 z-[70] overflow-y-auto bg-workroom-background xl:hidden"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-workroom-ink bg-workroom-background px-4 py-3"><button className={buttonClass("secondary", "sm")} onClick={() => setMobileDetailOpen(false)} type="button">← 목록</button><p className="text-sm font-semibold">회원 상세</p><span className="w-[70px]" /></div><div className="mx-auto max-w-2xl p-3 pb-24"><AdminFeedback error={error} success={success} />{detail}</div></div> : null}
       </div>
     </AdminPage>
   );
