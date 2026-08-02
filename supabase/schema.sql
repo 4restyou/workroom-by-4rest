@@ -662,12 +662,11 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- 공개 읽기는 마이그레이션 0013에서 안전한 정책으로 대체됐다. 여기서 예전
+-- using(true) 정책을 다시 만들면 attendance_qr_token/매장 좌표가 그대로 노출되므로
+-- (허용 정책은 OR로 합쳐져 true가 이김) 다시 만들지 않고 제거만 한다.
+-- 실제 공개 읽기 정책은 0013의 space_settings_public_read_safe 가 담당한다.
 drop policy if exists "space_settings_public_read" on space_settings;
-create policy "space_settings_public_read"
-on space_settings
-for select
-to anon, authenticated
-using (true);
 
 drop policy if exists "space_settings_admin_all" on space_settings;
 create policy "space_settings_admin_all"
