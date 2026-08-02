@@ -271,6 +271,8 @@ export default function Account() {
       } else {
         setError(result.message);
       }
+    } catch (e) {
+      setError(`정기결제 처리 중 오류: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setActionBusy(null);
     }

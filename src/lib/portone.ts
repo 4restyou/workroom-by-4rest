@@ -36,24 +36,29 @@ export async function payReservation(reservation: Reservation): Promise<PayResul
   const amount = reservation.price_at_booking ?? 0;
   const paymentId = `wr-${reservation.id.slice(0, 8)}-${Date.now()}`;
 
-  const response = await PortOne.requestPayment({
-    storeId: STORE_ID,
-    channelKey: CHANNEL_KEY,
-    paymentId,
-    orderName: `WORKROOM ${reservation.pass_name_snapshot || reservation.pass_type}`,
-    totalAmount: amount,
-    currency: "CURRENCY_KRW",
-    payMethod: "CARD",
-    customData: { reservationId: reservation.id },
-    redirectUrl: `${window.location.origin}/payment/portone`,
-    customer: {
-      fullName: reservation.name,
-      phoneNumber: reservation.phone,
-      ...(reservation.email ? { email: reservation.email } : {}),
-    },
-  });
+  let response: Awaited<ReturnType<typeof PortOne.requestPayment>>;
+  try {
+    response = await PortOne.requestPayment({
+      storeId: STORE_ID,
+      channelKey: CHANNEL_KEY,
+      paymentId,
+      orderName: `WORKROOM ${reservation.pass_name_snapshot || reservation.pass_type}`,
+      totalAmount: amount,
+      currency: "CURRENCY_KRW",
+      payMethod: "CARD",
+      customData: { reservationId: reservation.id },
+      redirectUrl: `${window.location.origin}/payment/portone`,
+      customer: {
+        fullName: reservation.name,
+        phoneNumber: reservation.phone,
+        ...(reservation.email ? { email: reservation.email } : {}),
+      },
+    });
+  } catch (error) {
+    return { ok: false, message: `결제창 오류: ${error instanceof Error ? error.message : String(error)}` };
+  }
 
-  if (!response) return { ok: false, message: "결제창을 여는 데 실패했습니다." };
+  if (!response) return { ok: false, message: "결제창을 여는 데 실패했습니다. (응답 없음 — 채널 키/상점 ID를 확인해 주세요)" };
   if (response.code !== undefined) {
     // 사용자가 창을 닫은 경우 등: PortOne이 코드·메시지를 돌려준다.
     return { ok: false, message: response.message ?? "결제가 취소되었습니다." };
@@ -98,22 +103,27 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
   const passName = reservation.pass_name_snapshot || reservation.pass_type;
   const issueId = `wrbk-${reservation.id.slice(0, 8)}-${Date.now()}`;
 
-  const response = await PortOne.requestIssueBillingKey({
-    storeId: STORE_ID,
-    channelKey: BILLING_CHANNEL_KEY,
-    billingKeyMethod: "CARD",
-    issueId,
-    issueName: `WORKROOM ${passName} 정기결제`,
-    // 모바일 리디렉션 복귀 시 예약 id를 알 수 있도록 쿼리에 실어 보낸다.
-    redirectUrl: `${window.location.origin}/payment/portone?res=${reservation.id}`,
-    customer: {
-      fullName: reservation.name,
-      phoneNumber: reservation.phone,
-      ...(reservation.email ? { email: reservation.email } : {}),
-    },
-  });
+  let response: Awaited<ReturnType<typeof PortOne.requestIssueBillingKey>>;
+  try {
+    response = await PortOne.requestIssueBillingKey({
+      storeId: STORE_ID,
+      channelKey: BILLING_CHANNEL_KEY,
+      billingKeyMethod: "CARD",
+      issueId,
+      issueName: `WORKROOM ${passName} 정기결제`,
+      // 모바일 리디렉션 복귀 시 예약 id를 알 수 있도록 쿼리에 실어 보낸다.
+      redirectUrl: `${window.location.origin}/payment/portone?res=${reservation.id}`,
+      customer: {
+        fullName: reservation.name,
+        phoneNumber: reservation.phone,
+        ...(reservation.email ? { email: reservation.email } : {}),
+      },
+    });
+  } catch (error) {
+    return { ok: false, message: `정기결제 창 오류: ${error instanceof Error ? error.message : String(error)}` };
+  }
 
-  if (!response) return { ok: false, message: "정기결제 창을 여는 데 실패했습니다." };
+  if (!response) return { ok: false, message: "정기결제 창을 여는 데 실패했습니다. (응답 없음 — 채널 키/상점 ID를 확인해 주세요)" };
   if (response.code !== undefined) return { ok: false, message: response.message ?? "정기결제 등록이 취소되었습니다." };
   if (!response.billingKey) return { ok: false, message: "카드 등록에 실패했습니다." };
 
