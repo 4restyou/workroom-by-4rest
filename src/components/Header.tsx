@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { getCurrentProfile } from "../lib/profiles";
+import { useSession } from "../lib/sessionContext";
 import { supabase } from "../lib/supabase";
 import NotificationBell from "./NotificationBell";
-import type { Profile } from "../lib/types";
 import logoSig from "../../assets/logo/logo_sig.png";
 
 type HeaderProps = {
@@ -20,29 +18,12 @@ function adminNavClass({ isActive }: { isActive: boolean }) {
 
 export default function Header({ adminMode }: HeaderProps) {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-
-  useEffect(() => {
-    async function loadProfile() {
-      if (!supabase) return;
-      const loadedProfile = await getCurrentProfile();
-      setProfile(loadedProfile);
-    }
-
-    void loadProfile();
-    const {
-      data: { subscription },
-    } =
-      supabase?.auth.onAuthStateChange(() => {
-        void loadProfile();
-      }) ?? { data: { subscription: null } };
-
-    return () => subscription?.unsubscribe();
-  }, []);
+  const { profile } = useSession();
 
   async function signOut() {
+    // 로그아웃하면 onAuthStateChange가 SessionProvider를 깨우므로 여기서
+    // 프로필 상태를 따로 비울 필요가 없다.
     if (supabase) await supabase.auth.signOut();
-    setProfile(null);
     navigate("/", { replace: true });
   }
 

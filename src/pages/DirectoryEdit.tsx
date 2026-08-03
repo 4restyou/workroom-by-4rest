@@ -7,6 +7,7 @@ import { ACCENT_BG, ACCENT_LABEL, ACCENTS, CARD_CATEGORIES } from "../lib/direct
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { CardAccent, MemberCard } from "../lib/types";
 import paperTexture from "../../assets/paper-texture.webp";
+import { confirmDialog } from "../lib/confirm";
 
 type Form = {
   display_name: string;
@@ -33,7 +34,8 @@ const EMPTY: Form = {
   instagram: "",
   contact: "",
   accent: "yellow",
-  is_published: true,
+  // 공개는 opt-in. 회원이 직접 켜야 명함첩에 올라간다 (DB 기본값도 false).
+  is_published: false,
 };
 
 const fieldClass =
@@ -147,7 +149,13 @@ export default function DirectoryEdit() {
 
   async function remove() {
     if (!supabase || !existing) return;
-    if (!window.confirm("내 명함을 삭제할까요? 되돌릴 수 없어요.")) return;
+    const ok = await confirmDialog({
+      title: "내 명함을 삭제할까요?",
+      description: "명함첩에서 사라지며 되돌릴 수 없어요.",
+      confirmLabel: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     const { error: delError } = await supabase.from("member_cards").delete().eq("id", existing.id);
     setBusy(false);
@@ -251,7 +259,17 @@ export default function DirectoryEdit() {
               </div>
               <div className="grid gap-1.5">
                 <label className={labelClass} htmlFor="contact">연락처 / 이메일</label>
-                <input id="contact" className={fieldClass} value={form.contact} onChange={(e) => update("contact", e.target.value)} placeholder="공개해도 괜찮은 연락처" />
+                <input
+                  id="contact"
+                  className={fieldClass}
+                  value={form.contact}
+                  onChange={(e) => update("contact", e.target.value)}
+                  placeholder="공개해도 괜찮은 연락처"
+                  aria-describedby="contact-help"
+                />
+                <span id="contact-help" className="text-xs font-medium text-workroom-muted">
+                  연락처는 로그인한 회원에게만 보여요.
+                </span>
               </div>
             </div>
 
@@ -276,7 +294,9 @@ export default function DirectoryEdit() {
             <label className={`${card} flex cursor-pointer items-center justify-between gap-3 p-4`}>
               <span>
                 <span className="block text-sm font-black">명함첩에 공개</span>
-                <span className="block text-xs font-medium text-workroom-muted">끄면 나만 볼 수 있어요.</span>
+                <span className="block text-xs font-medium text-workroom-muted">
+                  켜면 이름·소개가 명함첩에 올라가요. 끄면 나만 볼 수 있어요.
+                </span>
               </span>
               <input type="checkbox" className="h-5 w-5 accent-workroom-ink" checked={form.is_published} onChange={(e) => update("is_published", e.target.checked)} />
             </label>

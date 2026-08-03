@@ -10,6 +10,7 @@ const BOARD_ACCENTS: CardAccent[] = ["yellow", "gray", "pink", "blue"];
 import { PinIcon } from "../components/icons";
 import { buttonClass, tintCard } from "../lib/ui";
 import type { BoardPost, CardAccent } from "../lib/types";
+import { confirmDialog } from "../lib/confirm";
 
 const DEMO_BOARD_POSTS: BoardPost[] = [
   {
@@ -426,7 +427,13 @@ export default function Board() {
 
   async function removePost(post: BoardPost) {
     if (!supabase) return;
-    if (!window.confirm(post.parent_id ? "이 답글을 삭제할까요?" : "이 메모를 삭제할까요?")) return;
+    const ok = await confirmDialog({
+      title: post.parent_id ? "이 답글을 삭제할까요?" : "이 메모를 삭제할까요?",
+      description: post.parent_id ? undefined : "메모에 달린 답글도 함께 사라집니다.",
+      confirmLabel: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
     await supabase.from("board_posts").delete().eq("id", post.id);
     await load();
   }

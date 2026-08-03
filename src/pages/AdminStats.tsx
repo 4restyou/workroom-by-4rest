@@ -3,11 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback } from "../components/AdminPage";
 import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, statusLabel } from "../lib/format";
-import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { buttonClass } from "../lib/ui";
 import type { Pass, PaymentStatus, Reservation, ReservationStatus } from "../lib/types";
+import { useSession } from "../lib/sessionContext";
 
 type Period = "day" | "week" | "month" | "quarter" | "year";
 const periodLabels: Record<Period, string> = { day: "일별", week: "주별", month: "월별", quarter: "분기별", year: "연도별" };
@@ -43,6 +43,7 @@ function monthRange(offset = 0) {
 }
 
 export default function AdminStats() {
+  const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
   const navigate = useNavigate();
   const currentMonth = monthRange();
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -60,16 +61,17 @@ export default function AdminStats() {
   useFeedbackToast(undefined, error);
 
   useEffect(() => {
+    // 세션·권한은 SessionProvider가 이미 읽어 뒀다(RequireAdmin도 같은 값을 본다).
+    // 여기서는 상태만 확인하고 데이터만 불러온다.
+    if (sessionStatus !== "ready") return;
     async function checkAndLoad() {
       if (!supabase) { setError("Supabase 환경 변수가 연결되지 않았습니다."); setIsLoading(false); return; }
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) { navigate("/admin", { replace: true }); return; }
-      const profile = await getCurrentProfile();
-      if (profile?.role !== "admin") { navigate("/account", { replace: true }); return; }
+      if (!isSignedIn) { navigate("/admin", { replace: true }); return; }
+      if (!isAdmin) { navigate("/account", { replace: true }); return; }
       await loadStats();
     }
     void checkAndLoad();
-  }, [navigate]);
+  }, [sessionStatus, isSignedIn, isAdmin, navigate]);
 
   async function loadStats() {
     if (!supabase) return;

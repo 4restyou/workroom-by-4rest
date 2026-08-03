@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/AdminPage";
 import { formatTimeRange, todayValue } from "../lib/format";
-import { getCurrentProfile } from "../lib/profiles";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, type TintColor } from "../lib/ui";
 import type { Reservation } from "../lib/types";
+import { confirmDialog } from "../lib/confirm";
+import { useSession } from "../lib/sessionContext";
 
 type AttendanceRow = {
   id: string;
@@ -51,6 +52,7 @@ function startMinute(value?: string | null) {
 }
 
 export default function AdminAttendance() {
+  const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
   const navigate = useNavigate();
   const [view, setView] = useState<View>("today");
   const [rows, setRows] = useState<AttendanceRow[]>([]);
@@ -89,21 +91,20 @@ export default function AdminAttendance() {
   }
 
   useEffect(() => {
+    // 세션·권한은 SessionProvider가 이미 읽어 뒀다(RequireAdmin도 같은 값을 본다).
+    if (sessionStatus !== "ready") return;
     let active = true;
     async function checkAndLoad() {
       if (!supabase) { setError("Supabase 환경 변수가 연결되지 않았습니다."); setIsLoading(false); return; }
-      const { data } = await supabase.auth.getSession();
+      if (!isSignedIn) { navigate("/admin", { replace: true }); return; }
+      if (!isAdmin) { navigate("/account", { replace: true }); return; }
       if (!active) return;
-      if (!data.session) { navigate("/admin", { replace: true }); return; }
-      const profile = await getCurrentProfile();
-      if (!active) return;
-      if (profile?.role !== "admin") { navigate("/account", { replace: true }); return; }
       await load();
     }
     void checkAndLoad();
     const timer = window.setInterval(() => void load(true), 30000);
     return () => { active = false; window.clearInterval(timer); };
-  }, [navigate]);
+  }, [sessionStatus, isSignedIn, isAdmin, navigate]);
 
   async function searchMembers(query: string) {
     if (!supabase) return;
@@ -128,7 +129,8 @@ export default function AdminAttendance() {
     if (!supabase || !couponTarget) return;
     const name = couponTarget.full_name || "회원";
     const label = couponLabel.trim() || "보상";
-    if (!window.confirm(`${name}님에게 '${label}' 쿠폰을 발급할까요?`)) return;
+    const ok = await confirmDialog({ title: `${name}님에게 '${label}' 쿠폰을 발급할까요?`, confirmLabel: "발급" });
+    if (!ok) return;
     setBusy("coupon");
     const { data, error: rpcError } = await supabase.rpc("admin_issue_coupon", { p_profile_id: couponTarget.id, p_label: couponLabel.trim() || null });
     const result = data as { ok?: boolean; message?: string; label?: string } | null;
@@ -144,7 +146,8 @@ export default function AdminAttendance() {
 
   async function addAttendance(profileId: string, reservationId: string | null, name: string) {
     if (!supabase) return;
-    if (!window.confirm(`${name}님에게 오늘 출근 도장을 찍어줄까요?`)) return;
+    const ok = await confirmDialog({ title: `${name}님에게 오늘 출근 도장을 찍어줄까요?`, confirmLabel: "도장 찍기" });
+    if (!ok) return;
     setBusy(reservationId ?? "manual");
     // 하루 1회 규칙·쿠폰 발급까지 자동 출근과 동일하게 처리하는 RPC 경유.
     const { data, error: rpcError } = await supabase.rpc("admin_attendance_stamp", { p_profile_id: profileId, p_reservation_id: reservationId });
@@ -170,7 +173,14 @@ export default function AdminAttendance() {
   }
 
   async function deleteAttendance(id: string) {
-    if (!supabase || !window.confirm("잘못 등록된 출석 기록을 삭제할까요?")) return;
+    if (!supabase) return;
+    const ok = await confirmDialog({
+      title: "출석 기록을 삭제할까요?",
+      description: "잘못 등록된 기록을 지웁니다. 되돌릴 수 없습니다.",
+      confirmLabel: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(id);
     const { error: deleteError } = await supabase.from("attendance").delete().eq("id", id);
     setBusy(null);
@@ -181,7 +191,8 @@ export default function AdminAttendance() {
   async function changeCoupon(coupon: CouponRow, nextStatus: "issued" | "used") {
     if (!supabase) return;
     const action = nextStatus === "used" ? "사용" : "사용 취소";
-    if (!window.confirm(`이 쿠폰을 ${action} 처리할까요?`)) return;
+    const ok = await confirmDialog({ title: `이 쿠폰을 ${action} 처리할까요?`, confirmLabel: action });
+    if (!ok) return;
     setBusy(coupon.id);
     const usedAt = nextStatus === "used" ? new Date().toISOString() : null;
     const { error: updateError } = await supabase.from("coupons").update({ status: nextStatus, used_at: usedAt }).eq("id", coupon.id);
