@@ -63,6 +63,15 @@ function isReservationStatus(value: string | null): value is ReservationStatus {
   return Boolean(value && statusOptions.includes(value as ReservationStatus));
 }
 
+// "YYYY-MM" 기준 월 이동.
+function shiftMonth(month: string, delta: number): string {
+  if (!month) return month;
+  const year = Number(month.slice(0, 4));
+  const index = Number(month.slice(5, 7)) - 1 + delta;
+  const date = new Date(year, index, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function addDaysStr(dateStr: string, days: number): string {
   if (!dateStr) return dateStr;
   const d = new Date(`${dateStr}T00:00:00`);
@@ -88,6 +97,8 @@ export default function AdminReservations() {
   const [passes, setPasses] = useState<Pass[]>([]);
   // 영업 요일(휴무가 아닌 요일). 월권·주간권 기본 이용 요일에서 휴무일을 제외한다.
   const [openWeekdays, setOpenWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  // 장기 이용 탭: 기본은 이번 달에 걸친 이용권만 본다("" = 전체 기간).
+  const [longTermMonth, setLongTermMonth] = useState(() => todayValue().slice(0, 7));
   const [showCreate, setShowCreate] = useState(false);
   const [dateFilter, setDateFilter] = useState(dateParam ?? (reservationParam || statusParam ? "" : todayValue()));
   const [query, setQuery] = useState("");
@@ -184,6 +195,13 @@ export default function AdminReservations() {
       .filter((reservation) => (archiveFilter === "archived" ? Boolean(reservation.deleted_at) : !reservation.deleted_at))
       .filter((reservation) => (dateFilter ? reservationCoversDate(reservation, dateFilter) : true))
       .filter((reservation) => (viewMode === "longterm" ? isLongTermReservation(reservation) : true))
+      .filter((reservation) => {
+        // 이용 기간이 선택한 달과 하루라도 겹치면 그 달의 이용자로 본다.
+        if (viewMode !== "longterm" || !longTermMonth) return true;
+        const start = reservation.access_start_date ?? reservation.date;
+        const end = reservation.access_end_date ?? reservation.date;
+        return start.slice(0, 7) <= longTermMonth && end.slice(0, 7) >= longTermMonth;
+      })
       .filter((reservation) => (viewMode === "today" ? reservation.status !== "canceled" && reservation.status !== "no_show" : true))
       .filter((reservation) => {
         // 예정: 오늘 이후 진행 예정(대기·확정) / 지난: 오늘보다 이전에 끝난 예약
@@ -201,7 +219,7 @@ export default function AdminReservations() {
         const phoneMatch = qDigits.length > 0 && reservation.phone.replace(/\D/g, "").includes(qDigits);
         return nameMatch || phoneMatch;
       });
-  }, [archiveFilter, dateFilter, query, reservations, viewMode]);
+  }, [archiveFilter, dateFilter, longTermMonth, query, reservations, viewMode]);
 
   const statusCounts = useMemo(() => {
     const counts = Object.fromEntries(statusOptions.map((status) => [status, 0])) as Record<ReservationStatus, number>;
@@ -560,13 +578,61 @@ export default function AdminReservations() {
               { value: "today", label: "오늘 운영", count: reservations.filter((item) => !item.deleted_at && reservationCoversDate(item, todayValue()) && item.status !== "canceled" && item.status !== "no_show").length },
               { value: "upcoming", label: "예정", count: reservations.filter((item) => !item.deleted_at && (item.access_end_date ?? item.date) >= todayValue() && (item.status === "pending" || item.status === "confirmed")).length },
               { value: "pending", label: "확인 대기", count: pendingCount },
-              { value: "longterm", label: "장기 이용", count: reservations.filter((item) => !item.deleted_at && item.status === "confirmed" && isLongTermReservation(item)).length },
+              {
+                value: "longterm",
+                label: "장기 이용",
+                // 뱃지도 현재 보고 있는 달 기준으로 맞춘다(목록과 숫자가 어긋나지 않도록).
+                count: reservations.filter((item) => {
+                  if (item.deleted_at || item.status !== "confirmed" || !isLongTermReservation(item)) return false;
+                  if (!longTermMonth) return true;
+                  const start = item.access_start_date ?? item.date;
+                  const end = item.access_end_date ?? item.date;
+                  return start.slice(0, 7) <= longTermMonth && end.slice(0, 7) >= longTermMonth;
+                }).length,
+              },
               { value: "past", label: "지난 예약" },
               { value: "all", label: "전체" },
             ]}
             onChange={changeView}
             value={viewMode}
           />
+          {/* 장기 이용은 기간 이용권이라 전부 나열하면 지난 회원까지 쌓인다.
+              기본은 이번 달에 걸친 이용자만 보고, 달 이동·전체 보기를 제공한다. */}
+          {viewMode === "longterm" ? (
+            <div className="flex flex-wrap items-center gap-1.5 py-3">
+              <button
+                aria-label="이전 달"
+                className={buttonClass("secondary", "sm", "px-3")}
+                disabled={!longTermMonth}
+                onClick={() => setLongTermMonth((current) => shiftMonth(current, -1))}
+                type="button"
+              >
+                ‹
+              </button>
+              <div className="grid h-[38px] min-w-[120px] place-items-center rounded-[6px] border border-workroom-ink bg-white px-3 text-sm font-bold tabular-nums">
+                {longTermMonth ? `${longTermMonth.slice(0, 4)}년 ${Number(longTermMonth.slice(5, 7))}월` : "전체 기간"}
+              </div>
+              <button
+                aria-label="다음 달"
+                className={buttonClass("secondary", "sm", "px-3")}
+                disabled={!longTermMonth}
+                onClick={() => setLongTermMonth((current) => shiftMonth(current, 1))}
+                type="button"
+              >
+                ›
+              </button>
+              <button className={buttonClass("secondary", "sm")} onClick={() => setLongTermMonth(todayValue().slice(0, 7))} type="button">
+                이번 달
+              </button>
+              <button
+                className={buttonClass(longTermMonth ? "secondary" : "accent", "sm")}
+                onClick={() => setLongTermMonth((current) => (current ? "" : todayValue().slice(0, 7)))}
+                type="button"
+              >
+                {longTermMonth ? "전체 보기" : "전체 기간 보는 중"}
+              </button>
+            </div>
+          ) : null}
           <div className="grid gap-2 py-3 sm:grid-cols-[1fr_170px_auto_auto] sm:items-end">
             <label className="grid gap-1 text-xs font-semibold text-workroom-muted">이름·전화 검색<input placeholder="이름 또는 전화번호" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
             <label className="grid gap-1 text-xs font-semibold text-workroom-muted">이용일<input type="date" value={dateFilter} onChange={(event) => { setDateFilter(event.target.value); setViewMode(event.target.value === todayValue() ? "today" : "all"); }} /></label>
