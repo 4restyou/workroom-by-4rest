@@ -45,7 +45,7 @@ export default function Footer() {
         <div className="mt-8 border-t border-workroom-line pt-5">
           <p className="text-xs font-medium leading-6 text-workroom-muted">
             {SITE.name}
-            {SITE.business.representative ? ` · 대표 ${SITE.business.representative}` : ""}
+            {SITE.business.representative ? ` · 대표: ${SITE.business.representative}` : ""}
             {" · "}사업자등록번호 {SITE.business.registrationNumber}
             {" · "}통신판매업신고 {SITE.business.mailOrderNumber}
           </p>

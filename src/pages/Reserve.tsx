@@ -42,7 +42,7 @@ function startOfMonth(date: Date) {
 }
 
 type PassOption = Pass & {
-  group: "시간권" | "종일권" | "주간 / 월권" | "문의";
+  group: "시간권" | "종일권" | "주간 / 월권" | "단체·기타";
 };
 
 type SubmittedReservation = {
@@ -56,14 +56,6 @@ type SubmittedReservation = {
   phone: string;
   price: number | null;
   paymentPreference: "online" | "onsite";
-};
-
-const customInquiryPass: PassOption = {
-  id: "custom-inquiry",
-  name: "기타 문의",
-  description: "촬영, 모임, 장기 이용 상담",
-  price: 0,
-  group: "문의",
 };
 
 export default function Reserve() {
@@ -856,6 +848,9 @@ export default function Reserve() {
                 </div>
               </fieldset>
               )}
+              <p className="text-xs font-medium leading-5 text-workroom-muted">
+                촬영·단체·장기 이용 등 상담이 필요하면 <a className="font-bold underline underline-offset-4" href={`tel:${SITE.phone}`}>{SITE.phone}</a>로 문의해 주세요.
+              </p>
               <Field label="요청사항 (선택)">
                 <textarea
                   placeholder="방문 목적, 필요한 장비, 궁금한 점 (선택 입력)"
@@ -1065,15 +1060,14 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function groupPasses(passes: Pass[]) {
-  const passOptions: PassOption[] = [
-    ...passes.map((pass) => ({
-      ...pass,
-      group: getPassGroup(pass.name),
-    })),
-    customInquiryPass,
-  ];
+  // 0원 항목은 결제 심사에서 허용되지 않고 예약 흐름에도 맞지 않는다.
+  // 촬영·모임·장기 이용 상담은 전화·문자 문의로 안내한다.
+  const passOptions: PassOption[] = passes.map((pass) => ({
+    ...pass,
+    group: getPassGroup(pass.name),
+  }));
 
-  return (["시간권", "종일권", "주간 / 월권", "문의"] as const)
+  return (["시간권", "종일권", "주간 / 월권", "단체·기타"] as const)
     .map((name) => ({
       name,
       items: passOptions.filter((pass) => pass.group === name),
@@ -1085,7 +1079,7 @@ function getPassGroup(passName: string): PassOption["group"] {
   if (passName.includes("시간")) return "시간권";
   if (passName.includes("종일")) return "종일권";
   if (passName.includes("주간") || passName.includes("월권")) return "주간 / 월권";
-  return "문의";
+  return "단체·기타";
 }
 
 

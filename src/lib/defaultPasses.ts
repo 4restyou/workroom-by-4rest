@@ -39,7 +39,7 @@ export const defaultPasses: Pass[] = [
   },
   {
     id: "default-group-inquiry",
-    name: "단체 및 모임 문의",
+    name: "단체·모임 이용권",
     description: "현재는 일요일만 가능합니다. 09:00~22:00, 주류 및 음식 반입은 불가하며 음료와 간단한 핑거푸드는 가능합니다.",
     price: 300000,
   },
