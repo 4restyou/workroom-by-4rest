@@ -8,6 +8,8 @@ import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, statusLabel, todayValue } from "../lib/format";
 import { refundReservationPayment } from "../lib/portone";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
+import { ALL_WEEKDAYS, openWeekdaysFromRows } from "../lib/businessHours";
+import { PASS_COLUMNS } from "../lib/columns";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
@@ -48,7 +50,7 @@ export default function AdminReservations() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
   // 영업 요일(휴무가 아닌 요일). 월권·주간권 기본 이용 요일에서 휴무일을 제외한다.
-  const [openWeekdays, setOpenWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [openWeekdays, setOpenWeekdays] = useState<number[]>(ALL_WEEKDAYS);
   // 장기 이용 탭: 기본은 이번 달에 걸친 이용권만 본다("" = 전체 기간).
   const [longTermMonth, setLongTermMonth] = useState(() => todayValue().slice(0, 7));
   const [showCreate, setShowCreate] = useState(false);
@@ -100,8 +102,11 @@ export default function AdminReservations() {
     setError("");
 
     const [{ data, error: loadError }, { data: passRows }, { data: hourRows }] = await Promise.all([
+      // 이 화면은 목록과 상세 편집이 같은 배열을 쓴다. 상세 카드가 관리자 메모·
+      // 결제수단·요청사항까지 편집하므로 여기서는 전체 컬럼이 필요하다.
+      // (목록만 쓰는 화면은 lib/columns의 좁은 목록을 사용한다.)
       supabase.from("reservations").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
-      supabase.from("passes").select("id,name,description,price,seat_type_id,is_active,sort_order").eq("is_active", true).order("sort_order"),
+      supabase.from("passes").select(PASS_COLUMNS).eq("is_active", true).order("sort_order"),
       supabase.from("business_hours").select("weekday,is_closed"),
     ]);
 
@@ -115,9 +120,7 @@ export default function AdminReservations() {
     setReservations(data ?? []);
     setPasses((passRows ?? []) as Pass[]);
     if (hourRows?.length) {
-      const closed = new Set((hourRows as { weekday: number; is_closed: boolean }[]).filter((h) => h.is_closed).map((h) => h.weekday));
-      const open = [0, 1, 2, 3, 4, 5, 6].filter((d) => !closed.has(d));
-      setOpenWeekdays(open.length ? open : [0, 1, 2, 3, 4, 5, 6]);
+      setOpenWeekdays(openWeekdaysFromRows(hourRows as { weekday: number; is_closed: boolean }[]));
     }
   }
 

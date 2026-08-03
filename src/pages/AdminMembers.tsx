@@ -6,6 +6,7 @@ import { downloadCsv } from "../lib/csv";
 import { formatDate, formatTimeRange, todayValue } from "../lib/format";
 import { kstDateTime, kstTime } from "../lib/datetime";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
+import { ATTENDANCE_COLUMNS, COUPON_COLUMNS, PROFILE_LIST_COLUMNS, RESERVATION_LIST_COLUMNS } from "../lib/columns";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
@@ -50,15 +51,15 @@ export default function AdminMembers() {
     const [memberResult, reservationResult, attendanceResult, couponResult] = await Promise.all([
       // 화면에서 쓰는 컬럼만 받는다. select("*")는 주소·메모 등 큰 텍스트까지
       // 끌고 와 전송량과 JSON 파싱 비용을 키운다.
-      supabase.from("profiles").select("id,full_name,email,phone,address,admin_note,created_at,role").eq("role", "user").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("profiles").select(PROFILE_LIST_COLUMNS).eq("role", "user").order("created_at", { ascending: false }).limit(1000),
       supabase
         .from("reservations")
-        .select("id,profile_id,name,date,start_time,end_time,status,payment_status,price_at_booking,pass_type,pass_name_snapshot,access_start_date,access_end_date,access_weekdays,access_paused_from,access_paused_until")
+        .select(RESERVATION_LIST_COLUMNS)
         .is("deleted_at", null)
         .order("date", { ascending: false })
         .limit(2000),
-      supabase.from("attendance").select("id,profile_id,check_in_at,check_out_at").order("check_in_at", { ascending: false }).limit(1500),
-      supabase.from("coupons").select("id,profile_id,code,label,status,issued_at,used_at").order("issued_at", { ascending: false }).limit(1000),
+      supabase.from("attendance").select(ATTENDANCE_COLUMNS).order("check_in_at", { ascending: false }).limit(1500),
+      supabase.from("coupons").select(COUPON_COLUMNS).order("issued_at", { ascending: false }).limit(1000),
     ]);
     setIsLoading(false);
     const loadError = memberResult.error || reservationResult.error || attendanceResult.error || couponResult.error;

@@ -21,6 +21,8 @@ import { canPayOnline, canSubscribe, payReservation, subscribeMonthly } from "..
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { addDaysStr, isLongTermPassName, passPeriodWeeks, readableReservationError } from "../lib/reservations";
+import { hoursForDate, openWeekdaysFrom } from "../lib/businessHours";
+import { PASS_COLUMNS, RESERVATION_AVAILABILITY_COLUMNS } from "../lib/columns";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
 import type { BusinessDateException, BusinessHour, Pass, Profile, Reservation, ReservationInsert } from "../lib/types";
@@ -98,7 +100,7 @@ export default function Reserve() {
       if (!hasSupabaseConfig || !supabase) return;
       const { data, error: passError } = await supabase
         .from("passes")
-        .select("id,name,description,price,seat_type_id,is_active,sort_order")
+        .select(PASS_COLUMNS)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
@@ -166,12 +168,11 @@ export default function Reserve() {
     void loadOperatingInfo();
   }, []);
 
-  const selectedHours = useMemo(() => {
-    if (!form.date) return undefined;
-    if (dateExceptions[form.date]) return dateExceptions[form.date];
-    const weekday = new Date(`${form.date}T00:00:00`).getDay();
-    return hoursByWeekday[weekday];
-  }, [dateExceptions, form.date, hoursByWeekday]);
+  // 날짜 예외(임시 휴무·단축 운영)가 요일 설정을 덮어쓴다 — 판정은 lib/businessHours에 있다.
+  const selectedHours = useMemo(
+    () => hoursForDate(form.date, hoursByWeekday, dateExceptions),
+    [dateExceptions, form.date, hoursByWeekday],
+  );
   const selectedDateException = form.date ? dateExceptions[form.date] : undefined;
 
   const openHHMM = selectedHours?.open_time.slice(0, 5);
@@ -179,10 +180,7 @@ export default function Reserve() {
   // 자정을 넘겨 마감하는 날(예: 08:00–다음 날 01:00)은 종료가 시작보다 이른
   // 표기(01:00 < 08:00)가 정상이다. 단순 비교 검증은 이 경우를 건너뛴다.
   // 휴무 요일을 뺀 영업 요일 — 장기 이용권의 이용 가능 요일 기본값.
-  const openWeekdays = useMemo(() => {
-    const open = [0, 1, 2, 3, 4, 5, 6].filter((day) => !hoursByWeekday[day]?.is_closed);
-    return open.length ? open : [0, 1, 2, 3, 4, 5, 6];
-  }, [hoursByWeekday]);
+  const openWeekdays = useMemo(() => openWeekdaysFrom(hoursByWeekday), [hoursByWeekday]);
   const isOvernightWindow = Boolean(openHHMM && closeHHMM && closeHHMM <= openHHMM);
   const isClosedDay = selectedHours?.is_closed ?? false;
   const selectedDuration = passDurationHours(form.pass_type);
@@ -250,7 +248,7 @@ export default function Reserve() {
 
       const { data } = await supabase
         .from("reservations")
-        .select("date,start_time,end_time,people,status")
+        .select(RESERVATION_AVAILABILITY_COLUMNS)
         .eq("seat_type_id", selectedSeatTypeId)
         .in("status", ["pending", "confirmed"])
         .gte("date", monthStart)
