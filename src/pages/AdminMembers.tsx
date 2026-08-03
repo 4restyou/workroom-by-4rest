@@ -119,7 +119,8 @@ export default function AdminMembers() {
               {visibleMembers.map((member) => {
                 const memberReservations = reservations.filter((item) => item.profile_id === member.id);
                 const activePass = memberReservations.find((item) => item.status === "confirmed" && isLongTermReservation(item) && reservationCoversDate(item, todayValue()));
-                const next = memberReservations.filter((item) => item.status === "confirmed" && item.date >= todayValue()).sort((a, b) => a.date.localeCompare(b.date))[0];
+                // 목록에서도 장기 이용권은 '다음 예약'으로 중복 표시하지 않는다.
+                const next = memberReservations.filter((item) => item.status === "confirmed" && item.date >= todayValue() && !isLongTermReservation(item)).sort((a, b) => a.date.localeCompare(b.date))[0];
                 return <button className={`admin-row block w-full border-l-[4px] px-4 py-3 text-left ${member.id === selectedId ? "border-l-workroom-yellow bg-workroom-background" : "border-l-transparent bg-white hover:bg-workroom-background"}`} key={member.id} onClick={() => { setSelectedId(member.id); setMobileDetailOpen(true); }} type="button"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{member.full_name || "이름 미입력"}</p><p className="mt-0.5 truncate text-xs text-workroom-muted">{member.phone || member.email}</p></div>{activePass ? <span className={badge("yellow")}>이용권 사용 중</span> : null}</div><p className="mt-2 truncate text-xs font-medium text-workroom-muted">{activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · ${formatDate(activePass.access_end_date || activePass.date)}까지` : next ? `다음 예약 ${formatDate(next.date)}` : "예정된 예약 없음"}</p></button>;
               })}
               {!visibleMembers.length ? <AdminEmpty>조건에 맞는 회원이 없습니다.</AdminEmpty> : null}
@@ -139,13 +140,36 @@ function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }:
   useEffect(() => setNote(member.admin_note ?? ""), [member]);
   const today = todayValue();
   const activePass = reservations.find((item) => item.status === "confirmed" && isLongTermReservation(item) && reservationCoversDate(item, today));
-  const nextReservation = reservations.filter((item) => item.status === "confirmed" && item.date >= today).sort((a, b) => `${a.date}${a.start_time ?? ""}`.localeCompare(`${b.date}${b.start_time ?? ""}`))[0];
+  // 장기 이용권은 '현재 이용권'에서 기간으로 보여주므로 다음 예약에서는 제외한다.
+  // (같은 예약이 단건 예약처럼 한 번 더 보여 오해를 만들었다)
+  const nextReservation = reservations
+    .filter((item) => item.status === "confirmed" && item.date >= today && !isLongTermReservation(item))
+    .sort((a, b) => `${a.date}${a.start_time ?? ""}`.localeCompare(`${b.date}${b.start_time ?? ""}`))[0];
+
+  // 장기 이용권은 남은 기간과 이용 요일이 실제로 필요한 정보다.
+  const passPeriod = activePass
+    ? `${formatDate(activePass.access_start_date ?? activePass.date)} ~ ${formatDate(activePass.access_end_date ?? activePass.date)}`
+    : "";
+  const passDaysLeft = activePass
+    ? Math.max(0, Math.round((new Date(`${activePass.access_end_date ?? activePass.date}T00:00:00+09:00`).getTime() - new Date(`${today}T00:00:00+09:00`).getTime()) / 86400000) + 1)
+    : 0;
+  const passWeekdays = activePass?.access_weekdays?.length && activePass.access_weekdays.length < 7
+    ? activePass.access_weekdays.map((day) => ["일", "월", "화", "수", "목", "금", "토"][day]).join("·")
+    : "";
   const paidAmount = reservations.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + (item.price_at_booking ?? 0), 0);
   const activeCoupons = coupons.filter((item) => item.status === "issued");
 
   return <article className="border border-workroom-line bg-white p-4 sm:p-5">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-workroom-line pb-4"><div><h2 className="text-2xl font-bold">{member.full_name || "이름 미입력"}</h2><div className="mt-2 flex flex-wrap gap-2">{member.phone ? <a className={buttonClass("secondary", "sm")} href={`tel:${member.phone}`}>전화</a> : null}<a className={buttonClass("secondary", "sm")} href={`mailto:${member.email}`}>이메일</a></div></div><p className="text-xs font-medium text-workroom-muted">가입 {formatDate(member.created_at.slice(0, 10))}</p></header>
-    <div className="grid border-b border-workroom-line sm:grid-cols-2"><InfoCell label="현재 이용권" value={activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · ${formatDate(activePass.access_end_date || activePass.date)}까지` : "사용 중인 이용권 없음"} /><InfoCell label="다음 예약" value={nextReservation ? `${formatDate(nextReservation.date)} · ${formatTimeRange(nextReservation.start_time, nextReservation.end_time)}` : "예정 없음"} /></div>
+    <div className="grid border-b border-workroom-line sm:grid-cols-2"><InfoCell
+        label="현재 이용권"
+        value={activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · 남은 ${passDaysLeft}일` : "사용 중인 이용권 없음"}
+        hint={activePass ? `${passPeriod}${passWeekdays ? ` · ${passWeekdays}요일` : ""} · 매일 ${formatTimeRange(activePass.start_time, activePass.end_time)} 이용` : undefined}
+      /><InfoCell
+        label="다음 단건 예약"
+        value={nextReservation ? `${formatDate(nextReservation.date)} · ${formatTimeRange(nextReservation.start_time, nextReservation.end_time)}` : activePass ? "이용권으로 이용 중" : "예정 없음"}
+        hint={nextReservation ? nextReservation.pass_name_snapshot || nextReservation.pass_type : undefined}
+      /></div>
     <div className="grid grid-cols-2 border-b border-workroom-line sm:grid-cols-4"><SmallStat label="예약" value={`${reservations.length}건`} /><SmallStat label="방문" value={`${attendance.length}회`} /><SmallStat label="결제" value={`${paidAmount.toLocaleString("ko-KR")}원`} /><SmallStat label="쿠폰" value={`${activeCoupons.length}장`} /></div>
     {member.address ? <p className="border-b border-workroom-line py-3 text-sm font-medium text-workroom-muted">{member.address}</p> : null}
     <label className="mt-4 grid gap-1.5 text-sm font-semibold">관리자 메모<textarea placeholder="응대에 필요한 내용만 기록하세요." rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className={`${buttonClass("primary", "sm")} mt-2`} disabled={note === (member.admin_note ?? "")} onClick={() => onSaveNote(note)} type="button">메모 저장</button>
@@ -154,7 +178,7 @@ function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }:
   </article>;
 }
 
-function InfoCell({ label, value }: { label: string; value: string }) { return <div className="border-b border-workroom-line px-3 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></div>; }
+function InfoCell({ label, value, hint }: { label: string; value: string; hint?: string }) { return <div className="border-b border-workroom-line px-3 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p>{hint ? <p className="mt-0.5 text-xs font-medium text-workroom-muted">{hint}</p> : null}</div>; }
 function SmallStat({ label, value }: { label: string; value: string }) { return <div className="border-b border-r border-workroom-line px-3 py-3 even:border-r-0 sm:border-b-0 sm:even:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-base font-bold tabular-nums">{value}</p></div>; }
 function dateTimeLabel(value: string) { return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
 function timeLabel(value: string) { return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
