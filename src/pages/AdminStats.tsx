@@ -5,6 +5,7 @@ import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { buttonClass } from "../lib/ui";
 import type { Pass, PaymentStatus, Reservation, ReservationStatus } from "../lib/types";
 
@@ -46,6 +47,7 @@ export default function AdminStats() {
   const [isLoading, setIsLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  useFeedbackToast(undefined, error);
 
   useEffect(() => {
     async function checkAndLoad() {

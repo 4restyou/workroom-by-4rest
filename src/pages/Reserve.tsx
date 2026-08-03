@@ -19,6 +19,7 @@ import { maxBookingDateValue,
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, canSubscribe, payReservation, subscribeMonthly } from "../lib/portone";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { addDaysStr, isLongTermPassName, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
@@ -68,6 +69,7 @@ export default function Reserve() {
   const [paymentMessage, setPaymentMessage] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [error, setError] = useState("");
+  useFeedbackToast(undefined, error);
   const [success, setSuccess] = useState(false);
   const [submittedReservation, setSubmittedReservation] = useState<SubmittedReservation | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});

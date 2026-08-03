@@ -5,6 +5,7 @@ import BottomTabBar from "./components/BottomTabBar";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import PageLoading from "./components/PageLoading";
+import Toaster from "./components/Toaster";
 import { getCurrentProfile } from "./lib/profiles";
 import { supabase } from "./lib/supabase";
 import type { Profile } from "./lib/types";
@@ -95,6 +96,7 @@ export default function App() {
         </Suspense>
       </div>
       {!isAdminRoute ? <Footer /> : null}
+      <Toaster />
       {showTabBar ? <BottomTabBar /> : null}
       <BackToTop />
     </div>

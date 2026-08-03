@@ -10,6 +10,7 @@ import { readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Attendance, BusinessDateException, BusinessHour, Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
 
@@ -85,6 +86,7 @@ export default function Account() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  useFeedbackToast(success, error);
 
   // 프로필 미완성으로 중단된 흐름이 있으면(예: 예약) 버튼 문구로 알려 준다.
   const pendingNext = searchParams.get("next");

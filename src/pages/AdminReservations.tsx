@@ -8,6 +8,7 @@ import { getCurrentProfile } from "../lib/profiles";
 import { refundReservationPayment } from "../lib/portone";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import type {
   PaymentStatus,
@@ -103,6 +104,7 @@ export default function AdminReservations() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  useFeedbackToast(success, error);
 
   useEffect(() => {
     async function checkSessionAndLoad() {

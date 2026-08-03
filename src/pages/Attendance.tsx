@@ -5,6 +5,7 @@ import Skeleton from "../components/Skeleton";
 import StampCard from "../components/StampCard";
 import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Attendance, Coupon } from "../lib/types";
 
@@ -37,6 +38,7 @@ export default function Attendance() {
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useFeedbackToast(undefined, error);
 
   async function load() {
     if (!supabase) {

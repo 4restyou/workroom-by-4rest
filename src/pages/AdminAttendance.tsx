@@ -5,6 +5,7 @@ import { formatTimeRange, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, type TintColor } from "../lib/ui";
 import type { Reservation } from "../lib/types";
 
@@ -58,6 +59,7 @@ export default function AdminAttendance() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  useFeedbackToast(success, error);
   const [busy, setBusy] = useState<string | null>(null);
   const [manualQuery, setManualQuery] = useState("");
   const [manualResults, setManualResults] = useState<MemberOption[]>([]);

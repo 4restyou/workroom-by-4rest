@@ -7,6 +7,7 @@ import { todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import type { BusinessDateException, BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
 
 const settingKeys = [
@@ -66,6 +67,7 @@ export default function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  useFeedbackToast(success, error);
   const [tab, setTab] = useState<SettingsTab>("operation");
   const [savedSnapshot, setSavedSnapshot] = useState("");
 

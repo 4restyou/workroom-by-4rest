@@ -7,6 +7,7 @@ import { formatDate, formatTimeRange, todayValue } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
+import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { badge, buttonClass } from "../lib/ui";
 import type { Attendance, Coupon, Profile, Reservation } from "../lib/types";
@@ -27,6 +28,7 @@ export default function AdminMembers() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  useFeedbackToast(success, error);
 
   useEffect(() => {
     async function checkAndLoad() {
