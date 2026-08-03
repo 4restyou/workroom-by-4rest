@@ -2,39 +2,26 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
+import { kstDate, kstDayLabel, kstToday as kstTodayShared, kstLongDateTime, toKstInputValue, fromKstInputValue } from "../lib/datetime";
 import { badge, buttonClass, card, pressable, tintCard } from "../lib/ui";
 import { CheckIcon } from "./icons";
 import type { Reservation } from "../lib/types";
 
-function kstToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
-}
+const kstToday = kstTodayShared;
 
 function formatResDate(date: string): string {
   // date is a plain YYYY-MM-DD; render in KST with weekday.
-  const d = new Date(`${date}T00:00:00+09:00`);
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", weekday: "short" }).format(d);
+  return kstDayLabel(new Date(`${date}T00:00:00+09:00`));
 }
 
 function hhmm(time: string | null): string {
   return time ? time.slice(0, 5) : "";
 }
 
-function kstDateOf(value: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
-}
-function formatStamp(value: string): string {
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-// datetime-local(KST) 문자열 변환.
-function toKstInput(value: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
-  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-}
-function fromKstInput(value: string): string {
-  return new Date(`${value}:00+09:00`).toISOString();
-}
+const kstDateOf = kstDate;
+const formatStamp = kstLongDateTime;
+const toKstInput = toKstInputValue;
+const fromKstInput = fromKstInputValue;
 
 const statusLabel: Record<string, string> = {
   pending: "확정 대기",
@@ -196,11 +183,10 @@ export default function MemberDashboard() {
         if (!active) return;
         const setMap = Object.fromEntries(((sets ?? []) as { key: string; value: string }[]).map((s) => [s.key, s.value]));
         const goal = Number(setMap.attendance_stamp_goal) || 10;
-        const kst = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(v));
+        const kst = kstDate;
         const total = new Set((att ?? []).map((r: { check_in_at: string }) => kst(r.check_in_at))).size;
         const todayRows = (att ?? []).filter(
-          (r: { check_in_at: string; check_out_at: string | null }) =>
-            new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(r.check_in_at)) === today,
+          (r: { check_in_at: string; check_out_at: string | null }) => kstDate(r.check_in_at) === today,
         );
         const checkedInToday = todayRows.length > 0;
         const openNow = todayRows.some((r: { check_out_at: string | null }) => r.check_out_at === null);

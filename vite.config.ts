@@ -34,7 +34,9 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg}"],
         // The xlsx export chunk (~430KB) is admin-only and lazy-loaded on click,
         // so keep it out of the install-time precache; it's runtime-cached below.
-        globIgnores: ["**/woff2-dynamic-subset/**", "**/xlsx-*.js"],
+        // 장식용 고양이 SVG 3장은 합쳐 580KB(gzip 110KB)로 정적 자산 중 가장 크다.
+        // 설치 시 선다운로드할 이유가 없어 제외하고, 아래 런타임 캐시로 처리한다.
+        globIgnores: ["**/woff2-dynamic-subset/**", "**/xlsx-*.js", "**/cat[123]-*.svg"],
         navigateFallback: "/index.html",
         // Don't let the SW intercept Supabase/auth/API or admin deep links.
         navigateFallbackDenylist: [/^\/admin/, /\/auth\//, /supabase/],
@@ -47,6 +49,15 @@ export default defineConfig({
             options: {
               cacheName: "workroom-assets",
               expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            // 첫 방문에 필요하지 않은 큰 일러스트: 처음 요청될 때만 받아 캐시한다.
+            urlPattern: ({ url }) => /\/assets\/cat[123]-.*\.svg$/.test(url.pathname),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "workroom-illustrations",
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {

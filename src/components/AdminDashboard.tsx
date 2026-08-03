@@ -4,6 +4,7 @@ import AdminPage, { AdminEmpty } from "./AdminPage";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
+import { kstDate as kstDateShared } from "../lib/datetime";
 import { badge, buttonClass } from "../lib/ui";
 import type { Reservation } from "../lib/types";
 
@@ -46,9 +47,7 @@ function nowMinutes() {
   return value("hour") * 60 + value("minute");
 }
 
-function kstDate(value: string) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
-}
+const kstDate = kstDateShared;
 
 function visitState(reservation: Reservation, attendance?: AttendanceRow) {
   if (reservation.status === "pending") return { label: "확인 대기", tone: "yellow" as const };

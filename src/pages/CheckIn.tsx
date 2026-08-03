@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import { signInWithGoogle } from "../lib/profiles";
 import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
+import { kstDate as kstDateShared, kstLongDateTime, toKstInputValue, fromKstInputValue } from "../lib/datetime";
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { CheckInResult } from "../lib/types";
 
@@ -16,21 +17,10 @@ function memberWording(message: string): string {
   return message.replace(/입실/g, "출근").replace(/퇴실/g, "퇴근");
 }
 
-function kstDate(value: string | Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
-}
-function formatStamp(value: string): string {
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-// datetime-local(KST) 문자열 변환.
-function toKstInput(value: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
-  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-}
-function fromKstInput(value: string): string {
-  return new Date(`${value}:00+09:00`).toISOString();
-}
+const kstDate = kstDateShared;
+const formatStamp = kstLongDateTime;
+const toKstInput = toKstInputValue;
+const fromKstInput = fromKstInputValue;
 
 export default function CheckIn() {
   const [params] = useSearchParams();

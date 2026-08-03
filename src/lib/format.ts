@@ -8,8 +8,12 @@ export const statusLabel: Record<ReservationStatus, string> = {
   no_show: "노쇼",
 };
 
+// Intl 포매터 생성은 포맷 호출보다 50배가량 비싸다. 목록의 모든 행에서 불리므로
+// 인스턴스를 만들어 재사용한다(로케일·옵션이 고정이라 안전하다).
+const priceFormatter = new Intl.NumberFormat("ko-KR");
+
 export function formatPrice(price: number) {
-  return `${new Intl.NumberFormat("ko-KR").format(price)}원`;
+  return `${priceFormatter.format(price)}원`;
 }
 
 // Auto-insert hyphens as a Korean phone number is typed (e.g. 010-0000-0000).
@@ -21,13 +25,15 @@ export function formatPhone(value: string) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
 }
 
+const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+
 export function formatDate(value: string) {
   if (!value) return "";
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date(`${value}T00:00:00`));
+  return dateFormatter.format(new Date(`${value}T00:00:00`));
 }
 
 export function formatTimeRange(start?: string | null, end?: string | null) {

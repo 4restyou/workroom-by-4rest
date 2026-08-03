@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/AdminPage";
 import { formatTimeRange, todayValue } from "../lib/format";
+import { kstDate as kstDateShared, kstDateTime, kstTime } from "../lib/datetime";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
@@ -30,17 +31,12 @@ type CouponRow = {
 };
 type View = "today" | "history" | "coupons";
 
-function kstDate(value: string | Date) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
-}
-function dateTime(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-function timeOnly(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
+const minutePartsFmt = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const kstDate = kstDateShared;
+const dateTime = kstDateTime;
+const timeOnly = kstTime;
 function currentMinute() {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const parts = minutePartsFmt.formatToParts(new Date());
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
   return hour * 60 + minute;

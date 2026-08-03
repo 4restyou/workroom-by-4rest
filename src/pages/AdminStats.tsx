@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback } from "../components/AdminPage";
 import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, statusLabel } from "../lib/format";
+import { kstDate, kstHour, kstWeekdayIndex } from "../lib/datetime";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { buttonClass } from "../lib/ui";
@@ -449,7 +450,7 @@ function periodKey(dateValue: string, period: Period) {
   return dateValue.slice(5);
 }
 function getWeekNumber(date: Date) { const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())); const day = target.getUTCDay() || 7; target.setUTCDate(target.getUTCDate() + 4 - day); const start = new Date(Date.UTC(target.getUTCFullYear(), 0, 1)); return Math.ceil(((target.getTime() - start.getTime()) / 86400000 + 1) / 7); }
-function kstDateStr(value: string) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value)); }
-function kstHour(value: string) { return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).format(new Date(value))); }
-function kstWeekdayIndex(value: string) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", weekday: "short" }).format(new Date(value))); }
+const kstDateStr = kstDate;
+
+
 function formatMinutes(min: number) { const h = Math.floor(min / 60); const m = Math.round(min % 60); return h ? `${h}시간${m ? ` ${m}분` : ""}` : `${m}분`; }

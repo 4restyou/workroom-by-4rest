@@ -93,13 +93,16 @@ export function formatCompactPeriod(start: string, end: string) {
   return `${formatCompactDate(start)}–${formatCompactDate(end)}`;
 }
 
+// 이력 목록의 모든 행에서 호출된다 — 포매터는 한 번만 만든다.
+const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  month: "long",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 export function formatAuditTime(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return auditTimeFormatter.format(new Date(value));
 }
 
 // ── 예약 충돌 ─────────────────────────────────────────────────────────

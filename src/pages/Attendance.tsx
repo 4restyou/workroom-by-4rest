@@ -5,13 +5,12 @@ import Skeleton from "../components/Skeleton";
 import StampCard from "../components/StampCard";
 import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
+import { kstDate as kstDateShared } from "../lib/datetime";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Attendance, Coupon } from "../lib/types";
 
-function kstDate(value: string | Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(value));
-}
+const kstDate = kstDateShared;
 
 function formatStamp(value: string): string {
   return new Intl.DateTimeFormat("ko-KR", {

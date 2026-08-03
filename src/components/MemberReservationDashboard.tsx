@@ -13,6 +13,7 @@ type Props = {
   reservations: Reservation[];
 };
 
+const kstDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" });
 export default function MemberReservationDashboard({ attendance, businessHours, dateExceptions, now, reservations }: Props) {
   const today = kstDate(new Date(now));
   const activeReservations = reservations.filter((item) => !item.deleted_at && (item.status === "pending" || item.status === "confirmed"));
@@ -236,7 +237,7 @@ function formatRemaining(milliseconds: number) {
 }
 
 function kstDate(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(value);
+  return kstDayFmt.format(value);
 }
 
 function weekday(value: string) {
