@@ -17,7 +17,7 @@ import { maxBookingDateValue,
   todayValue,
 } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
-import { canPayOnline, payReservation } from "../lib/portone";
+import { canPayOnline, canSubscribe, payReservation, subscribeMonthly } from "../lib/portone";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { addDaysStr, isLongTermPassName, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { SITE } from "../lib/site";
@@ -535,6 +535,28 @@ export default function Reserve() {
     setStep(1);
   }
 
+  // 월권 정기결제(배치) 등록 — 예약 직후 바로 카드 등록 창을 띄운다.
+  async function subscribeSubmittedReservation() {
+    if (!submittedReservation) return;
+    setPaymentError("");
+    setPaymentMessage("");
+    setIsPaymentBusy(true);
+    try {
+      const result = await subscribeMonthly(submittedReservation.reservation);
+      if (!result.ok) {
+        setPaymentError(result.message);
+        return;
+      }
+      setSubmittedReservation((current) => current ? {
+        ...current,
+        reservation: { ...current.reservation, payment_status: "paid", status: "confirmed" },
+      } : current);
+      setPaymentMessage(result.message);
+    } finally {
+      setIsPaymentBusy(false);
+    }
+  }
+
   async function paySubmittedReservation() {
     if (!submittedReservation) return;
     setPaymentError("");
@@ -798,7 +820,7 @@ export default function Reserve() {
               </div>
               {/* 온라인 결제 준비 전에는 어느 쪽을 골라도 '운영자 확인 후 결제'로 동일하다.
                   고를 이유가 없는 선택지를 없애고 안내 한 줄로 대체한다. */}
-              {!SITE.booking.onlinePaymentLive ? (
+              {!SITE.booking.paymentEnabled ? (
                 <div className="grid gap-2">
                   <p className="text-sm font-bold">결제 안내</p>
                   <p className="rounded-card border border-workroom-ink bg-workroom-yellow/50 p-3 text-xs font-bold leading-5">
@@ -808,6 +830,11 @@ export default function Reserve() {
               ) : (
               <fieldset className="grid gap-2">
                 <legend className="mb-1 text-sm font-bold">결제 방법</legend>
+                {!SITE.booking.onlinePaymentLive ? (
+                  <p className="rounded-card border border-workroom-ink bg-workroom-yellow/50 p-3 text-xs font-bold leading-5">
+                    {SITE.booking.paymentTestNotice}
+                  </p>
+                ) : null}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label
                     className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 ${
@@ -822,7 +849,7 @@ export default function Reserve() {
                       type="radio"
                     />
                     <span>
-                      <span className="block font-bold">온라인 카드 결제</span>
+                      <span className="block font-bold">신용카드 결제</span>
                       <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">
                         예약 신청 직후 결제하며, 결제가 완료되면 예약도 바로 확정됩니다.
                       </span>
@@ -889,10 +916,10 @@ export default function Reserve() {
                 )}
                 <dt className="font-bold text-workroom-muted">금액</dt>
                 <dd className="font-bold">{selectedPassInfo?.price ? formatPrice(selectedPassInfo.price) : "확인 후 안내"}</dd>
-                {SITE.booking.onlinePaymentLive ? (
+                {SITE.booking.paymentEnabled ? (
                   <>
                     <dt className="font-bold text-workroom-muted">결제</dt>
-                    <dd className="font-bold">{form.payment_preference === "online" ? "온라인 카드 결제" : "현장 결제(문의)"}</dd>
+                    <dd className="font-bold">{form.payment_preference === "online" ? "신용카드 결제" : "현장 결제(문의)"}</dd>
                   </>
                 ) : null}
               </dl>
@@ -985,10 +1012,10 @@ export default function Reserve() {
                   </dd>
                   <dt className="font-bold text-workroom-muted">금액</dt>
                   <dd className="font-bold">{submittedReservation.price ? formatPrice(submittedReservation.price) : "확인 후 안내"}</dd>
-                  {SITE.booking.onlinePaymentLive ? (
+                  {SITE.booking.paymentEnabled ? (
                     <>
                       <dt className="font-bold text-workroom-muted">결제</dt>
-                      <dd className="font-bold">{submittedReservation.paymentPreference === "online" ? "온라인 카드 결제" : "현장 결제(문의)"}</dd>
+                      <dd className="font-bold">{submittedReservation.paymentPreference === "online" ? "신용카드 결제" : "현장 결제(문의)"}</dd>
                     </>
                   ) : null}
                 </dl>
@@ -998,14 +1025,25 @@ export default function Reserve() {
             {paymentMessage ? <p className={`${tintCard("mint")} mt-4 p-3 text-sm font-bold`}>{paymentMessage}</p> : null}
             {paymentError ? <p className={`${tintCard("danger")} mt-4 p-3 text-sm font-bold`}>{paymentError}</p> : null}
 
-            {submittedReservation && canPayOnline(submittedReservation.reservation) ? (
+            {/* 월권은 정기결제(배치) 창, 그 외는 일반 카드(인증) 결제창으로 바로 갈 수 있게 한다. */}
+            {submittedReservation && canSubscribe(submittedReservation.reservation) ? (
               <button
                 className={buttonClass("accent", "lg", "mt-6 w-full")}
+                disabled={isPaymentBusy}
+                onClick={() => void subscribeSubmittedReservation()}
+                type="button"
+              >
+                {isPaymentBusy ? "카드 등록 중…" : `신용카드 정기결제 등록 · 매월 ${formatPrice(submittedReservation.price ?? 0)}`}
+              </button>
+            ) : null}
+            {submittedReservation && canPayOnline(submittedReservation.reservation) ? (
+              <button
+                className={buttonClass(canSubscribe(submittedReservation.reservation) ? "secondary" : "accent", "lg", "mt-2 w-full")}
                 disabled={isPaymentBusy}
                 onClick={() => void paySubmittedReservation()}
                 type="button"
               >
-                {isPaymentBusy ? "결제 진행 중…" : `${formatPrice(submittedReservation.price ?? 0)} 결제하고 예약 확정`}
+                {isPaymentBusy ? "결제 진행 중…" : `신용카드로 ${formatPrice(submittedReservation.price ?? 0)} 결제하기`}
               </button>
             ) : null}
             <Link

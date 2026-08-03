@@ -16,9 +16,8 @@ export const hasBillingConfig = Boolean(STORE_ID && BILLING_CHANNEL_KEY);
 
 export function canPayOnline(reservation: Reservation): boolean {
   return (
-    // 결제 정식 오픈 전에는 키가 설정돼 있어도 결제 버튼을 노출하지 않는다.
-    // (안내 문구는 '관리자 결제 링크·현장 결제'인데 버튼만 뜨면 서로 모순된다)
-    SITE.booking.onlinePaymentLive &&
+    // 카드사 심사에서 결제창 호출을 확인해야 하므로 정식 오픈 전에도 노출한다.
+    SITE.booking.paymentEnabled &&
     hasPortoneConfig &&
     (reservation.status === "pending" || reservation.status === "confirmed") &&
     reservation.payment_preference === "online" &&
@@ -89,7 +88,7 @@ export async function confirmPayment(paymentId: string): Promise<PayResult> {
 export function canSubscribe(reservation: Reservation): boolean {
   const name = reservation.pass_name_snapshot || reservation.pass_type;
   return (
-    SITE.booking.onlinePaymentLive &&
+    SITE.booking.paymentEnabled &&
     hasBillingConfig &&
     name.includes("월권") &&
     (reservation.status === "pending" || reservation.status === "confirmed") &&

@@ -3,6 +3,11 @@
 // (문자 안내는 supabase/functions/reservation-sms 의 ONLINE_PAYMENT_LIVE도 함께 변경)
 const onlinePaymentLive: boolean = false;
 
+// 결제창(카드 결제·정기결제) 노출 여부. 카드사 사전 심사에서는 결제창이 실제로
+// 호출되는지(약관·카드사 목록)를 확인하므로, 정식 오픈 문구와 별개로 결제 수단과
+// 버튼을 먼저 노출해야 한다. 심사 통과 후 onlinePaymentLive도 true로 바꾼다.
+const paymentEnabled: boolean = true;
+
 // Single source of truth for business / contact info used across the site.
 export const SITE = {
   name: "WORKROOM by 4REST",
@@ -13,6 +18,7 @@ export const SITE = {
   booking: {
     memberOnly: true,
     onlinePaymentLive,
+    paymentEnabled,
     confirmationLabel: onlinePaymentLive
       ? "온라인 결제 예약은 결제 완료 즉시 자동 확정됩니다."
       : "예약은 신청 후 운영자 확인을 거쳐 확정됩니다.",
@@ -25,7 +31,7 @@ export const SITE = {
       ? "월권(자유석·지정석)은 정기결제로 이용할 수 있습니다. 정기결제 신청·해지는 문의해 주세요."
       : "월권(자유석·지정석) 정기결제는 준비 중입니다. 현재는 문의 후 결제 링크 또는 현장 결제로 진행됩니다.",
     // 온라인 결제(PG) 테스트 기간 안내. onlinePaymentLive를 true로 바꾸면 숨겨진다.
-    paymentTestNotice: "현재 온라인 결제는 시스템 테스트 중입니다. 카드 결제는 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
+    paymentTestNotice: "온라인 카드 결제는 현재 카드사 심사 중입니다. 결제가 완료되지 않을 수 있으며, 그 경우 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
   },
   business: {
     // 전자상거래법 표시 의무 항목. 대표자명은 확인 후 채운다.
