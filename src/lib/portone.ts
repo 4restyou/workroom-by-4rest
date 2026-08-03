@@ -1,4 +1,9 @@
 import * as PortOne from "@portone/browser-sdk/v2";
+import {
+  canPayOnline as canPayOnlineRule,
+  canSubscribe as canSubscribeRule,
+  type PaymentAvailability,
+} from "./paymentPolicy";
 import { SITE } from "./site";
 import { supabase } from "./supabase";
 import type { Reservation } from "./types";
@@ -14,18 +19,17 @@ const BILLING_CHANNEL_KEY = import.meta.env.VITE_PORTONE_BILLING_CHANNEL_KEY as 
 export const hasPortoneConfig = Boolean(STORE_ID && CHANNEL_KEY);
 export const hasBillingConfig = Boolean(STORE_ID && BILLING_CHANNEL_KEY);
 
+// 카드사 심사에서 결제창 호출을 확인해야 하므로 정식 오픈 전에도 노출한다.
+function availability(): PaymentAvailability {
+  return {
+    paymentEnabled: SITE.booking.paymentEnabled,
+    hasOneOffChannel: hasPortoneConfig,
+    hasBillingChannel: hasBillingConfig,
+  };
+}
+
 export function canPayOnline(reservation: Reservation): boolean {
-  return (
-    // 카드사 심사에서 결제창 호출을 확인해야 하므로 정식 오픈 전에도 노출한다.
-    SITE.booking.paymentEnabled &&
-    hasPortoneConfig &&
-    (reservation.status === "pending" || reservation.status === "confirmed") &&
-    reservation.payment_preference === "online" &&
-    reservation.payment_status !== "paid" &&
-    reservation.payment_status !== "refunded" &&
-    reservation.payment_status !== "service" &&
-    (reservation.price_at_booking ?? 0) > 0
-  );
+  return canPayOnlineRule(reservation, availability());
 }
 
 export type PayResult = { ok: boolean; message: string };
@@ -86,17 +90,7 @@ export async function confirmPayment(paymentId: string): Promise<PayResult> {
 // 월권 예약에 한해 카드 빌링키를 발급받아 서버에 전달하면, 서버가 첫 주기를
 // 즉시 청구하고 매 주기 자동 청구한다.
 export function canSubscribe(reservation: Reservation): boolean {
-  const name = reservation.pass_name_snapshot || reservation.pass_type;
-  return (
-    SITE.booking.paymentEnabled &&
-    hasBillingConfig &&
-    name.includes("월권") &&
-    (reservation.status === "pending" || reservation.status === "confirmed") &&
-    reservation.payment_status !== "paid" &&
-    reservation.payment_status !== "refunded" &&
-    reservation.payment_status !== "service" &&
-    (reservation.price_at_booking ?? 0) > 0
-  );
+  return canSubscribeRule(reservation, availability());
 }
 
 export async function subscribeMonthly(reservation: Reservation): Promise<PayResult> {
@@ -166,6 +160,30 @@ export async function cancelSubscription(subscriptionId: string): Promise<PayRes
   const result = data as { ok?: boolean; message?: string } | null;
   if (error || !result?.ok) return { ok: false, message: result?.message ?? "해지에 실패했습니다." };
   return { ok: true, message: result.message ?? "정기결제를 해지했어요." };
+}
+
+// 회원 본인 예약 취소. 결제건이면 서버가 PortOne 환불까지 실행하고, 월권
+// 정기결제가 걸려 있으면 함께 해지한다. 소유권·시작시간 정책은 전부 서버에서
+// 재검증하므로 클라이언트 판단은 버튼 노출용일 뿐이다.
+export type CancelResult = PayResult & { refunded: boolean };
+
+export async function cancelOwnReservation(reservationId: string, reason = "회원 예약 취소"): Promise<CancelResult> {
+  if (!supabase) return { ok: false, refunded: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
+  const { data, error } = await supabase.functions.invoke("refund-reservation", {
+    body: { reservationId, reason },
+  });
+  const result = data as { ok?: boolean; refunded?: boolean; message?: string } | null;
+  if (error) {
+    return { ok: false, refunded: false, message: await invokeErrorMessage(error, "예약 취소에 실패했습니다.") };
+  }
+  if (!result?.ok) {
+    return { ok: false, refunded: false, message: result?.message ?? "예약 취소에 실패했습니다." };
+  }
+  return {
+    ok: true,
+    refunded: Boolean(result.refunded),
+    message: result.message ?? (result.refunded ? "예약이 취소되고 환불되었습니다." : "예약이 취소되었습니다."),
+  };
 }
 
 // 관리자 환불.

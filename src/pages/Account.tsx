@@ -1,11 +1,12 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
-import AddressSearchField from "../components/AddressSearchField";
-import { formatDate, formatPhone, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
-import { canPayOnline, canSubscribe, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
+import AccountProfileForm from "../components/AccountProfileForm";
+import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
+import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
+import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
 import { readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
@@ -13,6 +14,7 @@ import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import type { Attendance, BusinessDateException, BusinessHour, Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
+import { confirmDialog } from "../lib/confirm";
 
 type AccountTab = "reservations" | "profile";
 
@@ -21,18 +23,9 @@ const tabLabels: Record<AccountTab, string> = {
   profile: "회원정보",
 };
 
-// Cancellation (and refund) is only allowed before the reservation start time.
-function canCancel(reservation: Reservation): boolean {
-  const start = new Date(`${reservation.date}T${(reservation.start_time ?? "00:00").slice(0, 5)}:00+09:00`);
-  if (Number.isNaN(start.getTime())) return false;
-  return Date.now() < start.getTime();
-}
-
-// A canceled reservation that was already paid needs an operator refund; keep
-// that state visible to the member until payment_status flips to "refunded".
-function isRefundPending(reservation: Reservation): boolean {
-  return reservation.status === "canceled" && reservation.payment_status === "paid";
-}
+// 취소 가능 시점·환불 대기 판정은 lib/paymentPolicy에 모아 두고
+// (서버·DB와 같은 기준) 여기서는 그대로 가져다 쓴다.
+const canCancel = canCancelReservation;
 
 const reservationStatusCardClass: Record<ReservationStatus, string> = {
   pending: "border-workroom-ink bg-workroom-yellow/25",
@@ -78,18 +71,13 @@ export default function Account() {
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [editingInquiryId, setEditingInquiryId] = useState<string | null>(null);
   const [inquiryEditDraft, setInquiryEditDraft] = useState("");
+  const [oauthName, setOauthName] = useState("");
   const [activeTab, setActiveTab] = useState<AccountTab>(tabParam === "profile" ? "profile" : "reservations");
-  const [form, setForm] = useState({ full_name: "", phone: "", address: "" });
-  const [detailAddress, setDetailAddress] = useState("");
-  const [consent, setConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   useFeedbackToast(success, error);
 
-  // 프로필 미완성으로 중단된 흐름이 있으면(예: 예약) 버튼 문구로 알려 준다.
-  const pendingNext = searchParams.get("next");
 
   const loadSubscriptions = useCallback(async () => {
     if (!supabase) return;
@@ -118,12 +106,8 @@ export default function Account() {
       try {
         const loadedProfile = await ensureCurrentProfile();
         setProfile(loadedProfile);
-        setForm({
-          full_name: loadedProfile?.full_name ?? user.user_metadata?.full_name ?? user.user_metadata?.name ?? "",
-          phone: loadedProfile?.phone ?? "",
-          address: loadedProfile?.address ?? "",
-        });
-        setConsent(Boolean(loadedProfile?.consented_at));
+        // 프로필에 이름이 아직 없으면 구글 계정 이름을 폼 기본값으로 넘긴다.
+        setOauthName(user.user_metadata?.full_name ?? user.user_metadata?.name ?? "");
 
         if (loadedProfile?.role === "admin") {
           setActiveTab("profile");
@@ -157,7 +141,13 @@ export default function Account() {
   }, [navigate, loadSubscriptions]);
 
   async function cancelSub(id: string) {
-    if (!window.confirm("정기결제를 해지할까요? 이번 이용기간까지는 그대로 이용할 수 있어요.")) return;
+    const ok = await confirmDialog({
+      title: "정기결제를 해지할까요?",
+      description: "이번 이용기간까지는 그대로 이용할 수 있어요.",
+      confirmLabel: "해지",
+      tone: "danger",
+    });
+    if (!ok) return;
     setError("");
     setActionBusy(`cancelsub-${id}`);
     const result = await cancelSubscription(id);
@@ -202,11 +192,7 @@ export default function Account() {
     [orderedReservations],
   );
 
-  const updateField = useCallback((name: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [name]: value }));
-  }, []);
 
-  const updateAddress = useCallback((value: string) => updateField("address", value), [updateField]);
 
   async function sendInquiry(reservationId: string) {
     if (!supabase || !profile) return;
@@ -328,34 +314,33 @@ export default function Account() {
       return;
     }
     const wasPaid = reservation.payment_status === "paid";
-    const prompt = wasPaid ? "예약을 취소할까요? 결제/환불은 운영자가 확인 후 안내드립니다." : "예약을 취소할까요?";
-    if (!window.confirm(prompt)) return;
+    const ok = await confirmDialog({
+      title: wasPaid ? `예약을 취소하고 ${formatPrice(reservation.price_at_booking ?? 0)}을 환불할까요?` : "예약을 취소할까요?",
+      description: wasPaid ? "카드 승인 취소가 즉시 실행되며 되돌릴 수 없습니다." : "취소한 예약은 되돌릴 수 없습니다.",
+      confirmLabel: wasPaid ? "취소하고 환불" : "예약 취소",
+      cancelLabel: "닫기",
+      tone: "danger",
+    });
+    if (!ok) return;
     setError("");
     setActionBusy(reservation.id);
 
-    const { error: cancelError } = await supabase.from("reservations").update({ status: "canceled" }).eq("id", reservation.id);
+    // 결제건은 서버에서 PortOne 환불까지 처리한다. 미결제 예약도 같은 경로로
+    // 보내 취소 정책(본인 확인·시작시간)을 한 곳에서만 판정하게 한다.
+    const result = await cancelOwnReservation(reservation.id);
     setActionBusy(null);
-    if (cancelError) {
-      setError(cancelError.message);
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
-    setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, status: "canceled" } : item)));
-  }
-
-  async function withdraw() {
-    if (!supabase) return;
-    if (!window.confirm("정말 탈퇴하시겠어요?\n계정과 개인정보가 삭제되며 되돌릴 수 없습니다.")) return;
-    setError("");
-    setActionBusy("withdraw");
-    const { data, error: deleteError } = await supabase.functions.invoke("delete-account", { body: {} });
-    const result = data as { ok?: boolean; message?: string } | null;
-    if (deleteError || !result?.ok) {
-      setActionBusy(null);
-      setError(result?.message ?? "탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-      return;
-    }
-    await supabase.auth.signOut();
-    navigate("/", { replace: true });
+    setReservations((current) =>
+      current.map((item) =>
+        item.id === reservation.id
+          ? { ...item, status: "canceled", payment_status: result.refunded ? "refunded" : item.payment_status }
+          : item,
+      ),
+    );
+    setSuccess(result.message);
   }
 
   async function saveInquiryEdit(inquiry: ReservationInquiry) {
@@ -373,60 +358,6 @@ export default function Account() {
       current.map((item) => (item.id === inquiry.id ? { ...item, body, edited_at: new Date().toISOString() } : item)),
     );
     setEditingInquiryId(null);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!supabase || !profile) return;
-    if (!form.full_name.trim() || !form.phone.trim()) {
-      setError("이름과 연락처는 필수입니다.");
-      return;
-    }
-    if (!consent) {
-      setError("개인정보 수집·이용에 동의해 주세요.");
-      return;
-    }
-
-    const isCompletingSignup = profile.role !== "admin" && (!profile.full_name || !profile.phone || !profile.consented_at);
-    setIsSaving(true);
-    const nextProfile = {
-      ...profile,
-      full_name: form.full_name.trim(),
-      phone: form.phone.trim(),
-      address: [form.address.trim(), detailAddress.trim()].filter(Boolean).join(" ") || null,
-    };
-
-    const { data: savedProfile, error: updateError } = await supabase.rpc("update_my_profile", {
-      p_full_name: nextProfile.full_name,
-      p_phone: nextProfile.phone,
-      p_address: nextProfile.address ?? "",
-      p_consent: consent,
-    });
-    setIsSaving(false);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
-    if (!savedProfile) {
-      setError("내정보가 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.");
-      return;
-    }
-
-    setProfile(savedProfile as Profile);
-    setForm((current) => ({ ...current, address: (savedProfile as Profile).address ?? "" }));
-    setDetailAddress("");
-    if (isCompletingSignup) {
-      // 프로필 때문에 중단됐던 흐름(예약 등)이 있으면 그리로 돌아간다.
-      const next = searchParams.get("next");
-      navigate(next && next.startsWith("/") ? next : "/", { replace: true });
-      return;
-    }
-    setSuccess("내정보를 저장했습니다.");
   }
 
   return (
@@ -456,115 +387,7 @@ export default function Account() {
             </div>
 
             {activeTab === "profile" ? (
-              <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
-                {(!profile.full_name || !profile.phone || !profile.consented_at) && profile.role !== "admin" ? (
-                  <p className={`${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>
-                    가입을 완료하려면 이름·연락처를 입력하고 개인정보 수집·이용에 동의한 뒤 저장해 주세요.
-                  </p>
-                ) : null}
-                <div>
-                  <p className="text-sm font-bold text-workroom-muted">{profile.role === "admin" ? "관리자" : "회원"}</p>
-                  <p className="mt-1 text-2xl font-bold">{profile.full_name || (profile.role === "admin" ? "관리자 계정" : "내 정보")}</p>
-                </div>
-                {profile.role === "admin" ? (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <Link className={buttonClass("accent", "md")} to="/admin/reservations">
-                      예약관리
-                    </Link>
-                    <Link className={buttonClass("secondary", "md")} to="/admin/members">
-                      회원관리
-                    </Link>
-                    <Link className={buttonClass("secondary", "md")} to="/admin/stats">
-                      통계
-                    </Link>
-                  </div>
-                ) : null}
-
-                <label className="grid gap-2 text-sm font-bold">
-                  <span>
-                    이메일
-                    <span className="ml-1 align-middle text-xs font-bold text-red-600">필수</span>
-                  </span>
-                  <input disabled value={profile.email} />
-                </label>
-                <label className="grid gap-2 text-sm font-bold">
-                  <span>
-                    이름
-                    <span className="ml-1 align-middle text-xs font-bold text-red-600">필수</span>
-                  </span>
-                  <input required value={form.full_name} onChange={(event) => updateField("full_name", event.target.value)} />
-                  <span className="text-xs font-medium text-workroom-muted">
-                    {profile.role === "admin" ? "관리 화면에서 표시될 이름입니다." : "예약자 확인을 위해 알아볼 수 있는 본명으로 적어 주세요."}
-                  </span>
-                </label>
-                <label className="grid gap-2 text-sm font-bold">
-                  <span>
-                    연락처
-                    <span className="ml-1 align-middle text-xs font-bold text-red-600">필수</span>
-                  </span>
-                  <input
-                    required
-                    inputMode="numeric"
-                    placeholder="010-0000-0000"
-                    value={form.phone}
-                    onChange={(event) => updateField("phone", formatPhone(event.target.value))}
-                  />
-                </label>
-                <AddressSearchField
-                  address={form.address}
-                  detailAddress={detailAddress}
-                  onAddressChange={updateAddress}
-                  onDetailAddressChange={setDetailAddress}
-                />
-                <label className={`${tintCard("yellow")} flex items-start gap-3 p-4 text-sm font-bold`}>
-                  <input
-                    className="mt-0.5 h-5 w-5 shrink-0"
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(event) => setConsent(event.target.checked)}
-                  />
-                  <span className="font-medium leading-6">
-                    <span className="font-bold">[필수]</span> 개인정보 수집·이용에 동의합니다. 예약 운영을 위해 이름·연락처·이메일을 수집하며,{" "}
-                    <Link className="font-bold underline underline-offset-2" to="/privacy" target="_blank">
-                      개인정보처리방침
-                    </Link>
-                    을 따릅니다.
-                  </span>
-                </label>
-                {success ? <p className={`${tintCard("mint")} p-3 text-sm font-bold`}>{success}</p> : null}
-                <button className={buttonClass("primary", "lg")} disabled={isSaving} type="submit">
-                  {isSaving ? "저장 중…" : pendingNext ? "저장하고 예약 계속하기" : "내정보 저장"}
-                </button>
-
-                {profile.role !== "admin" ? (
-                  <div className="mt-2 border-t border-workroom-line pt-4">
-                    <p className="text-sm font-bold">이메일 로그인 비밀번호</p>
-                    <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">
-                      구글 계정으로 가입했더라도 비밀번호를 설정하면 현재 이메일로 직접 로그인할 수 있습니다.
-                    </p>
-                    <Link className={buttonClass("secondary", "sm", "mt-3")} to="/reset-password">
-                      비밀번호 설정·변경
-                    </Link>
-                  </div>
-                ) : null}
-
-                {profile.role !== "admin" ? (
-                <div className="mt-2 border-t-2 border-workroom-line pt-4">
-                  <p className="text-sm font-bold">회원 탈퇴</p>
-                  <p className="mt-1 text-xs font-medium leading-6 text-workroom-muted">
-                    탈퇴하면 계정과 개인정보(이름·연락처·이메일)가 삭제되며 되돌릴 수 없습니다. 과거 예약 내역은 익명 처리되어 운영 기록으로만 남습니다.
-                  </p>
-                  <button
-                    className={buttonClass("secondary", "sm", "mt-3")}
-                    disabled={actionBusy === "withdraw"}
-                    onClick={() => void withdraw()}
-                    type="button"
-                  >
-                    {actionBusy === "withdraw" ? "처리 중…" : "회원 탈퇴"}
-                  </button>
-                </div>
-                ) : null}
-              </form>
+              <AccountProfileForm fallbackName={oauthName} onProfileSaved={setProfile} profile={profile} />
             ) : null}
 
             {activeTab === "reservations" && profile.role !== "admin" ? (

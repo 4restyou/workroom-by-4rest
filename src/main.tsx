@@ -5,6 +5,7 @@ import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireAdmin from "./components/RequireAdmin";
 import ScrollToTop from "./components/ScrollToTop";
+import SessionProvider from "./components/SessionProvider";
 import Home from "./pages/Home";
 import { initAnalytics } from "./lib/analytics";
 import "./styles/globals.css";
@@ -37,6 +38,7 @@ initAnalytics();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
+      <SessionProvider>
       <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
         <ScrollToTop />
         <Routes>
@@ -68,6 +70,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Route>
         </Routes>
       </BrowserRouter>
+      </SessionProvider>
     </ErrorBoundary>
   </React.StrictMode>,
 );

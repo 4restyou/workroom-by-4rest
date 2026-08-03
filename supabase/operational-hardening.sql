@@ -1,3 +1,16 @@
+-- ⚠️ DEPRECATED — 실행하지 마세요.
+--
+-- 이 파일은 초기 스키마(대략 0005) 시점에서 멈춘 과거 스냅샷입니다.
+-- 명함첩(member_cards), 메모판, 정기결제(subscriptions), 출근부·지오 체크인,
+-- 관리자 기능 등 이후 마이그레이션 내용이 통째로 빠져 있습니다.
+--
+-- 신규 셋업이든 운영 DB든, 스키마의 정본은 `supabase/migrations/` 뿐입니다.
+-- 0001_baseline.sql 부터 번호 순서대로 실행하세요. 이 파일을 실행하면
+-- 반쪽짜리 DB가 만들어지거나, 이후 마이그레이션에서 좁혀 둔 권한·정책이
+-- 과거 상태로 되돌아갑니다.
+--
+-- 참고용으로만 남겨 둡니다.
+
 -- Run this once on an existing WORKROOM by 4REST Supabase project.
 -- It tightens data integrity without requiring service-role keys in the frontend.
 

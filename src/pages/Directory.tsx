@@ -8,6 +8,14 @@ import { buttonClass, tintCard } from "../lib/ui";
 import type { MemberCard } from "../lib/types";
 import paperTexture from "../../assets/paper-texture.webp";
 
+// 비로그인 방문자에게 내려보내는 컬럼. `contact`(연락처)는 개인정보라 제외하며,
+// DB에서도 anon 역할에는 해당 컬럼 권한이 없다 (0035 마이그레이션).
+// (supabase-js는 select 문자열을 리터럴 타입으로 파싱하므로 `as const`가 필요하다.)
+const MEMBER_CARD_COLUMNS_PUBLIC =
+  "id,profile_id,display_name,category,occupation,company,headline,bio,link_url,instagram,accent,is_published,created_at,updated_at" as const;
+const MEMBER_CARD_COLUMNS_SIGNED_IN =
+  "id,profile_id,display_name,category,occupation,company,headline,bio,link_url,instagram,accent,is_published,created_at,updated_at,contact" as const;
+
 const instaUrl = (handle: string) =>
   `https://instagram.com/${handle.replace(/^@/, "").trim()}`;
 
@@ -244,16 +252,22 @@ export default function Directory() {
       const uid = sessionData.session?.user.id ?? null;
       setSignedIn(Boolean(uid));
 
+      // 연락처는 로그인한 회원에게만 보인다. anon 역할에는 `contact` 컬럼
+      // 조회 권한 자체가 없으므로(0035 마이그레이션) 비로그인 상태에서
+      // 요청하면 권한 오류가 난다 — 그래서 컬럼 목록을 나눠 보낸다.
       const { data, error: loadError } = await supabase
         .from("member_cards")
-        .select("*")
+        .select(uid ? MEMBER_CARD_COLUMNS_SIGNED_IN : MEMBER_CARD_COLUMNS_PUBLIC)
         .eq("is_published", true);
       if (loadError) {
         setError("명함을 불러오지 못했어요.");
         setIsLoading(false);
         return;
       }
-      const loaded = (data ?? []) as MemberCard[];
+      // 컬럼 목록이 로그인 여부에 따라 갈리므로 supabase-js가 행 타입을
+      // 정적으로 좁히지 못한다. 비로그인 응답에는 contact가 없고, MemberCard의
+      // contact는 nullable이라 런타임상 안전하다.
+      const loaded = (data ?? []) as unknown as MemberCard[];
       const list = shuffle(import.meta.env.DEV && !loaded.length ? DEMO_MEMBER_CARDS : loaded);
       setCards(list);
       if (uid) {

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { getCurrentProfile } from "../lib/profiles";
-import { supabase } from "../lib/supabase";
+import { useSession } from "../lib/sessionContext";
 import { IdCardIcon, PinIcon } from "./icons";
 
 type Tab = {
@@ -131,51 +130,19 @@ const adminMoreItems: MoreItem[] = [
 
 export default function BottomTabBar() {
   const location = useLocation();
-  const [role, setRole] = useState<"guest" | "user" | "admin" | null>(null);
+  const { status, isSignedIn, isAdmin } = useSession();
   const [moreOpen, setMoreOpen] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    async function loadRole() {
-      if (!supabase) {
-        setRole("guest");
-        return;
-      }
-      const { data } = await supabase.auth.getSession();
-      if (!active) return;
-      if (!data.session) {
-        setRole("guest");
-        return;
-      }
-      const profile = await getCurrentProfile();
-      if (!active) return;
-      setRole(profile?.role === "admin" ? "admin" : "user");
-    }
-
-    void loadRole();
-    if (!supabase) {
-      return () => {
-        active = false;
-      };
-    }
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void loadRole();
-    });
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   // 페이지를 이동하면 시트를 닫는다.
   useEffect(() => {
     setMoreOpen(false);
   }, [location.pathname, location.search]);
 
-  // Until we know, assume guest tabs (they overlap on 홈/예약 so there's no flicker
-  // on the most common landing paths).
+  // 세션을 아직 모르는 동안에는 게스트 탭을 그린다. 홈/예약이 겹쳐서 가장 흔한
+  // 진입 경로에서는 티가 나지 않고, SessionProvider가 한 번만 읽으므로 예전처럼
+  // 컴포넌트마다 따로 조회하며 늦게 바뀌지도 않는다.
+  const role: "guest" | "user" | "admin" =
+    status !== "ready" || !isSignedIn ? "guest" : isAdmin ? "admin" : "user";
   const tabs = role === "admin" ? adminTabs : role === "user" ? memberTabs : guestTabs;
   const moreItems = role === "admin" ? adminMoreItems : role === "user" ? memberMoreItems : guestMoreItems;
   const moreActive = moreOpen || moreItems.some((item) => location.pathname.startsWith(item.to.split("?")[0]) && item.to !== "/?site=1");

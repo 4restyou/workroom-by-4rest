@@ -32,6 +32,10 @@ function corsHeaders(request: Request): Record<string, string> {
   };
 }
 
+// 주의: 이것은 인증이 아니다. Origin 헤더는 비브라우저 클라이언트에서 생략되며
+// (그래서 `!origin`도 통과시킨다) 얼마든지 위조된다. 실제 안전장치는 아래
+// 핸들러의 액세스 토큰 검증이고, 이 함수는 브라우저발 오·남용을 줄이는 보조
+// 장치일 뿐이다.
 function isAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get("Origin");
   return !origin || ALLOWED_ORIGINS.includes(origin);

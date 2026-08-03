@@ -7,11 +7,11 @@ import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { CAUTION_ITEMS, FIT_ITEMS, GUIDE_ITEMS } from "../lib/guide";
-import { getCurrentProfile } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { badge, buttonClass, card, pressable, tintCard, type TintColor } from "../lib/ui";
 import type { Pass } from "../lib/types";
 import { SITE } from "../lib/site";
+import { useSession } from "../lib/sessionContext";
 
 const { address: ADDRESS, naverMapUrl: NAVER_MAP_URL, kakaoMapUrl: KAKAO_MAP_URL } = SITE;
 
@@ -76,6 +76,7 @@ const heroPhotos = [
 ];
 
 export default function Home() {
+  const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
   const location = useLocation();
   // 관리자는 기본적으로 관리자 홈으로 보내되, 헤더의 '사이트' 버튼(?site=1)으로
   // 들어온 경우에는 공개 화면을 그대로 보여준다.
@@ -94,40 +95,12 @@ export default function Home() {
   const scrollIdleTimer = useRef<number | null>(null);
   const autoplayPaused = useRef(false);
 
+  // 세션·역할은 SessionProvider가 한 번만 읽는다. 랜딩에서 같은 쿼리를 또
+  // 보내지 않도록 그 값을 그대로 쓴다.
   useEffect(() => {
-    let active = true;
-    async function loadViewerRole() {
-      if (!supabase) {
-        setViewerRole("guest");
-        return;
-      }
-      const { data } = await supabase.auth.getSession();
-      if (!active) return;
-      if (!data.session) {
-        setViewerRole("guest");
-        return;
-      }
-      const profile = await getCurrentProfile();
-      if (!active) return;
-      setViewerRole(profile?.role === "admin" ? "admin" : "user");
-    }
-
-    void loadViewerRole();
-    if (!supabase) {
-      return () => {
-        active = false;
-      };
-    }
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void loadViewerRole();
-    });
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    if (sessionStatus !== "ready") return;
+    setViewerRole(!isSignedIn ? "guest" : isAdmin ? "admin" : "user");
+  }, [sessionStatus, isSignedIn, isAdmin]);
 
   useEffect(() => {
     async function loadPasses() {

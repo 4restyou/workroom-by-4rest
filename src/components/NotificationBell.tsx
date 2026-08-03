@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentProfile } from "../lib/profiles";
+import { useSession } from "../lib/sessionContext";
 import { supabase } from "../lib/supabase";
 import { buttonClass, cardFlat } from "../lib/ui";
 import type { ReservationNotification } from "../lib/types";
@@ -19,7 +19,7 @@ export default function NotificationBell() {
   const [items, setItems] = useState<ReservationNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ReservationNotification | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { userId, isAdmin } = useSession();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -47,19 +47,15 @@ export default function NotificationBell() {
 
   async function load() {
     if (!supabase) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
-    if (!user) {
+    // 세션·역할은 SessionProvider가 이미 읽어 뒀다. 여기서는 알림만 가져온다.
+    if (!userId) {
       setItems([]);
-      setIsAdmin(false);
       return;
     }
-    const profile = await getCurrentProfile();
-    setIsAdmin(profile?.role === "admin");
     const { data } = await supabase
       .from("reservation_notifications")
       .select("*")
-      .eq("profile_id", user.id)
+      .eq("profile_id", userId)
       .order("created_at", { ascending: false })
       .limit(30);
     const rows = (data ?? []) as ReservationNotification[];
@@ -68,13 +64,15 @@ export default function NotificationBell() {
   }
 
   // Initial load + light polling so new notifications surface during a session.
+  // userId는 세션을 읽은 뒤에 채워지므로, 값이 생기면 즉시 다시 불러온다
+  // (그러지 않으면 첫 알림이 폴링 주기만큼 늦게 뜬다).
   useEffect(() => {
     void load();
     const timer = window.setInterval(() => void load(), 30000);
     return () => window.clearInterval(timer);
-    // load is intentionally mount-only (polling); deps left empty on purpose.
+    // load는 매 렌더 새로 만들어지므로 의존성에서 제외하고 userId로만 제어한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   // Auto-dismiss the toast.
   useEffect(() => {

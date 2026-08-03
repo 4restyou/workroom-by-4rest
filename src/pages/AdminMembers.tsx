@@ -4,17 +4,18 @@ import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/A
 import StatusBadge from "../components/StatusBadge";
 import { downloadCsv } from "../lib/csv";
 import { formatDate, formatTimeRange, todayValue } from "../lib/format";
-import { getCurrentProfile } from "../lib/profiles";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { badge, buttonClass } from "../lib/ui";
 import type { Attendance, Coupon, Profile, Reservation } from "../lib/types";
+import { useSession } from "../lib/sessionContext";
 
 type MemberView = "all" | "active" | "noted";
 
 export default function AdminMembers() {
+  const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
   const navigate = useNavigate();
   const [members, setMembers] = useState<Profile[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -31,16 +32,16 @@ export default function AdminMembers() {
   useFeedbackToast(success, error);
 
   useEffect(() => {
+    // 세션·권한은 SessionProvider가 이미 읽어 뒀다(RequireAdmin도 같은 값을 본다).
+    if (sessionStatus !== "ready") return;
     async function checkAndLoad() {
       if (!supabase) { setError("Supabase 환경 변수가 연결되지 않았습니다."); setIsLoading(false); return; }
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) { navigate("/admin", { replace: true }); return; }
-      const profile = await getCurrentProfile();
-      if (profile?.role !== "admin") { navigate("/account", { replace: true }); return; }
+      if (!isSignedIn) { navigate("/admin", { replace: true }); return; }
+      if (!isAdmin) { navigate("/account", { replace: true }); return; }
       await loadMembers();
     }
     void checkAndLoad();
-  }, [navigate]);
+  }, [sessionStatus, isSignedIn, isAdmin, navigate]);
 
   async function loadMembers() {
     if (!supabase) return;

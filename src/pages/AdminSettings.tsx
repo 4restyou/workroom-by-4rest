@@ -5,10 +5,11 @@ import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import MoneyInput from "../components/MoneyInput";
 import { todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
-import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import type { BusinessDateException, BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
+import { confirmDialog } from "../lib/confirm";
+import { useSession } from "../lib/sessionContext";
 
 const settingKeys = [
   "reservation_notice",
@@ -43,6 +44,7 @@ function settingsSnapshot(seats: SeatType[], passRows: Pass[], hours: BusinessHo
 }
 
 export default function AdminSettings() {
+  const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
   const navigate = useNavigate();
   const qrRef = useRef<HTMLDivElement>(null);
   const [locationMsg, setLocationMsg] = useState("");
@@ -72,21 +74,20 @@ export default function AdminSettings() {
   const [savedSnapshot, setSavedSnapshot] = useState("");
 
   useEffect(() => {
+    // 세션·권한은 SessionProvider가 이미 읽어 뒀다(RequireAdmin도 같은 값을 본다).
+    if (sessionStatus !== "ready") return;
+
     async function checkAndLoad() {
       if (!supabase) {
         setError("Supabase 환경 변수가 아직 연결되지 않았습니다.");
         setIsLoading(false);
         return;
       }
-
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      if (!isSignedIn) {
         navigate("/admin", { replace: true });
         return;
       }
-
-      const profile = await getCurrentProfile();
-      if (profile?.role !== "admin") {
+      if (!isAdmin) {
         navigate("/account", { replace: true });
         return;
       }
@@ -95,7 +96,7 @@ export default function AdminSettings() {
     }
 
     void checkAndLoad();
-  }, [navigate]);
+  }, [sessionStatus, isSignedIn, isAdmin, navigate]);
 
   async function loadSettings() {
     if (!supabase) return;
@@ -132,7 +133,12 @@ export default function AdminSettings() {
 
   async function saveAll() {
     if (!supabase) return;
-    if (!window.confirm("좌석·이용권·운영시간 설정을 저장할까요?\n가격과 노출 여부 변경은 즉시 예약 화면에 반영됩니다.")) return;
+    const ok = await confirmDialog({
+      title: "좌석·이용권·운영시간 설정을 저장할까요?",
+      description: "가격과 노출 여부 변경은 즉시 예약 화면에 반영됩니다.",
+      confirmLabel: "저장",
+    });
+    if (!ok) return;
     setIsSaving(true);
     setError("");
     setSuccess("");
@@ -236,7 +242,13 @@ export default function AdminSettings() {
 
   async function deleteSeatType(id: string, name: string) {
     if (!supabase) return;
-    if (!window.confirm(`'${name}' 좌석 유형을 삭제할까요? 연결된 이용권은 좌석 미지정으로 바뀝니다.`)) return;
+    const ok = await confirmDialog({
+      title: `'${name}' 좌석 유형을 삭제할까요?`,
+      description: "연결된 이용권은 좌석 미지정으로 바뀝니다.",
+      confirmLabel: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: deleteError } = await supabase.from("seat_types").delete().eq("id", id);
     if (deleteError) {
       setError(deleteError.message);
@@ -247,7 +259,16 @@ export default function AdminSettings() {
 
   async function deletePass(id: string, name: string) {
     if (!supabase) return;
-    if (!window.confirm(`'${name}' 이용권을 삭제할까요?\n\n삭제하면 되돌릴 수 없고 지난 예약의 연결도 끊어집니다.\n더 이상 판매만 중단하려면 삭제 대신 '노출' 체크를 해제하세요.`)) return;
+    // 지난 예약의 연결까지 끊어지는 동작이라 이용권 이름을 직접 입력하게 한다.
+    const ok = await confirmDialog({
+      title: `'${name}' 이용권을 삭제할까요?`,
+      description:
+        "삭제하면 되돌릴 수 없고 지난 예약의 연결도 끊어집니다.\n\n판매만 중단하려면 삭제 대신 '노출' 체크를 해제하세요.",
+      confirmLabel: "삭제",
+      tone: "danger",
+      requireTyped: name,
+    });
+    if (!ok) return;
     const { error: deleteError } = await supabase.from("passes").delete().eq("id", id);
     if (deleteError) {
       setError(deleteError.message);
@@ -277,7 +298,14 @@ export default function AdminSettings() {
   }
 
   async function deleteDateException(date: string) {
-    if (!supabase || !window.confirm(`${date} 예외 일정을 삭제하고 정기 운영시간을 적용할까요?`)) return;
+    if (!supabase) return;
+    const ok = await confirmDialog({
+      title: `${date} 예외 일정을 삭제할까요?`,
+      description: "이 날짜에 다시 정기 운영시간이 적용됩니다.",
+      confirmLabel: "삭제",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: deleteError } = await supabase.from("business_date_exceptions").delete().eq("date", date);
     if (deleteError) {
       setError(deleteError.message);
@@ -655,7 +683,15 @@ export default function AdminSettings() {
 
   async function regenerateToken() {
     if (!supabase) return;
-    if (!window.confirm("QR 토큰을 재생성할까요?\n기존 QR과 NFC 스티커는 즉시 사용할 수 없게 되며, 새 주소로 모두 교체해야 합니다.")) return;
+    // 매장에 붙어 있는 QR·NFC가 전부 죽는 동작이라 확인 문구를 입력하게 한다.
+    const ok = await confirmDialog({
+      title: "QR 토큰을 재생성할까요?",
+      description: "기존 QR과 NFC 스티커는 즉시 사용할 수 없게 되며, 새 주소로 모두 교체해야 합니다.",
+      confirmLabel: "재생성",
+      tone: "danger",
+      requireTyped: "재생성",
+    });
+    if (!ok) return;
     const token = crypto.randomUUID().replace(/-/g, "");
     const { error: tokenError } = await supabase.from("space_settings").upsert({ key: "attendance_qr_token", value: token }, { onConflict: "key" });
     if (tokenError) {

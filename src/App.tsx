@@ -1,14 +1,13 @@
-import { useEffect, Suspense, useState } from "react";
+import { useEffect, Suspense } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BackToTop from "./components/BackToTop";
 import BottomTabBar from "./components/BottomTabBar";
+import ConfirmDialog from "./components/ConfirmDialog";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import PageLoading from "./components/PageLoading";
 import Toaster from "./components/Toaster";
-import { getCurrentProfile } from "./lib/profiles";
-import { supabase } from "./lib/supabase";
-import type { Profile } from "./lib/types";
+import { useSession } from "./lib/sessionContext";
 
 // Pages a not-yet-onboarded member may visit (to finish the profile or read
 // the policies). Everything else redirects to profile completion.
@@ -17,67 +16,32 @@ const ONBOARDING_ALLOWED = ["/account", "/privacy", "/terms", "/login", "/reset-
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { status, isSignedIn, profile, isAdmin } = useSession();
   const isAdminRoute = location.pathname.startsWith("/admin");
   const isAdminLogin = location.pathname === "/admin";
-  const isAdminUser = profile?.role === "admin";
-  const adminMode = Boolean(isAdminRoute && isAdminUser && !isAdminLogin);
+  const adminMode = Boolean(isAdminRoute && isAdmin && !isAdminLogin);
   // Focused task flows hide the bottom tab bar so their own sticky actions own
   // the bottom edge.
   const isFocusedFlow = location.pathname === "/reserve" || location.pathname.startsWith("/checkin");
   const showTabBar = !isFocusedFlow && (!isAdminRoute || adminMode);
 
-  useEffect(() => {
-    let active = true;
-    async function loadProfile() {
-      if (!supabase) return;
-      const loadedProfile = await getCurrentProfile();
-      if (active) setProfile(loadedProfile);
-    }
-
-    void loadProfile();
-    const {
-      data: { subscription },
-    } =
-      supabase?.auth.onAuthStateChange(() => {
-        void loadProfile();
-      }) ?? { data: { subscription: null } };
-
-    return () => {
-      active = false;
-      subscription?.unsubscribe();
-    };
-  }, []);
-
   // First login onboarding: if a signed-in member hasn't completed their
   // profile (name, phone, privacy consent), send them to 회원정보 first.
   useEffect(() => {
-    let active = true;
-    async function checkOnboarding() {
-      if (!supabase) return;
-      const { data } = await supabase.auth.getSession();
-      if (!active || !data.session) return;
+    if (status !== "ready" || !isSignedIn || !profile || isAdmin) return;
 
-      const onAllowed =
-        location.pathname.startsWith("/admin") || ONBOARDING_ALLOWED.some((path) => location.pathname.startsWith(path));
-      if (onAllowed) return;
+    const onAllowed =
+      location.pathname.startsWith("/admin") || ONBOARDING_ALLOWED.some((path) => location.pathname.startsWith(path));
+    if (onAllowed) return;
 
-      const profile = await getCurrentProfile();
-      if (!active || !profile || profile.role === "admin") return;
+    const incomplete = !profile.full_name || !profile.phone || !profile.consented_at;
+    if (!incomplete) return;
 
-      const incomplete = !profile.full_name || !profile.phone || !profile.consented_at;
-      if (incomplete) {
-        // 하려던 일(예: 예약)을 기억해 두고, 회원정보 저장 후 그 자리로 돌려보낸다.
-        const next = `${location.pathname}${location.search}`;
-        const query = next && next !== "/" ? `&next=${encodeURIComponent(next)}` : "";
-        navigate(`/account?tab=profile${query}`, { replace: true });
-      }
-    }
-    void checkOnboarding();
-    return () => {
-      active = false;
-    };
-  }, [location.pathname, location.search, navigate]);
+    // 하려던 일(예: 예약)을 기억해 두고, 회원정보 저장 후 그 자리로 돌려보낸다.
+    const next = `${location.pathname}${location.search}`;
+    const query = next && next !== "/" ? `&next=${encodeURIComponent(next)}` : "";
+    navigate(`/account?tab=profile${query}`, { replace: true });
+  }, [status, isSignedIn, profile, isAdmin, location.pathname, location.search, navigate]);
 
   return (
     <div className="flex min-h-screen flex-col bg-workroom-background text-workroom-text">
@@ -97,6 +61,7 @@ export default function App() {
       </div>
       {!isAdminRoute ? <Footer /> : null}
       <Toaster />
+      <ConfirmDialog />
       {showTabBar ? <BottomTabBar /> : null}
       <BackToTop />
     </div>
