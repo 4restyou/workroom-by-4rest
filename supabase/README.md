@@ -1,31 +1,34 @@
 # Supabase 스키마 / 마이그레이션
 
-## 두 파일의 관계
+## 유일한 기준은 `migrations/`
 
-- **`schema.sql`** — 신규 DB 초기 셋업용 파일. 이후 마이그레이션 내용은 담고 있지 않으므로 운영 DB 재실행 금지.
-  **새 프로젝트 셋업에만** 사용합니다. 이 파일은 초기 스키마 시점에 멈춰 있어서,
-  이미 운영 중인 DB에 다시 실행하면 이후 마이그레이션에서 좁혀 둔 권한·정책이
-  과거 상태로 되돌아갈 수 있습니다.
 - **`migrations/`** — 변경 이력을 시간순으로 남기는 **버전드 마이그레이션**.
-  `0001_baseline.sql`은 현재 시점의 전체 스키마(=`schema.sql`)와 동일합니다.
+  스키마의 단 하나뿐인 정본(source of truth)입니다. `0001_baseline.sql`부터
+  번호순으로 전부 실행하면 현재 운영 스키마가 그대로 만들어집니다.
+- **`schema.sql` / `operational-hardening.sql`** — ⚠️ **더 이상 쓰지 않는 과거
+  스냅샷입니다.** 초기 스키마 시점(대략 0005)에서 멈춰 있어 명함첩(`member_cards`),
+  메모판, 정기결제(`subscriptions`), 출근부·지오 체크인 등이 통째로 빠져 있습니다.
+  신규 셋업에 쓰면 **반쪽짜리 DB**가 만들어지고, 운영 DB에 재실행하면 이후
+  마이그레이션에서 좁혀 둔 권한·정책이 과거 상태로 되돌아갑니다. 실행하지 마세요.
 
 ## 앞으로 스키마를 바꿀 때
 
-1. `migrations/` 에 다음 번호의 파일을 추가합니다. 예: `0002_payments.sql`
+1. `migrations/` 에 다음 번호의 파일을 추가합니다. 예: `0036_xxx.sql`
    - 그 파일에는 **이번 변경분만** (새 테이블/컬럼/정책/트리거) 넣습니다.
    - 멱등하게 작성하세요(`add column if not exists`, `create or replace`,
      `drop ... if exists` 등).
-2. 같은 변경을 `schema.sql` 에도 반영해 둡니다(전체 셋업 파일을 최신으로 유지).
-3. 운영 DB 적용:
+2. 운영 DB 적용:
    - Supabase 대시보드 SQL 에디터에서 **새 마이그레이션 파일만** 순서대로 실행, 또는
    - Supabase CLI 연결 시 `supabase db push`.
 
+> 예전에는 "같은 변경을 `schema.sql`에도 반영" 하는 규칙이었지만, 실제로는
+> 동기화가 끊긴 채 방치되어 오히려 위험한 파일이 됐습니다. 스냅샷을 손으로
+> 유지하는 대신 마이그레이션만 관리합니다.
+
 ## 적용 순서 (대시보드 수동 적용 기준)
 
-- 신규 DB: `schema.sql` 1회 실행.
+- 신규 DB: `migrations/0001_baseline.sql` 부터 **번호 순서대로 전부** 실행.
 - 기존 DB 업데이트: 아직 적용하지 않은 `migrations/*.sql` 을 번호 순서대로 실행.
-  `schema.sql` 은 초기 스키마 기준이라 이후 마이그레이션(권한 축소 등)을 포함하지
-  않는다. 운영 DB에 재실행하지 말 것 — 보안 설정이 과거 상태로 되돌아갈 수 있다.
 
 ---
 
@@ -88,11 +91,18 @@ Solapi에 등록한 뒤, `sendSms` 의 Solapi 호출을 `kakaoOptions`(pfId/temp
 함수 배포:
 
 ```bash
+supabase secrets set CRON_SECRET=충분히_긴_랜덤문자열
 supabase functions deploy reservation-end-reminder --no-verify-jwt
 ```
 
-Netlify 환경 변수에는 프론트와 동일한 `VITE_SUPABASE_URL`이 있어야 합니다. 문자 발송 결과는
-관리자 예약 상세의 문자 발송 이력에 `reservation_end_reminder` 이벤트로 기록됩니다.
+> `--no-verify-jwt`라 Supabase 인증이 붙지 않으므로 `CRON_SECRET`을 **반드시** 설정해야
+> 합니다. 미설정 시 함수는 모든 호출을 401로 거절합니다(fail closed). 문자 발송은 비용이
+> 발생하는 동작이라 열어둔 채 배포하지 않습니다.
+
+Netlify 환경 변수에는 프론트와 동일한 `VITE_SUPABASE_URL`, 그리고 위와 **같은 값의**
+`CRON_SECRET`이 있어야 합니다. 스케줄러가 `x-cron-secret` 헤더로 실어 보냅니다.
+문자 발송 결과는 관리자 예약 상세의 문자 발송 이력에 `reservation_end_reminder`
+이벤트로 기록됩니다.
 
 ---
 
@@ -110,9 +120,16 @@ Netlify 환경 변수에는 프론트와 동일한 `VITE_SUPABASE_URL`이 있어
 ## 취소·환불
 
 회원은 예약 시작 시간 전까지 예약을 취소할 수 있습니다.
-포트원으로 결제된 예약은 관리자 예약 상세의 `PG 환불 실행`에서 카드 승인 취소를 처리합니다.
-회원이 결제된 예약을 직접 취소한 경우에는 운영자가 환불 대기 상태를 확인한 뒤 PG 환불을 실행합니다.
+회원이 결제된 예약을 직접 취소하면 `refund-reservation` 함수가 포트원 카드 승인
+취소까지 즉시 실행하고 `payment_status`를 `refunded`로 바꿉니다. 환불이 실패하면
+예약을 취소하지 않고 오류를 돌려주므로, 돈만 남고 예약이 사라지는 상태가 생기지
+않습니다. 월권 정기결제가 걸린 예약이면 연결된 구독도 함께 해지합니다.
+운영자는 관리자 예약 상세의 `PG 환불 실행`(portone-payment)으로 직접 환불할 수 있습니다.
 일반 결제는 이용 시작 전 취소 시 전액 환불하며, 이용 시작 뒤에는 취소·환불이 어렵습니다.
+
+```bash
+supabase functions deploy refund-reservation   # Verify JWT ON (회원 토큰으로 본인 확인)
+```
 월권 정기결제는 다음 결제일 전에 해지할 수 있고, 이용 중 환불은 이용일수를 일할 계산해 차감한 잔액을 환불합니다.
 
 ## 포트원 결제 (portone-payment)
@@ -130,6 +147,17 @@ supabase functions deploy portone-payment --no-verify-jwt
 
 3. (권장) 포트원 콘솔 > 웹훅에 함수 URL 등록 — 브라우저가 닫혀도 결제가 반영됩니다:
    `https://<프로젝트>.supabase.co/functions/v1/portone-payment`
+
+   웹훅을 쓰려면 콘솔에 표시된 웹훅 시크릿(`whsec_`로 시작)을 함께 등록해야 합니다:
+
+   ```bash
+   supabase secrets set PORTONE_WEBHOOK_SECRET=whsec_...
+   ```
+
+   함수는 Standard Webhooks 규격으로 서명(`webhook-id`/`webhook-timestamp`/`webhook-signature`)을
+   검증하고, 5분을 넘긴 타임스탬프는 재전송으로 보고 거절합니다. 시크릿이 없으면 웹훅은
+   전부 401로 거절됩니다(fail closed) — 이 경우에도 사용자 브라우저의 confirm 경로로
+   결제는 반영되므로 결제가 유실되지는 않습니다.
 
 검증 원칙: 함수는 클라이언트 값을 믿지 않고 포트원 API로 결제를 다시 조회해
 금액이 예약(price_at_booking)과 일치할 때만 결제완료로 반영합니다.

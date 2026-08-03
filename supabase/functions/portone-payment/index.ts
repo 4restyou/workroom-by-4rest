@@ -10,16 +10,22 @@
 //
 // Required secrets:
 //   PORTONE_API_SECRET             - 포트원 V2 API Secret
+//   PORTONE_WEBHOOK_SECRET         - 포트원 콘솔 > 웹훅의 시크릿 (whsec_...)
 //   SUPABASE_URL                   - (auto-provided)
 //   SUPABASE_SERVICE_ROLE_KEY      - (auto-provided)
 //   SUPABASE_ANON_KEY              - (auto-provided)
 //   ALLOWED_ORIGINS                - optional comma-separated browser origins
 //
 // Deploy: supabase functions deploy portone-payment --no-verify-jwt
-//   (웹훅은 인증 헤더 없이 오므로 --no-verify-jwt 필수. confirm은 Origin 검사,
-//    refund는 사용자 JWT로 관리자 여부를 직접 검증한다.)
+//   (웹훅은 Supabase 인증 헤더 없이 오므로 --no-verify-jwt 필수. 대신 웹훅은
+//    Standard Webhooks 서명으로, refund는 사용자 JWT로 관리자 여부를 검증한다.
+//    confirm은 결제 정보를 포트원 API로 재조회해 금액을 대조하므로 호출 자체는
+//    막지 않는다 — Origin 헤더는 인증 수단이 아니라 CORS 응답 계산에만 쓴다.)
+
+import { decidePaymentConfirmation, isPaymentId, isUuid } from "../_shared/paymentRules.ts";
 
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
+const PORTONE_WEBHOOK_SECRET = Deno.env.get("PORTONE_WEBHOOK_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -54,19 +60,60 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "unknown error";
 }
 
-function isUuid(value: unknown): value is string {
-  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function isPaymentId(value: unknown): value is string {
-  return typeof value === "string" && value.length >= 8 && value.length <= 120 && /^[A-Za-z0-9_-]+$/.test(value);
-}
-
 const serviceHeaders = {
   apikey: SERVICE_ROLE,
   Authorization: `Bearer ${SERVICE_ROLE}`,
   "Content-Type": "application/json",
 };
+
+// ── 웹훅 서명 검증 (Standard Webhooks, 포트원 V2가 따르는 규격) ──────────
+// 서명 대상은 `{webhook-id}.{webhook-timestamp}.{raw body}` 이고, 시크릿은
+// `whsec_` 접두사를 뗀 base64를 그대로 HMAC 키로 쓴다.
+const WEBHOOK_TOLERANCE_SECONDS = 5 * 60;
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function verifyWebhookSignature(request: Request, rawBody: string): Promise<boolean> {
+  if (!PORTONE_WEBHOOK_SECRET) return false;
+
+  const webhookId = request.headers.get("webhook-id") ?? "";
+  const timestamp = request.headers.get("webhook-timestamp") ?? "";
+  const signatureHeader = request.headers.get("webhook-signature") ?? "";
+  if (!webhookId || !timestamp || !signatureHeader) return false;
+
+  // 재전송(replay) 방지: 허용 오차를 벗어난 타임스탬프는 거절한다.
+  const sentAt = Number(timestamp);
+  if (!Number.isFinite(sentAt)) return false;
+  if (Math.abs(Date.now() / 1000 - sentAt) > WEBHOOK_TOLERANCE_SECONDS) return false;
+
+  const rawSecret = PORTONE_WEBHOOK_SECRET.startsWith("whsec_")
+    ? PORTONE_WEBHOOK_SECRET.slice("whsec_".length)
+    : PORTONE_WEBHOOK_SECRET;
+
+  let keyBytes: Uint8Array;
+  try {
+    keyBytes = Uint8Array.from(atob(rawSecret), (char) => char.charCodeAt(0));
+  } catch {
+    console.error("[portone-payment] webhook secret is not valid base64");
+    return false;
+  }
+
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signed = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${webhookId}.${timestamp}.${rawBody}`));
+  const expected = btoa(String.fromCharCode(...new Uint8Array(signed)));
+
+  // 헤더에는 `v1,<sig>` 형태가 공백으로 여러 개 올 수 있다 (키 회전 중).
+  return signatureHeader
+    .split(" ")
+    .map((entry) => entry.split(",")[1] ?? "")
+    .filter(Boolean)
+    .some((candidate) => timingSafeEqual(candidate, expected));
+}
 
 type ReservationRow = {
   id: string;
@@ -162,30 +209,42 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
   const reservation = await getReservation(reservationId);
   if (!reservation) return { ok: false, status: 404, message: "예약을 찾을 수 없습니다." };
 
-  if (reservation.payment_status === "paid") {
-    if (reservation.status === "pending") {
-      const updated = await updateReservation(reservationId, { status: "confirmed" });
-      if (!updated) {
-        await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: "DB_UPDATE_FAILED", message: "결제 완료 예약의 자동 확정에 실패했습니다." });
-        return { ok: false, status: 500, message: "결제는 완료되었지만 예약 확정에 실패했습니다. 운영자에게 문의해 주세요." };
-      }
-      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: "PAID_RESERVATION_CONFIRMED", message: "결제 완료 예약을 자동 확정했습니다." });
-      return { ok: true, status: 200, message: "결제가 확인되어 예약이 확정되었습니다." };
-    }
-    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: "ALREADY_PAID", message: "이미 결제 완료된 예약입니다." });
-    return { ok: true, status: 200, message: "이미 결제 완료된 예약입니다." };
-  }
-  if (payment.status !== "PAID") {
-    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: payment.status ?? "UNKNOWN", message: "결제가 완료 상태가 아닙니다." });
-    return { ok: false, status: 400, message: "결제가 완료되지 않았습니다." };
-  }
   const paidAmount = Number(payment.amount?.total ?? 0);
-  if (payment.currency !== "KRW" || paidAmount !== Number(reservation.price_at_booking)) {
-    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", amount: paidAmount, provider_code: "AMOUNT_MISMATCH", message: `결제 금액(${paidAmount})이 예약 금액(${reservation.price_at_booking})과 다릅니다.` });
-    return { ok: false, status: 400, message: "결제 금액이 예약 금액과 일치하지 않습니다." };
+  // 판정은 순수 규칙 모듈에 맡긴다(테스트 대상: src/lib/paymentRules.test.ts).
+  const decision = decidePaymentConfirmation({
+    reservationStatus: reservation.status,
+    reservationPaymentStatus: reservation.payment_status,
+    priceAtBooking: reservation.price_at_booking,
+    providerStatus: payment.status,
+    providerCurrency: payment.currency,
+    providerAmount: paidAmount,
+  });
+
+  if (decision.kind === "confirm_only") {
+    const updated = await updateReservation(reservationId, { status: "confirmed" });
+    if (!updated) {
+      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", provider_code: "DB_UPDATE_FAILED", message: "결제 완료 예약의 자동 확정에 실패했습니다." });
+      return { ok: false, status: 500, message: "결제는 완료되었지만 예약 확정에 실패했습니다. 운영자에게 문의해 주세요." };
+    }
+    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: decision.code, message: "결제 완료 예약을 자동 확정했습니다." });
+    return { ok: true, status: 200, message: "결제가 확인되어 예약이 확정되었습니다." };
   }
 
-  const canAutoConfirm = reservation.status === "pending" || reservation.status === "confirmed";
+  if (decision.kind === "noop") {
+    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: decision.code, message: "이미 결제 완료된 예약입니다." });
+    return { ok: true, status: 200, message: "이미 결제 완료된 예약입니다." };
+  }
+
+  if (decision.kind === "reject") {
+    await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", amount: paidAmount, provider_code: decision.code, message: decision.message });
+    return {
+      ok: false,
+      status: 400,
+      message: decision.code === "AMOUNT_MISMATCH" ? "결제 금액이 예약 금액과 일치하지 않습니다." : "결제가 완료되지 않았습니다.",
+    };
+  }
+
+  const canAutoConfirm = decision.autoConfirm;
   const updated = await updateReservation(reservationId, {
     payment_status: "paid",
     payment_method: "포트원 결제",
@@ -215,11 +274,25 @@ Deno.serve(async (request) => {
       return json({ ok: false, message: "결제 설정이 완료되지 않았습니다." }, 500, headers);
     }
 
-    const body = (await request.json()) as Record<string, unknown>;
+    // 서명 검증은 원문(raw body)에 대해 이뤄지므로 텍스트로 한 번만 읽는다.
+    const rawBody = await request.text();
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      return json({ ok: false, message: "잘못된 요청입니다." }, 400, headers);
+    }
     const type = typeof body.type === "string" ? body.type : "";
 
     // ---- PortOne 웹훅 (Transaction.Paid 등): paymentId만 힌트로 받아 재검증 ----
     if (type.startsWith("Transaction.")) {
+      // Fail closed. 시크릿이 없거나 서명이 맞지 않으면 처리하지 않는다.
+      // 결제 자체는 사용자 브라우저의 confirm 경로로도 반영되므로, 서명 미설정
+      // 상태에서 웹훅을 통과시키는 것보다 거절하는 편이 안전하다.
+      if (!(await verifyWebhookSignature(request, rawBody))) {
+        console.error("[portone-payment] webhook signature rejected");
+        return json({ ok: false, message: "서명 검증에 실패했습니다." }, 401, headers);
+      }
       const data = (body.data ?? {}) as Record<string, unknown>;
       const paymentId = data.paymentId;
       if (!isPaymentId(paymentId)) return json({ ok: false }, 400, headers);
@@ -230,6 +303,9 @@ Deno.serve(async (request) => {
 
     // ---- 결제창 완료 후 클라이언트 검증 요청 ----
     if (type === "confirm") {
+      // Origin 검사는 브라우저발 오·남용을 줄이는 보조 장치일 뿐 인증이 아니다.
+      // (Origin 헤더는 비브라우저 클라이언트에서 얼마든지 생략·위조된다.)
+      // 실제 안전장치는 아래 confirmPayment의 포트원 API 재조회 + 금액 대조다.
       const origin = request.headers.get("Origin");
       if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ ok: false, message: "허용되지 않은 요청입니다." }, 403, headers);
       const paymentId = body.paymentId;

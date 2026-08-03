@@ -1,5 +1,16 @@
 // Sends one end-of-use reminder for checked-in, confirmed reservations.
 // Candidates are atomically claimed by the database RPC to prevent duplicates.
+//
+// 크론(Netlify Scheduled Function)에서만 호출한다. `--no-verify-jwt`로 배포하므로
+// Supabase 인증이 없고, 대신 CRON_SECRET 공유 비밀을 fail-closed로 검사한다.
+// (portone-billing의 charge 분기, reservation-sms의 웹훅과 같은 방식)
+//
+// Required secrets:
+//   CRON_SECRET        - 크론 호출 인증용 공유 비밀 (필수)
+//   SOLAPI_API_KEY / SOLAPI_API_SECRET / SMS_SENDER
+//   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY  - (auto-provided)
+//
+// Deploy: supabase functions deploy reservation-end-reminder --no-verify-jwt
 
 type ReminderRow = {
   reservation_id: string;
@@ -15,6 +26,14 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
 const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 async function toHex(buffer: ArrayBuffer) {
   return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -88,6 +107,14 @@ function serviceHeaders() {
 Deno.serve(async (request) => {
   if (request.method !== "POST") return new Response("method not allowed", { status: 405 });
   if (!SUPABASE_URL || !SERVICE_ROLE) return new Response("server configuration missing", { status: 500 });
+
+  // Fail closed: 시크릿이 없으면 아무도 호출할 수 없다. 문자 발송은 비용이
+  // 발생하는 동작이라 미설정 상태에서 열어두지 않는다.
+  const presented = request.headers.get("x-cron-secret") ?? "";
+  if (!CRON_SECRET || !timingSafeEqual(presented, CRON_SECRET)) {
+    console.error("[reservation-end-reminder] unauthorized call");
+    return new Response("unauthorized", { status: 401 });
+  }
 
   try {
     const claimResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_reservation_end_reminders`, {

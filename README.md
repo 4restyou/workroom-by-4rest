@@ -68,15 +68,15 @@ Kakao Developers의 카카오톡 메시지 API는 같은 서비스 사용자/친
 
 ## Supabase
 
-`supabase/schema.sql`을 Supabase SQL editor에서 실행합니다.
+`supabase/migrations/`의 SQL을 `0001_baseline.sql`부터 **번호 순서대로 전부** 실행합니다
+(Supabase SQL editor 또는 `supabase db push`).
 
 1. Supabase Auth에서 관리자 계정을 만듭니다.
 2. `auth.users`의 해당 사용자 UUID를 확인합니다.
 3. `profiles`에 `role = 'admin'`으로 등록합니다.
 
-이미 운영 중인 Supabase 프로젝트에는 `supabase/operational-hardening.sql`도 한 번 실행합니다.
-이 SQL은 예약 인원/시간 데이터 검증, 이용권 중복 방지, 예약 보관 처리를 위한
-`deleted_at` 컬럼을 추가합니다.
+> `supabase/schema.sql`과 `supabase/operational-hardening.sql`은 초기 시점에서 멈춘
+> 과거 스냅샷이라 실행하면 안 됩니다. 자세한 내용은 [supabase/README.md](supabase/README.md) 참고.
 
 ## 배포
 
