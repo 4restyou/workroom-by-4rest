@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback } from "../components/AdminPage";
 import { defaultPasses } from "../lib/defaultPasses";
-import { formatPrice } from "../lib/format";
+import { formatPrice, statusLabel } from "../lib/format";
 import { getCurrentProfile } from "../lib/profiles";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
@@ -13,6 +13,16 @@ type Period = "day" | "week" | "month" | "quarter" | "year";
 const periodLabels: Record<Period, string> = { day: "일별", week: "주별", month: "월별", quarter: "분기별", year: "연도별" };
 
 type AttendanceLite = { check_in_at: string; check_out_at: string | null };
+type MetricKey = "revenue" | "total" | "receivable" | "refunded" | "confirmed" | "noShow" | "service";
+const metricLabels: Record<MetricKey, string> = {
+  revenue: "실결제 매출",
+  total: "예약",
+  receivable: "미수금",
+  refunded: "환불",
+  confirmed: "확정·완료",
+  noShow: "노쇼",
+  service: "서비스",
+};
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 특정 날짜가 속한 달(±offset)의 전체 범위와 라벨.
@@ -84,6 +94,32 @@ export default function AdminStats() {
     const start = new Date(`${startDate}T00:00:00`); const end = new Date(`${endDate}T00:00:00`); const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1); const prevEnd = new Date(start); prevEnd.setDate(prevEnd.getDate() - 1); const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - days + 1); const value = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; return { start: value(prevStart), end: value(prevEnd) };
   }, [currentMonth.end, currentMonth.start, endDate, startDate]);
   const previous = useMemo(() => reservations.filter((item) => item.date >= previousRange.start && item.date <= previousRange.end && (passFilter === "all" || (item.pass_name_snapshot || item.pass_type) === passFilter)), [passFilter, previousRange.end, previousRange.start, reservations]);
+
+  // 숫자만 보면 "어떤 예약인지" 확인하러 예약 화면을 뒤져야 한다.
+  // 카드를 누르면 그 숫자를 구성하는 예약을 바로 펼쳐 준다.
+  const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
+
+  const metricRows = useMemo(() => {
+    if (!openMetric) return [];
+    const active = (item: Reservation) => item.status !== "canceled" && item.status !== "no_show";
+    const filters: Record<MetricKey, (item: Reservation) => boolean> = {
+      revenue: (item) => item.payment_status === "paid",
+      total: () => true,
+      receivable: (item) => active(item) && (item.payment_status ?? "unpaid") === "unpaid",
+      refunded: (item) => item.payment_status === "refunded",
+      confirmed: (item) => item.status === "confirmed" || item.status === "completed",
+      noShow: (item) => item.status === "no_show",
+      service: (item) => item.payment_status === "service",
+    };
+    return visible
+      .filter(filters[openMetric])
+      .sort((a, b) => `${b.date}${b.start_time ?? ""}`.localeCompare(`${a.date}${a.start_time ?? ""}`));
+  }, [openMetric, visible]);
+
+  const metricTotal = useMemo(
+    () => metricRows.reduce((sum, item) => sum + reservationRevenue(item, priceByPassName), 0),
+    [metricRows, priceByPassName],
+  );
 
   const summary = useMemo(() => summarize(visible, priceByPassName), [priceByPassName, visible]);
   const previousSummary = useMemo(() => summarize(previous, priceByPassName), [previous, priceByPassName]);
@@ -185,6 +221,29 @@ export default function AdminStats() {
       ]);
       XLSX.utils.book_append_sheet(wb, passSheet, "이용권별");
 
+      // 미수금·실결제 매출은 "어떤 예약인지"까지 있어야 대사가 된다.
+      const detailSheets: [string, (item: Reservation) => boolean][] = [
+        ["실결제매출", (item) => item.payment_status === "paid"],
+        ["미수금", (item) => item.status !== "canceled" && item.status !== "no_show" && (item.payment_status ?? "unpaid") === "unpaid"],
+        ["환불", (item) => item.payment_status === "refunded"],
+      ];
+      detailSheets.forEach(([title, filter]) => {
+        const rows = visible.filter(filter);
+        const sheet = XLSX.utils.aoa_to_sheet([
+          ["이용일", "이름", "연락처", "이용권", "예약상태", "결제상태", "금액"],
+          ...rows.map((item) => [
+            item.date,
+            item.name,
+            item.phone ?? "",
+            item.pass_name_snapshot || item.pass_type,
+            statusLabel[item.status] ?? item.status,
+            item.payment_status ?? "unpaid",
+            reservationRevenue(item, priceByPassName),
+          ]),
+        ]);
+        XLSX.utils.book_append_sheet(wb, sheet, title);
+      });
+
       const hourSheet = XLSX.utils.aoa_to_sheet([["시간대", "입실수"], ...usage.hours.map((count, h) => [`${h}시`, count])]);
       XLSX.utils.book_append_sheet(wb, hourSheet, "시간대별");
 
@@ -228,17 +287,54 @@ export default function AdminStats() {
         {isLoading ? <AdminEmpty>통계를 불러오는 중입니다.</AdminEmpty> : null}
         {!isLoading ? <>
           <section className="grid border-y border-workroom-line bg-white lg:grid-cols-4">
-            <PrimaryStat label="실결제 매출" value={formatPrice(summary.revenue)} change={changeRate(summary.revenue, previousSummary.revenue)} />
-            <PrimaryStat label="예약" value={`${summary.total}건`} change={changeRate(summary.total, previousSummary.total)} />
-            <PrimaryStat label="미수금" value={formatPrice(summary.receivable)} />
-            <PrimaryStat label="환불" value={formatPrice(summary.refunded)} />
+            <PrimaryStat label="실결제 매출" value={formatPrice(summary.revenue)} change={changeRate(summary.revenue, previousSummary.revenue)} metric="revenue" openMetric={openMetric} onToggle={setOpenMetric} />
+            <PrimaryStat label="예약" value={`${summary.total}건`} change={changeRate(summary.total, previousSummary.total)} metric="total" openMetric={openMetric} onToggle={setOpenMetric} />
+            <PrimaryStat label="미수금" value={formatPrice(summary.receivable)} metric="receivable" openMetric={openMetric} onToggle={setOpenMetric} />
+            <PrimaryStat label="환불" value={formatPrice(summary.refunded)} metric="refunded" openMetric={openMetric} onToggle={setOpenMetric} />
           </section>
           <section className="mt-4 grid grid-cols-2 border-y border-workroom-line bg-white sm:grid-cols-4">
-            <SecondaryStat label="확정·완료" value={`${summary.confirmed + summary.completed}건`} />
-            <SecondaryStat label="노쇼" value={`${summary.noShow}건`} />
+            <SecondaryStat label="확정·완료" value={`${summary.confirmed + summary.completed}건`} metric="confirmed" openMetric={openMetric} onToggle={setOpenMetric} />
+            <SecondaryStat label="노쇼" value={`${summary.noShow}건`} metric="noShow" openMetric={openMetric} onToggle={setOpenMetric} />
             <SecondaryStat label="노쇼율" value={`${summary.total ? Math.round((summary.noShow / summary.total) * 100) : 0}%`} />
-            <SecondaryStat label="서비스" value={`${summary.service}건`} />
+            <SecondaryStat label="서비스" value={`${summary.service}건`} metric="service" openMetric={openMetric} onToggle={setOpenMetric} />
           </section>
+
+          {/* 선택한 지표를 구성하는 예약 목록 — 행을 누르면 해당 예약 상세로 간다. */}
+          {openMetric ? (
+            <section className="mt-3 border border-workroom-ink bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-workroom-line px-4 py-3">
+                <p className="text-sm font-bold">
+                  {metricLabels[openMetric]} 내역 <span className="tabular-nums text-workroom-muted">{metricRows.length}건</span>
+                  {openMetric !== "total" && openMetric !== "noShow" && openMetric !== "confirmed" ? (
+                    <span className="ml-2 tabular-nums">{formatPrice(metricTotal)}</span>
+                  ) : null}
+                </p>
+                <button className={buttonClass("secondary", "sm")} onClick={() => setOpenMetric(null)} type="button">닫기</button>
+              </div>
+              {metricRows.length ? (
+                <div className="max-h-[420px] overflow-y-auto">
+                  {metricRows.map((item) => (
+                    <Link
+                      className="admin-row grid grid-cols-[86px_1fr_auto] items-center gap-3 px-4 py-3 hover:bg-workroom-background"
+                      key={item.id}
+                      to={`/admin/reservations?reservation=${item.id}`}
+                    >
+                      <span className="text-xs font-semibold tabular-nums text-workroom-muted">{item.date}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">{item.name}</span>
+                        <span className="block truncate text-xs font-medium text-workroom-muted">
+                          {item.pass_name_snapshot || item.pass_type} · {statusLabel[item.status] ?? item.status}
+                        </span>
+                      </span>
+                      <span className="text-right text-sm font-bold tabular-nums">{formatPrice(reservationRevenue(item, priceByPassName))}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <AdminEmpty>해당하는 예약이 없습니다.</AdminEmpty>
+              )}
+            </section>
+          ) : null}
 
           <section className="mt-7 border border-workroom-line bg-white p-4 sm:p-5">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">기간별 흐름</h2><p className="mt-0.5 text-xs text-workroom-muted">막대는 실결제 매출 기준입니다.</p></div><select className="!min-h-[38px] !w-auto" value={period} onChange={(event) => setPeriod(event.target.value as Period)}>{Object.entries(periodLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
@@ -309,8 +405,40 @@ function summarize(items: Reservation[], prices: Map<string, number>) {
 }
 function reservationRevenue(item: Reservation, prices: Map<string, number>) { return item.price_at_booking ?? prices.get(item.pass_name_snapshot || item.pass_type) ?? 0; }
 function changeRate(current: number, previous: number) { if (!previous) return current ? "이전 기간보다 증가" : "변화 없음"; const rate = Math.round(((current - previous) / previous) * 100); return rate === 0 ? "이전 기간과 같음" : `이전 기간보다 ${Math.abs(rate)}% ${rate > 0 ? "증가" : "감소"}`; }
-function PrimaryStat({ change, label, value }: { change?: string; label: string; value: string }) { return <div className="border-b border-workroom-line px-4 py-4 last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{change ? <p className="mt-1 text-xs font-medium text-workroom-muted">{change}</p> : null}</div>; }
-function SecondaryStat({ label, value }: { label: string; value: string }) { return <div className="border-b border-r border-workroom-line px-4 py-3 even:border-r-0 sm:border-b-0 sm:even:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-lg font-bold tabular-nums">{value}</p></div>; }
+// metric이 주어지면 눌러서 구성 예약을 펼칠 수 있는 카드가 된다.
+function PrimaryStat({ change, label, value, metric, openMetric, onToggle }: { change?: string; label: string; value: string; metric?: MetricKey; openMetric?: MetricKey | null; onToggle?: (next: MetricKey | null) => void }) {
+  const isOpen = Boolean(metric && openMetric === metric);
+  const body = (
+    <>
+      <p className="text-xs font-semibold text-workroom-muted">{label}{metric ? <span className="ml-1 text-workroom-ink">{isOpen ? "▾" : "›"}</span> : null}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+      {change ? <p className="mt-1 text-xs font-medium text-workroom-muted">{change}</p> : null}
+    </>
+  );
+  const shell = `border-b border-workroom-line px-4 py-4 text-left last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0 ${isOpen ? "bg-workroom-yellow" : ""}`;
+  if (!metric || !onToggle) return <div className={shell}>{body}</div>;
+  return (
+    <button aria-expanded={isOpen} className={`${shell} w-full hover:bg-workroom-background`} onClick={() => onToggle(isOpen ? null : metric)} type="button">
+      {body}
+    </button>
+  );
+}
+function SecondaryStat({ label, value, metric, openMetric, onToggle }: { label: string; value: string; metric?: MetricKey; openMetric?: MetricKey | null; onToggle?: (next: MetricKey | null) => void }) {
+  const isOpen = Boolean(metric && openMetric === metric);
+  const body = (
+    <>
+      <p className="text-xs font-semibold text-workroom-muted">{label}{metric ? <span className="ml-1 text-workroom-ink">{isOpen ? "▾" : "›"}</span> : null}</p>
+      <p className="mt-1 text-lg font-bold tabular-nums">{value}</p>
+    </>
+  );
+  const shell = `border-b border-r border-workroom-line px-4 py-3 text-left even:border-r-0 sm:border-b-0 sm:even:border-r sm:last:border-r-0 ${isOpen ? "bg-workroom-yellow" : ""}`;
+  if (!metric || !onToggle) return <div className={shell}>{body}</div>;
+  return (
+    <button aria-expanded={isOpen} className={`${shell} w-full hover:bg-workroom-background`} onClick={() => onToggle(isOpen ? null : metric)} type="button">
+      {body}
+    </button>
+  );
+}
 function periodKey(dateValue: string, period: Period) {
   if (period === "year") return dateValue.slice(0, 4);
   if (period === "quarter") return `${dateValue.slice(0, 4)} Q${Math.ceil(Number(dateValue.slice(5, 7)) / 3)}`;
