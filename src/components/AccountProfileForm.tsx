@@ -73,17 +73,36 @@ export default function AccountProfileForm({
     setIsSaving(false);
 
     if (updateError) {
-      setError(updateError.message);
+      // 함수 자체가 없으면(마이그레이션 미적용) 원문만으로는 원인을 알기 어렵다.
+      const missingFunction = /function|does not exist|schema cache/i.test(updateError.message);
+      setError(
+        missingFunction
+          ? `내정보 저장 기능이 서버에 준비되지 않았습니다. 운영자에게 알려 주세요. (${updateError.message})`
+          : updateError.message,
+      );
       return;
     }
-    if (!savedProfile) {
+
+    // RPC가 행을 배열로 돌려주는 경우가 있어(반환 형태 차이) 형태를 맞춰서 읽는다.
+    // 배열을 그대로 상태에 넣으면 화면에는 "저장됨"으로 보이지만 값이 비어 보인다.
+    const saved = (Array.isArray(savedProfile) ? savedProfile[0] : savedProfile) as Profile | undefined;
+    if (!saved?.id) {
       setError("내정보가 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
 
-    const saved = savedProfile as Profile;
+    // 저장된 값이 실제로 반영됐는지 확인한다 — 트리거나 권한 때문에 조용히
+    // 되돌아가는 경우 "저장했습니다"라고 알리면 안 된다.
+    const expectedName = form.full_name.trim();
+    const expectedPhone = form.phone.trim();
+    if (saved.full_name !== expectedName || saved.phone !== expectedPhone) {
+      setError("변경 내용이 저장되지 않았습니다. 다시 시도해도 같으면 운영자에게 알려 주세요.");
+      onProfileSaved(saved);
+      return;
+    }
+
     onProfileSaved(saved);
-    setForm((current) => ({ ...current, address: saved.address ?? "" }));
+    setForm((current) => ({ ...current, full_name: saved.full_name ?? current.full_name, phone: saved.phone ?? current.phone, address: saved.address ?? "" }));
     setDetailAddress("");
 
     if (isCompletingSignup) {
@@ -122,6 +141,18 @@ export default function AccountProfileForm({
 
   return (
     <form className={`mx-auto grid max-w-2xl gap-4 ${card} p-5`} onSubmit={handleSubmit}>
+      {/* 토스트는 몇 초 뒤 사라지므로, 저장 실패는 폼 안에도 남겨 둔다. */}
+      {error ? (
+        <p aria-live="assertive" className={`${tintCard("danger")} p-4 text-sm font-bold leading-6`} role="alert">
+          {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p aria-live="polite" className={`${tintCard("mint")} p-4 text-sm font-bold leading-6`}>
+          {success}
+        </p>
+      ) : null}
+
       {needsOnboarding ? (
         <p className={`${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>
           가입을 완료하려면 이름·연락처를 입력하고 개인정보 수집·이용에 동의한 뒤 저장해 주세요.
