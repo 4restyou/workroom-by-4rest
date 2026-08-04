@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/AdminPage";
 import StatusBadge from "../components/StatusBadge";
 import { downloadCsv } from "../lib/csv";
@@ -23,8 +23,11 @@ export default function AdminMembers() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  // 예약 상세에서 "이용내역 보기"로 넘어올 때 해당 회원을 바로 연다.
+  const [searchParams] = useSearchParams();
+  const memberParam = searchParams.get("member");
+  const [selectedId, setSelectedId] = useState<string | null>(memberParam);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(memberParam));
   useOverlayBackClose(mobileDetailOpen, () => setMobileDetailOpen(false));
   const [query, setQuery] = useState("");
   const [view, setView] = useState<MemberView>("all");
@@ -95,8 +98,8 @@ export default function AdminMembers() {
 
   useEffect(() => {
     if (!visibleMembers.length) setSelectedId(null);
-    else if (!visibleMembers.some((member) => member.id === selectedId)) setSelectedId(visibleMembers[0].id);
-  }, [selectedId, visibleMembers]);
+    else if (!visibleMembers.some((member) => member.id === selectedId)) setSelectedId(memberParam && visibleMembers.some((m) => m.id === memberParam) ? memberParam : visibleMembers[0].id);
+  }, [memberParam, selectedId, visibleMembers]);
 
   // 회원별 조회를 위해 한 번만 인덱싱한다. 예전에는 목록의 회원마다
   // 전체 예약(최대 2000건)을 선형 탐색해서, 검색어를 한 글자 칠 때마다
@@ -129,12 +132,34 @@ export default function AdminMembers() {
   const selectedCoupons = selectedMember ? byProfile.coupons.get(selectedMember.id) ?? [] : [];
 
   function exportMembers() {
-    downloadCsv(`workroom-members-${todayValue()}.csv`, ["이름", "이메일", "연락처", "주소", "가입일", "예약수", "출석수", "사용가능쿠폰", "결제완료금액", "관리자메모"], visibleMembers.map((member) => {
+    downloadCsv(`workroom-members-${todayValue()}.csv`, ["이름", "이메일", "연락처", "주소", "가입일", "예약수", "방문수", "총이용시간(분)", "평균이용시간(분)", "마지막방문", "사용가능쿠폰", "결제완료금액", "관리자메모"], visibleMembers.map((member) => {
       // 인덱스를 재사용한다(회원마다 전체 테이블을 훑지 않는다).
       const memberReservations = byProfile.reservations.get(member.id) ?? [];
       const memberAttendance = byProfile.attendance.get(member.id) ?? [];
       const memberCoupons = byProfile.coupons.get(member.id) ?? [];
-      return [member.full_name, member.email, member.phone, member.address, member.created_at.slice(0, 10), memberReservations.length, memberAttendance.length, memberCoupons.filter((item) => item.status === "issued").length, memberReservations.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + (item.price_at_booking ?? 0), 0), member.admin_note];
+      // 이용 시간은 퇴근이 기록된 방문만 집계한다(열린 세션은 길이를 알 수 없다).
+      let totalMinutes = 0;
+      let closed = 0;
+      for (const visit of memberAttendance) {
+        if (!visit.check_out_at) continue;
+        const minutes = Math.round((new Date(visit.check_out_at).getTime() - new Date(visit.check_in_at).getTime()) / 60000);
+        if (minutes > 0 && minutes < 20 * 60) { totalMinutes += minutes; closed += 1; }
+      }
+      return [
+        member.full_name,
+        member.email,
+        member.phone,
+        member.address,
+        member.created_at.slice(0, 10),
+        memberReservations.length,
+        memberAttendance.length,
+        totalMinutes,
+        closed ? Math.round(totalMinutes / closed) : 0,
+        memberAttendance[0]?.check_in_at?.slice(0, 10) ?? "",
+        memberCoupons.filter((item) => item.status === "issued").length,
+        memberReservations.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + (item.price_at_booking ?? 0), 0),
+        member.admin_note,
+      ];
     }));
   }
 
@@ -197,6 +222,32 @@ function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }:
   const paidAmount = reservations.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + (item.price_at_booking ?? 0), 0);
   const activeCoupons = coupons.filter((item) => item.status === "issued");
 
+  // 이용내역: 얼마나 자주·얼마나 오래 머무는지가 운영 판단의 핵심이다.
+  // 퇴근이 기록된 방문만 시간 집계에 넣는다(열린 세션은 길이를 알 수 없다).
+  const visitStats = (() => {
+    let totalMinutes = 0;
+    let closedVisits = 0;
+    const byMonth = new Map<string, number>();
+    for (const item of attendance) {
+      const month = item.check_in_at.slice(0, 7);
+      byMonth.set(month, (byMonth.get(month) ?? 0) + 1);
+      if (!item.check_out_at) continue;
+      const minutes = Math.round((new Date(item.check_out_at).getTime() - new Date(item.check_in_at).getTime()) / 60000);
+      if (minutes > 0 && minutes < 20 * 60) {
+        totalMinutes += minutes;
+        closedVisits += 1;
+      }
+    }
+    const recentMonths = Array.from(byMonth.entries()).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
+    return {
+      totalMinutes,
+      averageMinutes: closedVisits ? Math.round(totalMinutes / closedVisits) : 0,
+      closedVisits,
+      recentMonths,
+      lastVisit: attendance[0]?.check_in_at ?? null,
+    };
+  })();
+
   return <article className="border border-workroom-line bg-white p-4 sm:p-5">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-workroom-line pb-4"><div><h2 className="text-2xl font-bold">{member.full_name || "이름 미입력"}</h2><div className="mt-2 flex flex-wrap gap-2">{member.phone ? <a className={buttonClass("secondary", "sm")} href={`tel:${member.phone}`}>전화</a> : null}<a className={buttonClass("secondary", "sm")} href={`mailto:${member.email}`}>이메일</a></div></div><p className="text-xs font-medium text-workroom-muted">가입 {formatDate(member.created_at.slice(0, 10))}</p></header>
     <div className="grid border-b border-workroom-line sm:grid-cols-2"><InfoCell
@@ -208,15 +259,81 @@ function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }:
         value={nextReservation ? `${formatDate(nextReservation.date)} · ${formatTimeRange(nextReservation.start_time, nextReservation.end_time)}` : activePass ? "이용권으로 이용 중" : "예정 없음"}
         hint={nextReservation ? nextReservation.pass_name_snapshot || nextReservation.pass_type : undefined}
       /></div>
-    <div className="grid grid-cols-2 border-b border-workroom-line sm:grid-cols-4"><SmallStat label="예약" value={`${reservations.length}건`} /><SmallStat label="방문" value={`${attendance.length}회`} /><SmallStat label="결제" value={`${paidAmount.toLocaleString("ko-KR")}원`} /><SmallStat label="쿠폰" value={`${activeCoupons.length}장`} /></div>
+    <div className="grid grid-cols-2 border-b border-workroom-line sm:grid-cols-3 lg:grid-cols-5"><SmallStat label="예약" value={`${reservations.length}건`} /><SmallStat label="방문" value={`${attendance.length}회`} /><SmallStat label="총 이용시간" value={formatDuration(visitStats.totalMinutes)} /><SmallStat label="결제" value={`${paidAmount.toLocaleString("ko-KR")}원`} /><SmallStat label="쿠폰" value={`${activeCoupons.length}장`} /></div>
     {member.address ? <p className="border-b border-workroom-line py-3 text-sm font-medium text-workroom-muted">{member.address}</p> : null}
     <label className="mt-4 grid gap-1.5 text-sm font-semibold">관리자 메모<textarea placeholder="응대에 필요한 내용만 기록하세요." rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className={`${buttonClass("primary", "sm")} mt-2`} disabled={note === (member.admin_note ?? "")} onClick={() => onSaveNote(note)} type="button">메모 저장</button>
     <details className="mt-5 border-t border-workroom-line pt-3" open><summary className="cursor-pointer text-sm font-semibold">예약 이력 {reservations.length}건</summary><div className="mt-2 border-y border-workroom-line">{reservations.slice(0, 12).map((reservation) => <Link className="admin-row flex items-center justify-between gap-3 px-3 py-3 hover:bg-workroom-background" key={reservation.id} to={`/admin/reservations?reservation=${reservation.id}`}><div><p className="text-sm font-semibold">{formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}</p><p className="mt-0.5 text-xs text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}</p></div><StatusBadge status={reservation.status} /></Link>)}{!reservations.length ? <AdminEmpty>예약 이력이 없습니다.</AdminEmpty> : null}</div></details>
-    <details className="mt-4 border-t border-workroom-line pt-3"><summary className="cursor-pointer text-sm font-semibold">방문·쿠폰 기록</summary><div className="mt-3 grid gap-4 sm:grid-cols-2"><div><p className="mb-2 text-xs font-semibold text-workroom-muted">최근 방문</p>{attendance.slice(0, 8).map((item) => <p className="admin-row py-2 text-sm" key={item.id}>{dateTimeLabel(item.check_in_at)}{item.check_out_at ? ` → ${timeLabel(item.check_out_at)}` : " · 이용 중"}</p>)}</div><div><p className="mb-2 text-xs font-semibold text-workroom-muted">쿠폰</p>{coupons.slice(0, 8).map((coupon) => <div className="admin-row flex items-center justify-between py-2 text-sm" key={coupon.id}><span>{coupon.label}</span><span className={badge(coupon.status === "issued" ? "yellow" : "sky")}>{coupon.status === "issued" ? "사용 가능" : "사용 완료"}</span></div>)}</div></div></details>
+    <details className="mt-4 border-t border-workroom-line pt-3" open>
+      <summary className="cursor-pointer text-sm font-semibold">이용내역 {attendance.length}회</summary>
+      {attendance.length ? (
+        <p className="mt-2 text-xs font-medium text-workroom-muted">
+          평균 {formatDuration(visitStats.averageMinutes)} 이용
+          {visitStats.closedVisits < attendance.length ? ` · 퇴근 미기록 ${attendance.length - visitStats.closedVisits}회 제외` : ""}
+          {visitStats.lastVisit ? ` · 마지막 방문 ${dateTimeLabel(visitStats.lastVisit)}` : ""}
+        </p>
+      ) : null}
+
+      {/* 월별 방문 횟수 — 이용이 늘고 있는지 줄고 있는지 한눈에 본다. */}
+      {visitStats.recentMonths.length ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {visitStats.recentMonths.map(([month, count]) => (
+            <span className="rounded-[5px] border border-workroom-line bg-workroom-background px-2 py-1 text-xs font-semibold tabular-nums" key={month}>
+              {Number(month.slice(5, 7))}월 <b className="text-workroom-ink">{count}회</b>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-3 max-h-[320px] overflow-y-auto border-y border-workroom-line">
+        {attendance.map((item) => {
+          const minutes = item.check_out_at
+            ? Math.round((new Date(item.check_out_at).getTime() - new Date(item.check_in_at).getTime()) / 60000)
+            : null;
+          return (
+            <div className="admin-row flex items-center justify-between gap-3 px-3 py-2.5 text-sm" key={item.id}>
+              <span className="tabular-nums">
+                {dateTimeLabel(item.check_in_at)}
+                {item.check_out_at ? ` → ${timeLabel(item.check_out_at)}` : ""}
+              </span>
+              {item.check_out_at ? (
+                <span className="shrink-0 text-xs font-bold tabular-nums text-workroom-muted">
+                  {minutes !== null && minutes > 0 && minutes < 20 * 60 ? formatDuration(minutes) : "시간 확인 필요"}
+                </span>
+              ) : (
+                <span className={badge("ink")}>이용 중</span>
+              )}
+            </div>
+          );
+        })}
+        {!attendance.length ? <AdminEmpty>이용내역이 없습니다.</AdminEmpty> : null}
+      </div>
+    </details>
+
+    <details className="mt-4 border-t border-workroom-line pt-3">
+      <summary className="cursor-pointer text-sm font-semibold">쿠폰 {coupons.length}장</summary>
+      <div className="mt-2">
+        {coupons.map((coupon) => (
+          <div className="admin-row flex items-center justify-between py-2 text-sm" key={coupon.id}>
+            <span>{coupon.label}</span>
+            <span className={badge(coupon.status === "issued" ? "yellow" : "sky")}>{coupon.status === "issued" ? "사용 가능" : "사용 완료"}</span>
+          </div>
+        ))}
+        {!coupons.length ? <AdminEmpty>발급된 쿠폰이 없습니다.</AdminEmpty> : null}
+      </div>
+    </details>
   </article>;
 }
 
 function InfoCell({ label, value, hint }: { label: string; value: string; hint?: string }) { return <div className="border-b border-workroom-line px-3 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p>{hint ? <p className="mt-0.5 text-xs font-medium text-workroom-muted">{hint}</p> : null}</div>; }
 function SmallStat({ label, value }: { label: string; value: string }) { return <div className="border-b border-r border-workroom-line px-3 py-3 even:border-r-0 sm:border-b-0 sm:even:border-r sm:last:border-r-0"><p className="text-xs font-semibold text-workroom-muted">{label}</p><p className="mt-1 text-base font-bold tabular-nums">{value}</p></div>; }
+// 분 단위를 "2시간 30분"처럼 읽기 쉬운 길이로.
+function formatDuration(minutes: number): string {
+  if (!minutes) return "—";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${rest}분`;
+  return rest ? `${hours}시간 ${rest}분` : `${hours}시간`;
+}
+
 const dateTimeLabel = kstDateTime;
 const timeLabel = kstTime;

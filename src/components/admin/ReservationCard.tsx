@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import StatusBadge from "../StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel } from "../../lib/format";
@@ -191,6 +192,12 @@ export default function ReservationCard({
         <a className={buttonClass("secondary", "sm")} href={`sms:${reservation.phone}`}>
           문자 보내기
         </a>
+        {/* 이 예약자가 실제로 얼마나 이용했는지 바로 확인할 수 있게 연결한다. */}
+        {reservation.profile_id ? (
+          <Link className={buttonClass("secondary", "sm")} to={`/admin/members?member=${reservation.profile_id}`}>
+            이용내역 보기
+          </Link>
+        ) : null}
         <details className="relative">
           <summary className={`${buttonClass("secondary", "sm")} list-none`}>안내 문구</summary>
           <div className="absolute left-0 top-[calc(100%+6px)] z-10 grid w-40 gap-1 border border-workroom-ink bg-white p-2">
