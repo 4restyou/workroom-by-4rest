@@ -133,11 +133,13 @@ export function decideCancellation(input: CancelInput): CancelDecision {
   return { kind: "cancel", refund };
 }
 
-// ── 장기 이용권 일할 환불 ─────────────────────────────────────────────
+// ── 장기 이용권 중도 해지 환불 ────────────────────────────────────────
 //
-// 약관은 "이용 기간 중 환불 시 이용한 일수를 일할 계산해 차감한 잔액을 환불"
-// 한다고 약속한다. 그 계산을 여기 한 곳에 두고 관리자 화면(미리보기)과 엣지
-// 함수(실제 부분 취소)가 같은 금액을 쓰게 한다.
+// 주 단위로 정산한다. 월권·주간권은 좌석을 그 기간 동안 배정해 두는 상품이라
+// (자유석도 단독석 위주로 배정한다) 중도 해지하면 남은 기간의 좌석을 다시
+// 판매하기 어렵다. 그래서 "시작한 주"는 이용한 것으로 보고 남은 주만 환불한다.
+//
+// 이용을 시작하기 전 취소는 전액 환불이다 — 아직 좌석을 쓰지 않았다.
 
 export type ProrateInput = {
   /** 결제 금액(원) */
@@ -153,10 +155,12 @@ export type ProrateInput = {
 export type ProrateResult = {
   /** 전체 이용 일수 */
   totalDays: number;
-  /** 이미 지난(사용한) 일수 */
-  usedDays: number;
-  /** 남은 일수 — 환불 대상 */
-  remainingDays: number;
+  /** 전체 주 수(마지막 주가 짧아도 한 주로 센다) */
+  totalWeeks: number;
+  /** 이미 시작한(소진된) 주 수 */
+  usedWeeks: number;
+  /** 남은 주 수 — 환불 대상 */
+  remainingWeeks: number;
   /** 환불 금액(원, 원 단위 내림) */
   refundAmount: number;
 };
@@ -168,32 +172,25 @@ function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / 86400000);
 }
 
-/**
- * 남은 일수만큼 환불액을 계산한다.
- * - 기간 시작 전이면 전액 환불(아직 하루도 쓰지 않았다).
- * - 기간이 끝났으면 0원.
- * - 기준일 당일은 "사용한 날"로 본다(그날 이용이 가능하므로).
- */
 export function prorateRefund(input: ProrateInput): ProrateResult {
   const totalDays = daysBetween(input.startDate, input.endDate) + 1;
   const amount = Math.max(0, Math.floor(input.paidAmount));
+  const empty = { totalDays: 0, totalWeeks: 0, usedWeeks: 0, remainingWeeks: 0, refundAmount: 0 };
 
-  if (!Number.isFinite(totalDays) || totalDays <= 0) {
-    return { totalDays: 0, usedDays: 0, remainingDays: 0, refundAmount: 0 };
-  }
+  if (!Number.isFinite(totalDays) || totalDays <= 0) return empty;
 
+  const totalWeeks = Math.ceil(totalDays / 7);
   const elapsed = daysBetween(input.startDate, input.onDate);
-  if (!Number.isFinite(elapsed)) {
-    return { totalDays, usedDays: 0, remainingDays: 0, refundAmount: 0 };
-  }
+  if (!Number.isFinite(elapsed)) return { ...empty, totalDays, totalWeeks };
 
-  // 시작 전 취소: 사용한 날이 없으므로 전액.
+  // 시작 전 취소: 좌석을 하루도 쓰지 않았으므로 전액.
   if (elapsed < 0) {
-    return { totalDays, usedDays: 0, remainingDays: totalDays, refundAmount: amount };
+    return { totalDays, totalWeeks, usedWeeks: 0, remainingWeeks: totalWeeks, refundAmount: amount };
   }
 
-  const usedDays = Math.min(totalDays, elapsed + 1);
-  const remainingDays = Math.max(0, totalDays - usedDays);
-  const refundAmount = Math.floor((amount * remainingDays) / totalDays);
-  return { totalDays, usedDays, remainingDays, refundAmount };
+  // 기준일이 속한 주까지는 이용한 것으로 본다.
+  const usedWeeks = Math.min(totalWeeks, Math.floor(elapsed / 7) + 1);
+  const remainingWeeks = Math.max(0, totalWeeks - usedWeeks);
+  const refundAmount = Math.floor((amount * remainingWeeks) / totalWeeks);
+  return { totalDays, totalWeeks, usedWeeks, remainingWeeks, refundAmount };
 }

@@ -230,44 +230,57 @@ describe("식별자 검증", () => {
   });
 });
 
-describe("prorateRefund", () => {
-  const base = { paidAmount: 280000, startDate: "2026-08-01", endDate: "2026-08-28" }; // 4주(28일)
+describe("prorateRefund (주 단위 정산)", () => {
+  // 4주(28일) 월권 280,000원 = 주당 70,000원
+  const base = { paidAmount: 280000, startDate: "2026-08-01", endDate: "2026-08-28" };
 
-  it("이용 기간 시작 전에는 전액을 환불한다", () => {
+  it("이용 시작 전에는 전액을 환불한다", () => {
     const result = prorateRefund({ ...base, onDate: "2026-07-31" });
     expect(result.refundAmount).toBe(280000);
-    expect(result.usedDays).toBe(0);
+    expect(result.usedWeeks).toBe(0);
   });
 
-  it("첫날 해지하면 하루치만 차감한다", () => {
-    const result = prorateRefund({ ...base, onDate: "2026-08-01" });
-    expect(result.totalDays).toBe(28);
-    expect(result.usedDays).toBe(1);
-    expect(result.remainingDays).toBe(27);
-    expect(result.refundAmount).toBe(270000); // 280000 * 27/28
+  it("첫 주에 해지하면 1주만 소진된다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-08-03" });
+    expect(result.totalWeeks).toBe(4);
+    expect(result.usedWeeks).toBe(1);
+    expect(result.remainingWeeks).toBe(3);
+    expect(result.refundAmount).toBe(210000);
   });
 
-  it("절반쯤 쓴 시점에는 남은 일수만큼만 돌려준다", () => {
-    const result = prorateRefund({ ...base, onDate: "2026-08-14" });
-    expect(result.usedDays).toBe(14);
-    expect(result.remainingDays).toBe(14);
+  it("주 경계를 넘으면 다음 주가 소진된다", () => {
+    // 8일차 = 2주차 시작
+    const result = prorateRefund({ ...base, onDate: "2026-08-08" });
+    expect(result.usedWeeks).toBe(2);
     expect(result.refundAmount).toBe(140000);
   });
 
-  it("마지막 날에는 환불할 잔여가 없다", () => {
-    expect(prorateRefund({ ...base, onDate: "2026-08-28" }).refundAmount).toBe(0);
+  it("7일차까지는 아직 1주차다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-08-07" });
+    expect(result.usedWeeks).toBe(1);
+    expect(result.refundAmount).toBe(210000);
+  });
+
+  it("마지막 주에 들어가면 환불할 잔여가 없다", () => {
+    expect(prorateRefund({ ...base, onDate: "2026-08-22" }).refundAmount).toBe(0);
   });
 
   it("기간이 끝난 뒤에는 0원이다", () => {
     const result = prorateRefund({ ...base, onDate: "2026-09-05" });
-    expect(result.remainingDays).toBe(0);
+    expect(result.remainingWeeks).toBe(0);
+    expect(result.refundAmount).toBe(0);
+  });
+
+  it("주간권(1주)은 시작하면 환불 잔여가 없다", () => {
+    const result = prorateRefund({ paidAmount: 149000, startDate: "2026-08-03", endDate: "2026-08-09", onDate: "2026-08-05" });
+    expect(result.totalWeeks).toBe(1);
     expect(result.refundAmount).toBe(0);
   });
 
   it("원 단위로 내림해 과다 환불을 막는다", () => {
-    // 100000 * 27/28 = 96428.57...
-    const result = prorateRefund({ paidAmount: 100000, startDate: "2026-08-01", endDate: "2026-08-28", onDate: "2026-08-01" });
-    expect(result.refundAmount).toBe(96428);
+    // 100000 * 3/4 = 75000 (딱 떨어지므로 나누어떨어지지 않는 금액으로 확인)
+    const result = prorateRefund({ paidAmount: 100001, startDate: "2026-08-01", endDate: "2026-08-28", onDate: "2026-08-01" });
+    expect(result.refundAmount).toBe(75000); // 100001 * 3/4 = 75000.75 → 내림
   });
 
   it("기간 정보가 잘못되면 0원으로 막는다(자동 환불 금지)", () => {

@@ -312,7 +312,7 @@ export default function Account() {
     if (!canCancel(reservation)) {
       setError(
         isLongTermReservation(reservation)
-          ? "이용이 시작된 이용권은 화면에서 바로 해지할 수 없어요. 남은 기간만큼 일할 계산해 환불해 드리니 운영자에게 문의해 주세요."
+          ? "이용이 시작된 이용권은 화면에서 바로 해지할 수 없어요. 남은 주에 해당하는 금액을 환불해 드리니 운영자에게 문의해 주세요."
           : "예약 시간이 지나 취소·환불이 불가합니다.",
       );
       return;
@@ -591,7 +591,7 @@ export default function Account() {
                               <p className="mt-3 text-xs font-medium leading-5 text-workroom-muted">
                                 {isLongTermReservation(reservation) ? (
                                   <>
-                                    이용이 시작된 이용권입니다. 중도 해지 시 남은 기간만큼 일할 계산해 환불해 드려요.{" "}
+                                    이용이 시작된 이용권입니다. 중도 해지 시 주 단위로 정산해 남은 주에 해당하는 금액을 환불해 드려요.{" "}
                                     <a className="font-bold underline underline-offset-2" href={`tel:${SITE.phone}`}>
                                       {SITE.phone}
                                     </a>
