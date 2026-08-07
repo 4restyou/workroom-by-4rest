@@ -140,6 +140,10 @@ export function decideCancellation(input: CancelInput): CancelDecision {
 // 판매하기 어렵다. 그래서 "시작한 주"는 이용한 것으로 보고 남은 주만 환불한다.
 //
 // 이용을 시작하기 전 취소는 전액 환불이다 — 아직 좌석을 쓰지 않았다.
+//
+// 예외: 전체 기간이 1주 이하인 상품(주간권)은 일 단위로 정산한다. 주 단위를
+// 그대로 적용하면 "시작하면 전액 몰수"가 되어, 남은 기간에 비례해 공제한다는
+// 규칙의 취지를 벗어나기 때문이다.
 
 export type ProrateInput = {
   /** 결제 금액(원) */
@@ -163,6 +167,12 @@ export type ProrateResult = {
   remainingWeeks: number;
   /** 환불 금액(원, 원 단위 내림) */
   refundAmount: number;
+  /** 실제 적용된 정산 단위 — 1주 이하 상품은 일 단위로 계산한다. */
+  unit: "week" | "day";
+  /** 이미 지난 일수 */
+  usedDays: number;
+  /** 남은 일수 */
+  remainingDays: number;
 };
 
 function daysBetween(from: string, to: string): number {
@@ -175,7 +185,7 @@ function daysBetween(from: string, to: string): number {
 export function prorateRefund(input: ProrateInput): ProrateResult {
   const totalDays = daysBetween(input.startDate, input.endDate) + 1;
   const amount = Math.max(0, Math.floor(input.paidAmount));
-  const empty = { totalDays: 0, totalWeeks: 0, usedWeeks: 0, remainingWeeks: 0, refundAmount: 0 };
+  const empty: ProrateResult = { totalDays: 0, totalWeeks: 0, usedWeeks: 0, remainingWeeks: 0, refundAmount: 0, unit: "week", usedDays: 0, remainingDays: 0 };
 
   if (!Number.isFinite(totalDays) || totalDays <= 0) return empty;
 
@@ -185,12 +195,37 @@ export function prorateRefund(input: ProrateInput): ProrateResult {
 
   // 시작 전 취소: 좌석을 하루도 쓰지 않았으므로 전액.
   if (elapsed < 0) {
-    return { totalDays, totalWeeks, usedWeeks: 0, remainingWeeks: totalWeeks, refundAmount: amount };
+    return { totalDays, totalWeeks, usedWeeks: 0, remainingWeeks: totalWeeks, refundAmount: amount, unit: totalWeeks <= 1 ? "day" : "week", usedDays: 0, remainingDays: totalDays };
+  }
+
+  // 1주 이하 상품은 일 단위로 정산한다(주 단위면 전액 몰수가 되어 버린다).
+  if (totalWeeks <= 1) {
+    const usedDays = Math.min(totalDays, elapsed + 1);
+    const remainingDays = Math.max(0, totalDays - usedDays);
+    return {
+      totalDays,
+      totalWeeks,
+      usedWeeks: remainingDays > 0 ? 0 : 1,
+      remainingWeeks: remainingDays > 0 ? 1 : 0,
+      refundAmount: Math.floor((amount * remainingDays) / totalDays),
+      unit: "day",
+      usedDays,
+      remainingDays,
+    };
   }
 
   // 기준일이 속한 주까지는 이용한 것으로 본다.
   const usedWeeks = Math.min(totalWeeks, Math.floor(elapsed / 7) + 1);
   const remainingWeeks = Math.max(0, totalWeeks - usedWeeks);
   const refundAmount = Math.floor((amount * remainingWeeks) / totalWeeks);
-  return { totalDays, totalWeeks, usedWeeks, remainingWeeks, refundAmount };
+  return {
+    totalDays,
+    totalWeeks,
+    usedWeeks,
+    remainingWeeks,
+    refundAmount,
+    unit: "week",
+    usedDays: Math.min(totalDays, elapsed + 1),
+    remainingDays: Math.max(0, totalDays - Math.min(totalDays, elapsed + 1)),
+  };
 }

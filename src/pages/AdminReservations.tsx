@@ -380,7 +380,9 @@ export default function AdminReservations() {
 
     const entered = window.prompt(
       prorated
-        ? `환불 금액을 입력해 주세요.\n전체 ${prorated.totalWeeks}주 중 ${prorated.usedWeeks}주 사용 · 잔여 ${prorated.remainingWeeks}주\n(결제 ${formatPrice(paid)} · 주 단위 정산 ${formatPrice(prorated.refundAmount)})`
+        ? prorated.unit === "week"
+          ? `환불 금액을 입력해 주세요.\n전체 ${prorated.totalWeeks}주 중 ${prorated.usedWeeks}주 사용 · 잔여 ${prorated.remainingWeeks}주\n(결제 ${formatPrice(paid)} · 주 단위 정산 ${formatPrice(prorated.refundAmount)})`
+          : `환불 금액을 입력해 주세요.\n전체 ${prorated.totalDays}일 중 ${prorated.usedDays}일 사용 · 잔여 ${prorated.remainingDays}일\n(결제 ${formatPrice(paid)} · 일 단위 정산 ${formatPrice(prorated.refundAmount)})`
         : `환불 금액을 입력해 주세요. (결제 ${formatPrice(paid)})`,
       String(suggested),
     );
@@ -391,7 +393,7 @@ export default function AdminReservations() {
       return;
     }
 
-    const reason = window.prompt("환불 사유를 입력해 주세요. (고객 안내에 사용)", amount < paid ? "이용 기간 중 해지 · 주 단위 정산 환불" : "예약 취소에 따른 환불");
+    const reason = window.prompt("환불 사유를 입력해 주세요. (고객 안내에 사용)", amount < paid ? `이용 기간 중 해지 · ${prorated?.unit === "day" ? "일" : "주"} 단위 정산 환불` : "예약 취소에 따른 환불");
     if (reason === null) return;
 
     // 돈이 즉시 되돌아가고 취소할 수 없는 동작이라, 금액을 직접 입력해야 열린다.

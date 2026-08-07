@@ -271,10 +271,29 @@ describe("prorateRefund (주 단위 정산)", () => {
     expect(result.refundAmount).toBe(0);
   });
 
-  it("주간권(1주)은 시작하면 환불 잔여가 없다", () => {
+  it("주간권(1주 이하)은 일 단위로 정산한다 — 주 단위면 전액 몰수가 되기 때문", () => {
+    // 7일 149,000원, 3일차에 해지 → 남은 4일치
     const result = prorateRefund({ paidAmount: 149000, startDate: "2026-08-03", endDate: "2026-08-09", onDate: "2026-08-05" });
-    expect(result.totalWeeks).toBe(1);
-    expect(result.refundAmount).toBe(0);
+    expect(result.unit).toBe("day");
+    expect(result.totalDays).toBe(7);
+    expect(result.usedDays).toBe(3);
+    expect(result.remainingDays).toBe(4);
+    expect(result.refundAmount).toBe(85142); // 149000 * 4/7 내림
+  });
+
+  it("주간권도 시작 전이면 전액 환불한다", () => {
+    const result = prorateRefund({ paidAmount: 149000, startDate: "2026-08-03", endDate: "2026-08-09", onDate: "2026-08-01" });
+    expect(result.refundAmount).toBe(149000);
+  });
+
+  it("주간권 마지막 날에는 잔여가 없다", () => {
+    expect(prorateRefund({ paidAmount: 149000, startDate: "2026-08-03", endDate: "2026-08-09", onDate: "2026-08-09" }).refundAmount).toBe(0);
+  });
+
+  it("월권은 여전히 주 단위로 정산한다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-08-10" });
+    expect(result.unit).toBe("week");
+    expect(result.refundAmount).toBe(140000);
   });
 
   it("원 단위로 내림해 과다 환불을 막는다", () => {
