@@ -132,3 +132,68 @@ export function decideCancellation(input: CancelInput): CancelDecision {
   const refund = input.paymentStatus === "paid" && isPaymentId(input.paymentKey);
   return { kind: "cancel", refund };
 }
+
+// ── 장기 이용권 일할 환불 ─────────────────────────────────────────────
+//
+// 약관은 "이용 기간 중 환불 시 이용한 일수를 일할 계산해 차감한 잔액을 환불"
+// 한다고 약속한다. 그 계산을 여기 한 곳에 두고 관리자 화면(미리보기)과 엣지
+// 함수(실제 부분 취소)가 같은 금액을 쓰게 한다.
+
+export type ProrateInput = {
+  /** 결제 금액(원) */
+  paidAmount: number;
+  /** 이용 기간 시작일 (YYYY-MM-DD) */
+  startDate: string;
+  /** 이용 기간 종료일 (YYYY-MM-DD, 이 날짜까지 이용) */
+  endDate: string;
+  /** 환불 기준일 (YYYY-MM-DD). 보통 오늘(KST). */
+  onDate: string;
+};
+
+export type ProrateResult = {
+  /** 전체 이용 일수 */
+  totalDays: number;
+  /** 이미 지난(사용한) 일수 */
+  usedDays: number;
+  /** 남은 일수 — 환불 대상 */
+  remainingDays: number;
+  /** 환불 금액(원, 원 단위 내림) */
+  refundAmount: number;
+};
+
+function daysBetween(from: string, to: string): number {
+  const a = new Date(`${from}T00:00:00+09:00`).getTime();
+  const b = new Date(`${to}T00:00:00+09:00`).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return Number.NaN;
+  return Math.round((b - a) / 86400000);
+}
+
+/**
+ * 남은 일수만큼 환불액을 계산한다.
+ * - 기간 시작 전이면 전액 환불(아직 하루도 쓰지 않았다).
+ * - 기간이 끝났으면 0원.
+ * - 기준일 당일은 "사용한 날"로 본다(그날 이용이 가능하므로).
+ */
+export function prorateRefund(input: ProrateInput): ProrateResult {
+  const totalDays = daysBetween(input.startDate, input.endDate) + 1;
+  const amount = Math.max(0, Math.floor(input.paidAmount));
+
+  if (!Number.isFinite(totalDays) || totalDays <= 0) {
+    return { totalDays: 0, usedDays: 0, remainingDays: 0, refundAmount: 0 };
+  }
+
+  const elapsed = daysBetween(input.startDate, input.onDate);
+  if (!Number.isFinite(elapsed)) {
+    return { totalDays, usedDays: 0, remainingDays: 0, refundAmount: 0 };
+  }
+
+  // 시작 전 취소: 사용한 날이 없으므로 전액.
+  if (elapsed < 0) {
+    return { totalDays, usedDays: 0, remainingDays: totalDays, refundAmount: amount };
+  }
+
+  const usedDays = Math.min(totalDays, elapsed + 1);
+  const remainingDays = Math.max(0, totalDays - usedDays);
+  const refundAmount = Math.floor((amount * remainingDays) / totalDays);
+  return { totalDays, usedDays, remainingDays, refundAmount };
+}

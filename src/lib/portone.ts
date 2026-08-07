@@ -187,10 +187,11 @@ export async function cancelOwnReservation(reservationId: string, reason = "회�
 }
 
 // 관리자 환불.
-export async function refundReservationPayment(reservationId: string, reason: string): Promise<PayResult> {
+// amount를 주면 부분 환불(장기 이용권 중도 해지 일할 계산 등), 없으면 전액 취소.
+export async function refundReservationPayment(reservationId: string, reason: string, amount?: number): Promise<PayResult> {
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다." };
   const { data, error } = await supabase.functions.invoke("portone-payment", {
-    body: { type: "refund", reservationId, reason },
+    body: { type: "refund", reservationId, reason, ...(typeof amount === "number" ? { amount } : {}) },
   });
   const result = data as { ok?: boolean; message?: string } | null;
   if (error || !result?.ok) return { ok: false, message: result?.message ?? "환불 처리에 실패했습니다." };

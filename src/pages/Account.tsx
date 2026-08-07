@@ -7,7 +7,7 @@ import AccountProfileForm from "../components/AccountProfileForm";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
 import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
-import { readableReservationError } from "../lib/reservations";
+import { isLongTermReservation, readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
@@ -310,7 +310,11 @@ export default function Account() {
   async function cancelReservation(reservation: Reservation) {
     if (!supabase) return;
     if (!canCancel(reservation)) {
-      setError("예약 시간이 지나 취소·환불이 불가합니다.");
+      setError(
+        isLongTermReservation(reservation)
+          ? "이용이 시작된 이용권은 화면에서 바로 해지할 수 없어요. 남은 기간만큼 일할 계산해 환불해 드리니 운영자에게 문의해 주세요."
+          : "예약 시간이 지나 취소·환불이 불가합니다.",
+      );
       return;
     }
     const wasPaid = reservation.payment_status === "paid";
@@ -584,8 +588,18 @@ export default function Account() {
                                 </button>
                               </div>
                             ) : (
-                              <p className="mt-3 text-xs font-medium text-workroom-muted">
-                                예약 시간이 지나 취소·환불이 불가합니다.
+                              <p className="mt-3 text-xs font-medium leading-5 text-workroom-muted">
+                                {isLongTermReservation(reservation) ? (
+                                  <>
+                                    이용이 시작된 이용권입니다. 중도 해지 시 남은 기간만큼 일할 계산해 환불해 드려요.{" "}
+                                    <a className="font-bold underline underline-offset-2" href={`tel:${SITE.phone}`}>
+                                      {SITE.phone}
+                                    </a>
+                                    로 문의해 주세요.
+                                  </>
+                                ) : (
+                                  "예약 시간이 지나 취소·환불이 불가합니다."
+                                )}
                               </p>
                             )
                           ) : null}

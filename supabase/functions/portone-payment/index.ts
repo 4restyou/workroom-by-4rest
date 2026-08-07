@@ -335,22 +335,34 @@ Deno.serve(async (request) => {
       }
 
       const reason = typeof body.reason === "string" && body.reason.trim() ? body.reason.trim().slice(0, 200) : "운영자 환불 처리";
-      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "requested", amount: reservation.price_at_booking, message: reason });
+
+      // 부분 환불(장기 이용권 중도 해지 일할 계산 등). 금액을 주지 않으면 전액 취소.
+      // 결제 금액을 넘는 요청은 거부한다 — 초과 환불은 되돌릴 수 없다.
+      const paidAmount = Number(reservation.price_at_booking ?? 0);
+      const requestedAmount = typeof body.amount === "number" && Number.isFinite(body.amount) ? Math.floor(body.amount) : null;
+      if (requestedAmount !== null && (requestedAmount <= 0 || requestedAmount > paidAmount)) {
+        return json({ ok: false, message: `환불 금액은 1원 이상 결제 금액(${paidAmount}원) 이하여야 합니다.` }, 400, headers);
+      }
+      const isPartial = requestedAmount !== null && requestedAmount < paidAmount;
+      const refundAmount = requestedAmount ?? paidAmount;
+
+      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "requested", amount: refundAmount, message: reason });
 
       const cancel = await fetch(`https://api.portone.io/payments/${encodeURIComponent(reservation.payment_key)}/cancel`, {
         method: "POST",
         headers: { Authorization: `PortOne ${PORTONE_API_SECRET}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify(isPartial ? { reason, amount: refundAmount } : { reason }),
       });
       if (!cancel.ok) {
         const detail = (await cancel.json().catch(() => null)) as { type?: string; message?: string } | null;
-        await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "failed", amount: reservation.price_at_booking, provider_code: detail?.type ?? String(cancel.status), message: detail?.message ?? "포트원 환불 실패" });
+        await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "failed", amount: refundAmount, provider_code: detail?.type ?? String(cancel.status), message: detail?.message ?? "포트원 환불 실패" });
         return json({ ok: false, message: "환불 처리에 실패했습니다. 포트원 콘솔에서 상태를 확인해 주세요." }, 502, headers);
       }
 
-      await updateReservation(reservationId, { payment_status: "refunded" });
-      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "succeeded", amount: reservation.price_at_booking, message: reason });
-      return json({ ok: true, message: "환불이 완료되었습니다." }, 200, headers);
+      // 부분 환불은 결제가 남아 있으므로 paid를 유지한다(전액일 때만 refunded).
+      if (!isPartial) await updateReservation(reservationId, { payment_status: "refunded" });
+      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "succeeded", amount: refundAmount, message: isPartial ? `부분 환불 ${refundAmount}원 · ${reason}` : reason });
+      return json({ ok: true, message: isPartial ? `${refundAmount.toLocaleString("ko-KR")}원을 환불했습니다.` : "환불이 완료되었습니다." }, 200, headers);
     }
 
     return json({ ok: false, message: "알 수 없는 요청입니다." }, 400, headers);

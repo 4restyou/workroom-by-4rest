@@ -8,6 +8,7 @@ import { downloadCsv } from "../lib/csv";
 import { formatDate, formatPrice, statusLabel, todayValue } from "../lib/format";
 import { refundReservationPayment } from "../lib/portone";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
+import { prorateRefund } from "../../supabase/functions/_shared/paymentRules";
 import { ALL_WEEKDAYS, openWeekdaysFromRows } from "../lib/businessHours";
 import { PASS_COLUMNS } from "../lib/columns";
 import { supabase } from "../lib/supabase";
@@ -359,21 +360,53 @@ export default function AdminReservations() {
     setReservations((current) => current.map((reservation) => (reservation.id === id ? updatedReservation as Reservation : reservation)));
   }
 
-  // 포트원으로 결제된 예약의 실제 PG 환불. 성공하면 payment_status가 refunded로 바뀐다.
+  // 포트원으로 결제된 예약의 실제 PG 환불. 전액이면 payment_status가 refunded로 바뀌고,
+  // 부분 환불(장기 이용권 중도 해지)이면 결제가 남아 있으므로 paid를 유지한다.
   async function refundViaPortone(reservation: Reservation) {
-    const reason = window.prompt("환불 사유를 입력해 주세요. (고객 안내에 사용)", "예약 취소에 따른 환불");
+    const paid = reservation.price_at_booking ?? 0;
+
+    // 약관은 이용 기간 중 해지 시 남은 일수만큼 돌려준다고 안내한다. 장기
+    // 이용권이면 그 금액을 계산해 기본값으로 제안한다(계산은 서버와 같은 규칙).
+    const isLongTerm = isLongTermReservation(reservation);
+    const prorated = isLongTerm
+      ? prorateRefund({
+          paidAmount: paid,
+          startDate: reservation.access_start_date ?? reservation.date,
+          endDate: reservation.access_end_date ?? reservation.date,
+          onDate: todayValue(),
+        })
+      : null;
+    const suggested = prorated && prorated.refundAmount > 0 && prorated.refundAmount < paid ? prorated.refundAmount : paid;
+
+    const entered = window.prompt(
+      prorated
+        ? `환불 금액을 입력해 주세요.\n전체 ${prorated.totalDays}일 중 ${prorated.usedDays}일 사용 · 잔여 ${prorated.remainingDays}일\n(결제 ${formatPrice(paid)} · 일할 계산 ${formatPrice(prorated.refundAmount)})`
+        : `환불 금액을 입력해 주세요. (결제 ${formatPrice(paid)})`,
+      String(suggested),
+    );
+    if (entered === null) return;
+    const amount = Math.floor(Number(entered.replace(/[^0-9]/g, "")));
+    if (!Number.isFinite(amount) || amount <= 0 || amount > paid) {
+      setError(`환불 금액은 1원 이상 ${formatPrice(paid)} 이하여야 합니다.`);
+      return;
+    }
+
+    const reason = window.prompt("환불 사유를 입력해 주세요. (고객 안내에 사용)", amount < paid ? "이용 기간 중 해지 · 일할 계산 환불" : "예약 취소에 따른 환불");
     if (reason === null) return;
+
     // 돈이 즉시 되돌아가고 취소할 수 없는 동작이라, 금액을 직접 입력해야 열린다.
-    const amount = reservation.price_at_booking ?? 0;
     const confirmedRefund = await confirmDialog({
       title: `${reservation.name}님에게 ${formatPrice(amount)}을 환불할까요?`,
-      description: "카드 승인 취소가 즉시 실행되며 되돌릴 수 없습니다.",
+      description:
+        amount < paid
+          ? `부분 환불입니다. 결제 ${formatPrice(paid)} 중 ${formatPrice(amount)}만 취소되며 되돌릴 수 없습니다.`
+          : "카드 승인 취소가 즉시 실행되며 되돌릴 수 없습니다.",
       confirmLabel: "환불 실행",
       tone: "danger",
       requireTyped: String(amount),
     });
     if (!confirmedRefund) return;
-    const result = await refundReservationPayment(reservation.id, reason);
+    const result = await refundReservationPayment(reservation.id, reason, amount);
     if (!result.ok) {
       setError(result.message);
       return;

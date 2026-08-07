@@ -8,6 +8,7 @@ import {
   isPaymentId,
   isUuid,
   reservationStartMs,
+  prorateRefund,
   type CancelInput,
   type ConfirmInput,
 } from "../../supabase/functions/_shared/paymentRules";
@@ -226,5 +227,50 @@ describe("식별자 검증", () => {
     expect(isPaymentId("a".repeat(121))).toBe(false);
     // PostgREST 필터에 그대로 들어가므로 특수문자를 막는다.
     expect(isPaymentId("abcdefgh&or=1")).toBe(false);
+  });
+});
+
+describe("prorateRefund", () => {
+  const base = { paidAmount: 280000, startDate: "2026-08-01", endDate: "2026-08-28" }; // 4주(28일)
+
+  it("이용 기간 시작 전에는 전액을 환불한다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-07-31" });
+    expect(result.refundAmount).toBe(280000);
+    expect(result.usedDays).toBe(0);
+  });
+
+  it("첫날 해지하면 하루치만 차감한다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-08-01" });
+    expect(result.totalDays).toBe(28);
+    expect(result.usedDays).toBe(1);
+    expect(result.remainingDays).toBe(27);
+    expect(result.refundAmount).toBe(270000); // 280000 * 27/28
+  });
+
+  it("절반쯤 쓴 시점에는 남은 일수만큼만 돌려준다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-08-14" });
+    expect(result.usedDays).toBe(14);
+    expect(result.remainingDays).toBe(14);
+    expect(result.refundAmount).toBe(140000);
+  });
+
+  it("마지막 날에는 환불할 잔여가 없다", () => {
+    expect(prorateRefund({ ...base, onDate: "2026-08-28" }).refundAmount).toBe(0);
+  });
+
+  it("기간이 끝난 뒤에는 0원이다", () => {
+    const result = prorateRefund({ ...base, onDate: "2026-09-05" });
+    expect(result.remainingDays).toBe(0);
+    expect(result.refundAmount).toBe(0);
+  });
+
+  it("원 단위로 내림해 과다 환불을 막는다", () => {
+    // 100000 * 27/28 = 96428.57...
+    const result = prorateRefund({ paidAmount: 100000, startDate: "2026-08-01", endDate: "2026-08-28", onDate: "2026-08-01" });
+    expect(result.refundAmount).toBe(96428);
+  });
+
+  it("기간 정보가 잘못되면 0원으로 막는다(자동 환불 금지)", () => {
+    expect(prorateRefund({ paidAmount: 100000, startDate: "", endDate: "", onDate: "2026-08-01" }).refundAmount).toBe(0);
   });
 });
