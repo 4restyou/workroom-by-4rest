@@ -201,15 +201,41 @@ export default function Reserve() {
     ] as [string, string | undefined][]
   ).filter((item): item is [string, string] => Boolean(item[1] && item[1].trim()));
 
-  // 완료 시트: Esc로 닫고, 열릴 때 패널로 포커스를 옮긴다.
+  // 완료 시트: Esc로 닫고, 열릴 때 패널로 포커스를 옮기며, 열려 있는 동안
+  // Tab이 시트 밖으로 나가지 않게 하고 뒤 배경도 스크롤되지 않게 한다.
+  // (예전에는 Tab을 누르면 시트 뒤의 예약 폼으로 포커스가 빠져나갔다.)
   useEffect(() => {
     if (!success) return;
     successPanelRef.current?.focus();
+
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setSuccess(false);
+      if (event.key === "Escape") {
+        setSuccess(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusables = successPanelRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables?.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === successPanelRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [success]);
 
   const selectedSeatTypeId = passes.find((pass) => pass.name === form.pass_type)?.seat_type_id ?? null;

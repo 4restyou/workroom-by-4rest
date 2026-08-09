@@ -35,7 +35,7 @@ export default function Calendar({ month, selected, minMonth, maxMonth, onSelect
           type="button"
           disabled={!canPrev}
           onClick={() => onMonthChange(new Date(year, monthIndex - 1, 1))}
-          className="grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-white text-sm font-bold disabled:text-workroom-line"
+          className="grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-white touch:h-11 touch:w-11 text-sm font-bold disabled:border-transparent disabled:bg-workroom-background disabled:text-workroom-muted"
           aria-label="이전 달"
         >
           ‹
@@ -47,7 +47,7 @@ export default function Calendar({ month, selected, minMonth, maxMonth, onSelect
           type="button"
           disabled={!canNext}
           onClick={() => onMonthChange(new Date(year, monthIndex + 1, 1))}
-          className="grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-white text-sm font-bold disabled:text-workroom-line"
+          className="grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-white touch:h-11 touch:w-11 text-sm font-bold disabled:border-transparent disabled:bg-workroom-background disabled:text-workroom-muted"
           aria-label="다음 달"
         >
           ›
@@ -84,7 +84,10 @@ export default function Calendar({ month, selected, minMonth, maxMonth, onSelect
                 isSelected
                   ? "border-workroom-ink bg-workroom-yellow"
                   : disabled
-                    ? "cursor-not-allowed border-transparent text-workroom-line"
+                    // 예전에는 text-workroom-line(#C8C2B7)이라 배경 대비가 1.7:1밖에
+                    // 안 돼 날짜 숫자가 거의 보이지 않았다. 눌리지 않는다는 신호는
+                    // 배경과 테두리로 주고, 글자는 읽을 수 있게 둔다.
+                    ? "cursor-not-allowed border-transparent bg-workroom-background text-workroom-muted"
                     : "border-workroom-line bg-white hover:border-workroom-ink hover:bg-workroom-sky"
               }`}
             >

@@ -20,9 +20,11 @@ const buttonVariants: Record<ButtonVariant, string> = {
   lilac: "bg-workroom-sky text-workroom-ink",
 };
 
+// 터치 기기에서는 최소 높이를 44px로 올린다(sm은 32px, md는 40px밖에 안 됐다).
+// 마우스 화면에서는 관리자 목록 밀도를 위해 원래 크기를 그대로 둔다.
 const buttonSizes: Record<ButtonSize, string> = {
-  sm: "px-4 py-2 text-sm",
-  md: "px-5 py-3 text-sm sm:text-base",
+  sm: "px-4 py-2 text-sm touch:min-h-[44px]",
+  md: "px-5 py-3 text-sm sm:text-base touch:min-h-[44px]",
   lg: "px-6 py-4 text-base sm:text-lg",
 };
 

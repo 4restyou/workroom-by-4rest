@@ -1,3 +1,4 @@
+import plugin from "tailwindcss/plugin";
 import type { Config } from "tailwindcss";
 
 export default {
@@ -83,5 +84,11 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // 손가락으로 누르는 기기에서만 최소 터치 영역을 키운다. 마우스 화면에서는
+    // 관리자 목록이 그만큼 길어지므로 조밀한 크기를 유지한다.
+    plugin(({ addVariant }) => {
+      addVariant("touch", "@media (pointer: coarse)");
+    }),
+  ],
 } satisfies Config;

@@ -254,7 +254,7 @@ export default function Home() {
 
                   <button
                     aria-label="이전 사진"
-                    className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-workroom-ink bg-workroom-surface/90 text-workroom-ink transition-[transform,opacity] duration-150 ease-out hover:scale-105 active:scale-95 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                    className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 touch:h-11 touch:w-11 place-items-center rounded-full border border-workroom-ink bg-workroom-surface/90 text-workroom-ink transition-[transform,opacity] duration-150 ease-out hover:scale-105 active:scale-95 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                     onClick={() => stepPhoto(-1)}
                     type="button"
                   >
@@ -264,7 +264,7 @@ export default function Home() {
                   </button>
                   <button
                     aria-label="다음 사진"
-                    className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-workroom-ink bg-workroom-surface/90 text-workroom-ink transition-[transform,opacity] duration-150 ease-out hover:scale-105 active:scale-95 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                    className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 touch:h-11 touch:w-11 place-items-center rounded-full border border-workroom-ink bg-workroom-surface/90 text-workroom-ink transition-[transform,opacity] duration-150 ease-out hover:scale-105 active:scale-95 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                     onClick={() => stepPhoto(1)}
                     type="button"
                   >

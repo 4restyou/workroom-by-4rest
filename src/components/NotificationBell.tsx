@@ -112,7 +112,7 @@ export default function NotificationBell() {
         onClick={() => (open ? setOpen(false) : openDropdown())}
         aria-label={`알림${unread ? ` ${unread}건` : ""}`}
         aria-expanded={open}
-        className="relative grid h-9 w-9 place-items-center rounded-[5px] border border-workroom-line bg-workroom-surface text-workroom-ink transition-colors hover:border-workroom-ink"
+        className="relative grid h-9 w-9 place-items-center rounded-[5px] touch:h-11 touch:w-11 border border-workroom-line bg-workroom-surface text-workroom-ink transition-colors hover:border-workroom-ink"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
