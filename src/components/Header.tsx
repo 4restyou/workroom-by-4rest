@@ -58,8 +58,16 @@ export default function Header({ adminMode }: HeaderProps) {
           </nav>
         ) : (
           <nav className="flex items-center gap-3 text-xs font-bold text-workroom-muted sm:gap-6 sm:text-sm">
-            <a className="hidden transition-colors hover:text-workroom-ink sm:inline" href="/#space">공간</a>
-            <a className="hidden transition-colors hover:text-workroom-ink sm:inline" href="/#pricing">이용권</a>
+            {/* 로그인한 회원의 홈은 대시보드라 소개·요금표 섹션이 없다.
+                그대로 두면 '공간'·'이용권'이 아무 데도 가지 않는 링크가 된다. */}
+            {profile && profile.role !== "admin" ? (
+              <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/reserve">예약</Link>
+            ) : (
+              <>
+                <a className="hidden transition-colors hover:text-workroom-ink sm:inline" href="/#space">공간</a>
+                <a className="hidden transition-colors hover:text-workroom-ink sm:inline" href="/#pricing">이용권</a>
+              </>
+            )}
             <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/directory">명함첩</Link>
             <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/board">메모판</Link>
             <Link className="hidden transition-colors hover:text-workroom-ink sm:inline" to="/faq">이용안내</Link>
