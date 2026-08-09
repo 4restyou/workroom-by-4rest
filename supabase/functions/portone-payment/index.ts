@@ -142,6 +142,22 @@ async function updateReservation(id: string, patch: Record<string, unknown>): Pr
   return resp.ok;
 }
 
+// 성공한 환불 금액의 합계. 부분 환불 한도 계산에 쓴다.
+async function sumSucceededRefunds(reservationId: string): Promise<number> {
+  try {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/reservation_payment_logs?reservation_id=eq.${reservationId}&action=eq.refund&status=eq.succeeded&select=amount`,
+      { headers: serviceHeaders },
+    );
+    if (!resp.ok) return Number.NaN;
+    const rows = (await resp.json()) as Array<{ amount: number | null }>;
+    return rows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+  } catch {
+    // 합계를 못 구하면 한도를 알 수 없다 — 호출부가 환불을 막도록 NaN을 돌려준다.
+    return Number.NaN;
+  }
+}
+
 async function recordPaymentLog(log: {
   reservation_id: string;
   profile_id?: string | null;
@@ -339,12 +355,26 @@ Deno.serve(async (request) => {
       // 부분 환불(장기 이용권 중도 해지 일할 계산 등). 금액을 주지 않으면 전액 취소.
       // 결제 금액을 넘는 요청은 거부한다 — 초과 환불은 되돌릴 수 없다.
       const paidAmount = Number(reservation.price_at_booking ?? 0);
-      const requestedAmount = typeof body.amount === "number" && Number.isFinite(body.amount) ? Math.floor(body.amount) : null;
-      if (requestedAmount !== null && (requestedAmount <= 0 || requestedAmount > paidAmount)) {
-        return json({ ok: false, message: `환불 금액은 1원 이상 결제 금액(${paidAmount}원) 이하여야 합니다.` }, 400, headers);
+
+      // 이미 환불한 금액을 합산해 남은 한도를 구한다. 부분 환불은 payment_status를
+      // paid로 두기 때문에, 누적을 보지 않으면 같은 예약을 결제액만큼 반복해서
+      // 환불할 수 있다(PG가 막아 주기 전까지 애플리케이션은 알지 못한다).
+      const refundedSoFar = await sumSucceededRefunds(reservationId);
+      if (!Number.isFinite(refundedSoFar)) {
+        return json({ ok: false, message: "환불 이력을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }, 503, headers);
       }
-      const isPartial = requestedAmount !== null && requestedAmount < paidAmount;
-      const refundAmount = requestedAmount ?? paidAmount;
+      const refundable = Math.max(0, paidAmount - refundedSoFar);
+      if (refundable <= 0) {
+        return json({ ok: false, message: "이미 전액 환불된 예약입니다." }, 400, headers);
+      }
+
+      const requestedAmount = typeof body.amount === "number" && Number.isFinite(body.amount) ? Math.floor(body.amount) : null;
+      if (requestedAmount !== null && (requestedAmount <= 0 || requestedAmount > refundable)) {
+        return json({ ok: false, message: `환불 금액은 1원 이상 남은 환불 가능액(${refundable}원) 이하여야 합니다.` }, 400, headers);
+      }
+      const refundAmount = requestedAmount ?? refundable;
+      // 누적 환불이 결제액에 도달하면 전액 환불로 취급한다.
+      const isPartial = refundedSoFar + refundAmount < paidAmount;
 
       await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "requested", amount: refundAmount, message: reason });
 

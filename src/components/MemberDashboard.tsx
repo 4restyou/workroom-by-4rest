@@ -167,11 +167,13 @@ export default function MemberDashboard() {
           supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
           supabase
             .from("reservations")
-            .select("id,pass_name_snapshot,pass_type,date,start_time,end_time,status,people")
+            .select("id,pass_name_snapshot,pass_type,date,start_time,end_time,status,people,access_start_date,access_end_date")
             .eq("profile_id", user.id)
             .in("status", ["pending", "confirmed"])
             .is("deleted_at", null)
-            .gte("date", today)
+            // 월권·주간권은 date가 '시작일'이라 gte(date)만 보면 이용 중인
+            // 이용권이 둘째 날부터 사라진다. 이용 기간이 오늘 이후인 것도 포함한다.
+            .or(`date.gte.${today},access_end_date.gte.${today}`)
             .order("date", { ascending: true })
             .order("start_time", { ascending: true })
             .limit(1),

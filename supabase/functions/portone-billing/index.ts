@@ -150,7 +150,9 @@ async function chargeBillingKey(
   const verify = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
     headers: { Authorization: `PortOne ${PORTONE_API_SECRET}` },
   });
-  if (!verify.ok) return { ok: false, code: "VERIFY_FAILED", message: "결제 확인에 실패했습니다." };
+  // 청구 요청은 이미 나갔다. 여기서 확인만 실패한 것을 "미결제"로 처리하면
+  // 다음 실행에서 같은 카드를 또 긁게 되므로, 구분 가능한 코드로 돌려준다.
+  if (!verify.ok) return { ok: false, code: "VERIFY_PENDING", message: "결제 확인이 지연되고 있습니다. 중복 청구를 막기 위해 자동 재시도하지 않습니다." };
   const payment = (await verify.json()) as PortonePayment;
   if (payment.status !== "PAID") return { ok: false, code: payment.status ?? "UNKNOWN", message: "결제가 완료되지 않았습니다." };
   if (payment.currency !== "KRW" || Number(payment.amount?.total ?? 0) !== amount) {
@@ -193,14 +195,19 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
   const cycleDays = 28;
   const today = kstToday();
   const weekdays = await openWeekdays();
+  // 회원이 예약할 때 확인한 이용 기간을 그대로 지킨다. 여기서 today 기준으로
+  // 다시 쓰면, 다음 주 시작으로 예약하고 오늘 카드를 등록한 회원의 기간이
+  // 통보 없이 당겨진다. 기간이 아직 없을 때만 예약일 기준으로 채운다.
+  const periodStart = reservation.access_start_date ?? reservation.date ?? today;
+  const periodEnd = reservation.access_end_date ?? addDays(periodStart, cycleDays - 1);
   const updated = await updateReservation(reservationId, {
     status: "confirmed",
     payment_status: "paid",
     payment_method: "포트원 정기결제",
     payment_key: paymentId,
-    access_start_date: today,
-    access_end_date: addDays(today, cycleDays - 1),
-    access_weekdays: weekdays,
+    access_start_date: periodStart,
+    access_end_date: periodEnd,
+    ...(reservation.access_weekdays?.length ? {} : { access_weekdays: weekdays }),
   });
   if (!updated) {
     await recordPaymentLog({ reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "failed", amount, provider_code: "DB_UPDATE_FAILED", message: "결제 후 예약 반영 실패" });
@@ -212,7 +219,7 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
     body: JSON.stringify({
       profile_id: user.id, reservation_id: reservationId, billing_key: billingKey,
       pass_id: reservation.pass_id, pass_name: passName, amount, cycle_days: cycleDays,
-      status: "active", next_charge_at: addDays(today, cycleDays), last_paid_at: new Date().toISOString(),
+      status: "active", next_charge_at: addDays(periodEnd, 1), last_paid_at: new Date().toISOString(),
     }),
   });
   await recordPaymentLog({ reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "succeeded", amount, message: "정기결제 등록 및 첫 결제 완료" });
@@ -235,7 +242,11 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
   let failed = 0;
   for (const sub of Array.isArray(subs) ? subs : []) {
     const reservation = sub.reservation_id ? await getReservation(sub.reservation_id) : null;
-    const paymentId = `wr-rec-${sub.id.slice(0, 8)}-${Date.now()}`;
+    // 결제 식별자를 주기(청구일)에 고정한다. 크론이 겹쳐 실행되거나 재시도돼도
+    // 같은 주기에 대해서는 같은 paymentId가 되어 PortOne이 중복 결제를 거부한다.
+    // (Date.now()를 쓰면 매번 다른 결제로 취급되어 이중 청구가 가능했다.)
+    const cycleKey = (sub.next_charge_at ?? today).replace(/-/g, "");
+    const paymentId = `wr-rec-${sub.id.slice(0, 8)}-${cycleKey}`;
     const customer = reservation
       ? { fullName: reservation.name, phoneNumber: reservation.phone, ...(reservation.email ? { email: reservation.email } : {}) }
       : { fullName: "회원", phoneNumber: "" };
@@ -259,10 +270,16 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
     } else {
       failed += 1;
       const nextFail = sub.fail_count + 1;
+      // 확인 지연은 이미 청구가 나갔을 수 있으므로 자동 재시도하지 않고 멈춘다.
+      const needsReview = charge.code === "VERIFY_PENDING";
       await fetch(`${SUPABASE_URL}/rest/v1/subscriptions?id=eq.${sub.id}`, {
         method: "PATCH",
         headers: { ...serviceHeaders, Prefer: "return=minimal" },
-        body: JSON.stringify({ fail_count: nextFail, ...(nextFail >= 3 ? { status: "paused" } : {}) }),
+        body: JSON.stringify(
+          needsReview
+            ? { status: "paused", fail_count: nextFail }
+            : { fail_count: nextFail, ...(nextFail >= 3 ? { status: "paused" } : {}) },
+        ),
       });
       if (sub.reservation_id) await recordPaymentLog({ reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "failed", amount: sub.amount, provider_code: charge.code, message: `${charge.message}${nextFail >= 3 ? " · 3회 실패로 일시정지" : ""}` });
     }

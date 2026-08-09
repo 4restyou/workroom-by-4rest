@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import ManualReservationForm from "../components/admin/ManualReservationForm";
@@ -311,23 +311,23 @@ export default function AdminReservations() {
     void loadAuditLogs();
   }, [selectedReservationId]);
 
-  useEffect(() => {
-    async function loadPaymentLogs() {
-      if (!supabase || !selectedReservationId) {
-        setPaymentLogs([]);
-        return;
-      }
-      const { data } = await supabase
-        .from("reservation_payment_logs")
-        .select("*")
-        .eq("reservation_id", selectedReservationId)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      setPaymentLogs((data ?? []) as ReservationPaymentLog[]);
+  const loadPaymentLogs = useCallback(async (reservationId: string | null) => {
+    if (!supabase || !reservationId) {
+      setPaymentLogs([]);
+      return;
     }
+    const { data } = await supabase
+      .from("reservation_payment_logs")
+      .select("*")
+      .eq("reservation_id", reservationId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setPaymentLogs((data ?? []) as ReservationPaymentLog[]);
+  }, []);
 
-    void loadPaymentLogs();
-  }, [selectedReservationId]);
+  useEffect(() => {
+    void loadPaymentLogs(selectedReservationId);
+  }, [loadPaymentLogs, selectedReservationId]);
 
   async function saveReservation(id: string, payload: ReservationEdit) {
     if (!supabase) return;
@@ -415,7 +415,13 @@ export default function AdminReservations() {
     }
     setError("");
     setSuccess(result.message);
-    setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "refunded" as const } : item)));
+    // 부분 환불은 결제가 남아 있어 서버가 paid를 유지한다. 여기서 무조건
+    // refunded로 바꾸면 새로고침 때 되돌아가고, 남은 금액도 알 수 없게 된다.
+    const fullyRefunded = amount >= paid;
+    if (fullyRefunded) {
+      setReservations((current) => current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "refunded" as const } : item)));
+    }
+    await loadPaymentLogs(reservation.id);
   }
 
   async function resendStatusSms(reservation: Reservation, kind: "confirmed" | "canceled") {
