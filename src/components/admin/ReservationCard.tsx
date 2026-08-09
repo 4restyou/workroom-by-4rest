@@ -3,13 +3,11 @@ import { useEffect, useState } from "react";
 import StatusBadge from "../StatusBadge";
 import { formatDate, formatPrice, formatTimeRange, statusLabel } from "../../lib/format";
 import {
-  addDaysStr,
   buildCanceledMessage,
   buildConfirmedMessage,
   describeAuditLog,
   describePaymentLog,
   formatAuditTime,
-  passPeriodWeeks,
   paymentLogTint,
   paymentStatusLabels,
   paymentStatusOptions,
@@ -21,7 +19,7 @@ import {
   statusOptions,
 } from "../../lib/adminReservations";
 import { confirmDialog } from "../../lib/confirm";
-import { isLongTermReservation } from "../../lib/reservations";
+import { isLongTermReservation, accessEndDate, passUsableDays } from "../../lib/reservations";
 import { buttonClass, tintCard } from "../../lib/ui";
 import type { ReservationEdit } from "../../lib/adminReservations";
 import type {
@@ -346,14 +344,14 @@ export default function ReservationCard({
         <details className="mt-3 rounded-card border border-workroom-line bg-white p-4" open>
           <summary className="cursor-pointer text-sm font-black">주간권·월권 이용기간</summary>
           <p className="mt-2 text-xs font-medium text-workroom-muted">
-            {bookingDraft.pass_type}은 <b className="text-workroom-ink">{passPeriodWeeks(bookingDraft.pass_type)}주({passPeriodWeeks(bookingDraft.pass_type) * 7}일)</b> 기준이에요. 시작일이나 종료일 한쪽을 바꾸면 나머지가 자동으로 맞춰져요.
+            {bookingDraft.pass_type}은 <b className="text-workroom-ink">이용 {passUsableDays(bookingDraft.pass_type, openWeekdays.length)}일</b> 기준이에요(휴무일 제외). 시작일을 바꾸면 종료일이 영업일 기준으로 자동 계산됩니다.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용 시작일
-              <input type="date" value={accessDraft.start} onChange={(event) => { const start = event.target.value; setAccessDraft((current) => ({ ...current, start, end: start ? addDaysStr(start, passPeriodWeeks(bookingDraft.pass_type) * 7 - 1) : current.end })); }} />
+              <input type="date" value={accessDraft.start} onChange={(event) => { const start = event.target.value; setAccessDraft((current) => ({ ...current, start, end: start ? accessEndDate(start, bookingDraft.pass_type, openWeekdays) : current.end })); }} />
             </label>
             <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용 종료일
-              <input min={accessDraft.start} type="date" value={accessDraft.end} onChange={(event) => { const end = event.target.value; setAccessDraft((current) => ({ ...current, end, start: end ? addDaysStr(end, -(passPeriodWeeks(bookingDraft.pass_type) * 7 - 1)) : current.start })); }} />
+              <input min={accessDraft.start} type="date" value={accessDraft.end} onChange={(event) => setAccessDraft((current) => ({ ...current, end: event.target.value }))} />
             </label>
           </div>
           <fieldset className="mt-3">

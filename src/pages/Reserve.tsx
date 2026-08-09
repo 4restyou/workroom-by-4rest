@@ -20,7 +20,7 @@ import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, canSubscribe, payReservation, subscribeMonthly } from "../lib/portone";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
-import { addDaysStr, isLongTermPassName, passPeriodWeeks, readableReservationError } from "../lib/reservations";
+import { accessEndDate, isLongTermPassName, passUsableDays, readableReservationError } from "../lib/reservations";
 import { hoursForDate, openWeekdaysFrom } from "../lib/businessHours";
 import { PASS_COLUMNS, RESERVATION_AVAILABILITY_COLUMNS } from "../lib/columns";
 import { SITE } from "../lib/site";
@@ -495,7 +495,8 @@ export default function Reserve() {
       ...(isLongTermPassName(form.pass_type)
         ? {
             access_start_date: form.date,
-            access_end_date: addDaysStr(form.date, passPeriodWeeks(form.pass_type) * 7 - 1),
+            // 영업일 기준으로 채운다 — 종료일이 휴무일이 되지 않도록.
+            access_end_date: accessEndDate(form.date, form.pass_type, openWeekdays),
             access_weekdays: openWeekdays,
           }
         : {}),
@@ -900,8 +901,8 @@ export default function Reserve() {
                   <>
                     <dt className="font-bold text-workroom-muted">이용 기간</dt>
                     <dd className="font-bold">
-                      {form.date ? `${formatDate(form.date)} ~ ${formatDate(addDaysStr(form.date, passPeriodWeeks(form.pass_type) * 7 - 1))}` : "-"}
-                      <span className="ml-1 font-medium text-workroom-muted">({passPeriodWeeks(form.pass_type)}주)</span>
+                      {form.date ? `${formatDate(form.date)} ~ ${formatDate(accessEndDate(form.date, form.pass_type, openWeekdays))}` : "-"}
+                      <span className="ml-1 font-medium text-workroom-muted">(이용 {passUsableDays(form.pass_type, openWeekdays.length)}일)</span>
                     </dd>
                   </>
                 ) : (
@@ -990,8 +991,8 @@ export default function Reserve() {
                     <>
                       <dt className="font-bold text-workroom-muted">이용 기간</dt>
                       <dd className="font-bold">
-                        {formatDate(submittedReservation.date)} ~ {formatDate(addDaysStr(submittedReservation.date, passPeriodWeeks(submittedReservation.passName) * 7 - 1))}
-                        <span className="ml-1 font-medium text-workroom-muted">({passPeriodWeeks(submittedReservation.passName)}주)</span>
+                        {formatDate(submittedReservation.date)} ~ {formatDate(accessEndDate(submittedReservation.date, submittedReservation.passName, openWeekdays))}
+                        <span className="ml-1 font-medium text-workroom-muted">(이용 {passUsableDays(submittedReservation.passName, openWeekdays.length)}일)</span>
                       </dd>
                     </>
                   ) : (
