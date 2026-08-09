@@ -340,6 +340,8 @@ export default function Reserve() {
       if (!form.pass_type) return "이용권을 먼저 선택해 주세요.";
     }
     if (step === 2) {
+      const people = Number(form.people);
+      if (!Number.isInteger(people) || people < 1 || people > 12) return "인원은 1명부터 12명까지 입력할 수 있습니다.";
       if (!form.date || form.date < todayValue()) return "오늘 이후 날짜를 선택해 주세요.";
       if (isClosedDay) return "선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.";
       if (form.date > maxBookable) return "예약은 오늘부터 2개월 이내 날짜까지만 가능해요.";
@@ -726,6 +728,12 @@ export default function Reserve() {
                 />
               </div>
               <div className="grid content-start gap-4">
+                <label className="grid gap-1 text-sm font-bold">
+                  인원
+                  <span className="text-xs font-medium text-workroom-muted">잔여 좌석은 인원 기준으로 확인해요.</span>
+                  <input min={1} max={12} required type="number" value={form.people} onChange={(event) => updateField("people", event.target.value)} />
+                </label>
+
                 {selectedDuration ? (
                   <fieldset className="grid gap-3">
                     <legend className="text-sm font-bold">시작 시간</legend>
@@ -814,9 +822,6 @@ export default function Reserve() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="이메일">
                   <input placeholder="선택 입력" type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} />
-                </Field>
-                <Field label="인원">
-                  <input min={1} required type="number" value={form.people} onChange={(event) => updateField("people", event.target.value)} />
                 </Field>
               </div>
               {/* 온라인 결제 준비 전에는 어느 쪽을 골라도 '운영자 확인 후 결제'로 동일하다.
@@ -916,7 +921,21 @@ export default function Reserve() {
                   </>
                 )}
                 <dt className="font-bold text-workroom-muted">금액</dt>
-                <dd className="font-bold">{selectedPassInfo?.price ? formatPrice(selectedPassInfo.price) : "확인 후 안내"}</dd>
+                <dd className="font-bold">
+                  {selectedPassInfo?.price ? (
+                    <>
+                      {formatPrice(selectedPassInfo.price)}
+                      <span className="ml-1 font-medium text-workroom-muted">/ 1인</span>
+                      {Number(form.people) > 1 ? (
+                        <span className="mt-0.5 block text-xs font-medium text-workroom-muted">
+                          {form.people}명 · 총 {formatPrice(selectedPassInfo.price * Number(form.people))} · 인원 추가분은 확인 후 안내드려요
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    "확인 후 안내"
+                  )}
+                </dd>
                 {SITE.booking.paymentEnabled ? (
                   <>
                     <dt className="font-bold text-workroom-muted">결제</dt>
