@@ -4,11 +4,11 @@ import Section from "../components/Section";
 import { signInWithGoogle } from "../lib/profiles";
 import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
-import { kstDate as kstDateShared, kstLongDateTime, toKstInputValue, fromKstInputValue } from "../lib/datetime";
+import { kstDate as kstDateShared, kstDayLabel, kstLongDateTime, toKstInputValue, fromKstInputValue } from "../lib/datetime";
 import { buttonClass, card, tintCard } from "../lib/ui";
 import type { CheckInResult } from "../lib/types";
 
-type State = "checking" | "need-login" | "prior-close" | "done";
+type State = "loading" | "ready" | "checking" | "need-login" | "prior-close" | "done";
 
 type PriorSession = { id: string; check_in_at: string };
 
@@ -26,7 +26,7 @@ export default function CheckIn() {
   const [params] = useSearchParams();
   const location = useLocation();
   const token = params.get("t") ?? "";
-  const [state, setState] = useState<State>("checking");
+  const [state, setState] = useState<State>("loading");
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [prior, setPrior] = useState<PriorSession | null>(null);
   const [checkoutInput, setCheckoutInput] = useState("");
@@ -83,10 +83,12 @@ export default function CheckIn() {
         return;
       }
 
-      await runCheckIn();
+      // 도장은 회원이 직접 누를 때만 찍는다. 예전에는 페이지가 열리자마자 자동으로
+      // 찍혀서, 북마크·지난 링크를 실수로 열어도 그날 출근이 기록되고 되돌릴 수 없었다.
+      // (위치 권한 창도 아무 설명 없이 떴다.)
+      setState("ready");
     }
     void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function savePriorCheckout() {
@@ -117,11 +119,31 @@ export default function CheckIn() {
 
   const success = result?.ok && !result.already;
   const title = state === "prior-close" ? "이전 퇴근 확인" : state === "done" && success ? "출근 완료!" : "출근 체크인";
+  const todayLabel = kstDayLabel(new Date());
 
   return (
     <main className="pb-16">
       <Section eyebrow="Check-in" title={title} accent={success ? "mint" : "yellow"}>
         <div className={`${card} grid gap-4 p-6`}>
+          {state === "loading" ? <p className="font-bold">준비하고 있어요…</p> : null}
+
+          {state === "ready" ? (
+            <>
+              <div>
+                <p className="font-bold">{todayLabel} 출근 도장을 찍을까요?</p>
+                <p className="mt-1 text-sm font-medium leading-6 text-workroom-muted">
+                  아래 버튼을 누르면 오늘 출근이 기록돼요. 한 번 찍은 도장은 회원이 직접 취소할 수 없으니, 오늘 이용하실 때 눌러 주세요.
+                </p>
+              </div>
+              <button className={buttonClass("primary", "lg", "w-full sm:w-auto")} onClick={() => void runCheckIn()} type="button">
+                출근 도장 찍기
+              </button>
+              <p className="text-xs font-medium leading-6 text-workroom-muted">
+                출근 확인을 위해 현재 위치를 잠시 확인할 수 있어요. 위치는 저장하지 않아요.
+              </p>
+            </>
+          ) : null}
+
           {state === "checking" ? (
             <div>
               <p className="font-bold">출근을 확인하고 있어요…</p>

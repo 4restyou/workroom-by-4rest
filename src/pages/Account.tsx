@@ -5,9 +5,10 @@ import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import AccountProfileForm from "../components/AccountProfileForm";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
+import { kstLongDateTime } from "../lib/datetime";
 import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
 import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
-import { isLongTermReservation, readableReservationError } from "../lib/reservations";
+import { isLongTermReservation, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
@@ -35,6 +36,15 @@ const reservationStatusCardClass: Record<ReservationStatus, string> = {
   no_show: "border-workroom-ink bg-workroom-danger/70",
 };
 
+// 회원이 볼 수 있는 결제·환불 기록(migration 0038의 my_payment_receipts 뷰).
+type PaymentReceipt = {
+  id: string;
+  reservation_id: string;
+  action: "confirm" | "refund";
+  amount: number | null;
+  created_at: string;
+};
+
 type SubscriptionRow = {
   id: string;
   pass_name: string;
@@ -59,6 +69,7 @@ export default function Account() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRow[]>([]);
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
@@ -86,6 +97,17 @@ export default function Account() {
       .select("id,pass_name,amount,status,next_charge_at,method_label")
       .order("created_at", { ascending: false });
     setSubscriptions((data ?? []) as SubscriptionRow[]);
+  }, []);
+
+  // 결제 기록은 뷰가 아직 배포되지 않은 환경에서도 화면이 깨지지 않도록 조용히 비워 둔다.
+  const loadReceipts = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error: receiptError } = await supabase
+      .from("my_payment_receipts")
+      .select("id,reservation_id,action,amount,created_at")
+      .order("created_at", { ascending: true });
+    if (receiptError) return;
+    setReceipts((data ?? []) as PaymentReceipt[]);
   }, []);
 
   useEffect(() => {
@@ -125,6 +147,7 @@ export default function Account() {
           if (reservationResult.error) throw reservationResult.error;
           setReservations((reservationResult.data ?? []) as Reservation[]);
           void loadSubscriptions();
+          void loadReceipts();
           setInquiries((inquiryResult.data ?? []) as ReservationInquiry[]);
           setAttendance((attendanceResult.data ?? []) as Attendance[]);
           setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
@@ -138,7 +161,7 @@ export default function Account() {
     }
 
     void loadAccount();
-  }, [navigate, loadSubscriptions]);
+  }, [navigate, loadSubscriptions, loadReceipts]);
 
   async function cancelSub(id: string) {
     const ok = await confirmDialog({
@@ -192,6 +215,16 @@ export default function Account() {
     [orderedReservations],
   );
 
+  const receiptsByReservation = useMemo(() => {
+    const grouped = new Map<string, PaymentReceipt[]>();
+    for (const receipt of receipts) {
+      const list = grouped.get(receipt.reservation_id);
+      if (list) list.push(receipt);
+      else grouped.set(receipt.reservation_id, [receipt]);
+    }
+    return grouped;
+  }, [receipts]);
+
 
 
   async function sendInquiry(reservationId: string) {
@@ -229,6 +262,19 @@ export default function Account() {
   async function saveEdit(reservation: Reservation) {
     if (!supabase) return;
     setError("");
+
+    // 저장하면 확정이 확인 대기로 돌아간다. 결제한 회원이 놀라지 않도록 먼저 알린다.
+    if (reservation.status === "confirmed") {
+      const paid = reservation.payment_status === "paid";
+      const ok = await confirmDialog({
+        title: "시간을 변경하면 다시 확인 대기가 됩니다",
+        description: paid
+          ? "결제 금액은 그대로 유지되며, 운영자 확인 후 다시 확정됩니다."
+          : "운영자 확인 후 다시 확정됩니다.",
+        confirmLabel: "변경 신청",
+      });
+      if (!ok) return;
+    }
 
     // 저장 전에 기본 검증 — 서버 트리거까지 가기 전에 흔한 실수를 잡는다.
     if (!editDraft.date || !editDraft.start_time || !editDraft.end_time) {
@@ -278,6 +324,7 @@ export default function Account() {
           current.map((item) => (item.id === reservation.id ? { ...item, payment_status: "paid" as const, status: "confirmed" as const } : item)),
         );
         setSuccess(result.message);
+        void loadReceipts();
       } else {
         setError(result.message);
       }
@@ -297,6 +344,7 @@ export default function Account() {
         );
         setSuccess(result.message);
         void loadSubscriptions();
+        void loadReceipts();
       } else {
         setError(result.message);
       }
@@ -312,7 +360,9 @@ export default function Account() {
     if (!canCancel(reservation)) {
       setError(
         isLongTermReservation(reservation)
-          ? "이용이 시작된 이용권은 화면에서 바로 해지할 수 없어요. 남은 주에 해당하는 금액을 환불해 드리니 운영자에게 문의해 주세요."
+          ? passPeriodWeeks(reservation.pass_name_snapshot || reservation.pass_type) <= 1
+            ? "이용이 시작된 이용권은 화면에서 바로 해지할 수 없어요. 남은 일수만큼 일 단위로 환불해 드리니 운영자에게 문의해 주세요."
+            : "이용이 시작된 이용권은 화면에서 바로 해지할 수 없어요. 남은 주에 해당하는 금액을 환불해 드리니 운영자에게 문의해 주세요."
           : "예약 시간이 지나 취소·환불이 불가합니다.",
       );
       return;
@@ -345,6 +395,7 @@ export default function Account() {
       ),
     );
     setSuccess(result.message);
+    void loadReceipts();
   }
 
   async function saveInquiryEdit(inquiry: ReservationInquiry) {
@@ -475,6 +526,11 @@ export default function Account() {
                             </div>
                           ) : null}
 
+                          <PaymentReceipts
+                            method={reservation.payment_method}
+                            receipts={receiptsByReservation.get(reservation.id) ?? []}
+                          />
+
                           {(reservation.status === "pending" || reservation.status === "confirmed") && reservation.payment_status !== "service" && (reservation.price_at_booking ?? 0) > 0 ? (
                             <div className="mt-3">
                               {reservation.payment_status === "paid" ? (
@@ -591,7 +647,11 @@ export default function Account() {
                               <p className="mt-3 text-xs font-medium leading-5 text-workroom-muted">
                                 {isLongTermReservation(reservation) ? (
                                   <>
-                                    이용이 시작된 이용권입니다. 중도 해지 시 주 단위로 정산해 남은 주에 해당하는 금액을 환불해 드려요.{" "}
+                                    이용이 시작된 이용권입니다. 중도 해지 시{" "}
+                                    {passPeriodWeeks(reservation.pass_name_snapshot || reservation.pass_type) <= 1
+                                      ? "남은 일수만큼 일 단위로"
+                                      : "주 단위로 정산해 남은 주에 해당하는 금액을"}{" "}
+                                    환불해 드려요.{" "}
                                     <a className="font-bold underline underline-offset-2" href={`tel:${SITE.phone}`}>
                                       {SITE.phone}
                                     </a>
@@ -705,5 +765,38 @@ export default function Account() {
         ) : null}
       </Section>
     </main>
+  );
+}
+
+// 결제·환불 기록. 예약 카드의 '결제완료' 배지만으로는 언제 얼마가 결제됐는지,
+// 부분 환불이 있었는지 알 수 없어서 거래기록을 그대로 보여 준다.
+function PaymentReceipts({ method, receipts }: { method: string | null; receipts: PaymentReceipt[] }) {
+  if (!receipts.length) return null;
+  const paid = receipts.filter((item) => item.action === "confirm").reduce((sum, item) => sum + (item.amount ?? 0), 0);
+  const refunded = receipts.filter((item) => item.action === "refund").reduce((sum, item) => sum + (item.amount ?? 0), 0);
+
+  return (
+    <details className="mt-3 rounded-xl border border-workroom-line bg-white/70 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-bold text-workroom-muted">
+        결제 내역 보기 · 결제 {formatPrice(paid)}
+        {refunded > 0 ? ` · 환불 ${formatPrice(refunded)}` : ""}
+      </summary>
+      <ul className="mt-2 grid gap-1.5">
+        {receipts.map((receipt) => (
+          <li className="flex flex-wrap items-baseline justify-between gap-2 text-xs font-medium" key={receipt.id}>
+            <span className="font-bold">{receipt.action === "refund" ? "환불" : "결제"}</span>
+            <span className="text-workroom-muted">{kstLongDateTime(receipt.created_at)}</span>
+            <span className="font-bold tabular-nums">
+              {receipt.action === "refund" ? "-" : ""}
+              {formatPrice(receipt.amount ?? 0)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] font-medium leading-5 text-workroom-muted">
+        결제 수단 {method || "카드"} · 카드사 매출전표는 결제하신 카드사 앱·홈페이지에서 확인하실 수 있어요.
+        {refunded > 0 ? " 환불 금액이 카드에 반영되기까지 카드사에 따라 3~5영업일이 걸릴 수 있어요." : ""}
+      </p>
+    </details>
   );
 }

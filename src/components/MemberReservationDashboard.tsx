@@ -135,7 +135,6 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
   const attendedDates = new Set(attendance.map((item) => kstDate(new Date(item.check_in_at))));
   const exceptionMap = new Map(dateExceptions.map((item) => [item.date, item]));
   const hourMap = new Map(businessHours.map((item) => [item.weekday, item]));
-  const remainingDays = Math.max(0, diffDays(today, end) + 1);
   const attendedCount = attendedDates.size;
 
   function available(date: string) {
@@ -146,6 +145,11 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
     if (exception) return !exception.is_closed;
     return !hourMap.get(day)?.is_closed;
   }
+
+  // 이용권 설명은 "이용 24일"처럼 실제 이용 가능한 날만 센다. 남은 기간도 달력 일수가
+  // 아니라 휴무·일시정지를 뺀 이용 가능일로 세야 회원이 보는 숫자가 서로 맞는다.
+  const usableDates = dates.filter(available);
+  const remainingUsable = usableDates.filter((date) => date >= today).length;
 
   return (
     <article className={`${card} p-5`}>
@@ -158,8 +162,16 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
         <StatusBadge status={reservation.status} />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className={`${tintCard("sky")} p-3`}><p className="text-xs font-bold text-workroom-muted">남은 이용기간</p><p className="mt-1 text-xl font-black">{today < start ? "이용 전" : `${remainingDays}일`}</p></div>
-        <div className={`${tintCard("yellow")} p-3`}><p className="text-xs font-bold text-workroom-muted">출근</p><p className="mt-1 text-xl font-black">{attendedCount}회</p></div>
+        <div className={`${tintCard("sky")} p-3`}>
+          <p className="text-xs font-bold text-workroom-muted">남은 이용일</p>
+          <p className="mt-1 text-xl font-black">{today < start ? `${usableDates.length}일` : `${remainingUsable}일`}</p>
+          <p className="mt-0.5 text-[11px] font-bold text-workroom-muted">{today < start ? "이용 시작 전" : `전체 ${usableDates.length}일 중`}</p>
+        </div>
+        <div className={`${tintCard("yellow")} p-3`}>
+          <p className="text-xs font-bold text-workroom-muted">출근</p>
+          <p className="mt-1 text-xl font-black">{attendedCount}회</p>
+          <p className="mt-0.5 text-[11px] font-bold text-workroom-muted">휴무일은 이용일에서 제외</p>
+        </div>
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs">
         {["일", "월", "화", "수", "목", "금", "토"].map((label) => <p className="py-1 font-black text-workroom-muted" key={label}>{label}</p>)}
@@ -255,8 +267,4 @@ function dateRange(start: string, end: string) {
   const result: string[] = [];
   for (let current = start; current <= end; current = addDays(current, 1)) result.push(current);
   return result;
-}
-
-function diffDays(start: string, end: string) {
-  return Math.floor((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
 }
