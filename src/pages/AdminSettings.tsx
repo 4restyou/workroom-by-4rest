@@ -199,9 +199,22 @@ export default function AdminSettings() {
     await loadSettings();
   }
 
+  // 즉시 적용 동작은 끝에서 loadSettings()로 전체를 다시 읽어, 버퍼링 중이던
+  // 이름·가격·운영시간 입력을 말없이 덮어썼다. 먼저 확인을 받는다.
+  async function keepUnsavedEdits(actionLabel: string) {
+    if (!hasChanges) return true;
+    return confirmDialog({
+      title: `저장하지 않은 변경사항이 있습니다`,
+      description: `${actionLabel}을(를) 진행하면 아직 저장하지 않은 이름·가격·운영시간·안내 문구 수정이 사라집니다.`,
+      confirmLabel: "계속",
+      tone: "danger",
+    });
+  }
+
   async function addSeatType(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !newSeatName.trim()) return;
+    if (!(await keepUnsavedEdits("좌석 추가"))) return;
 
     const { error: insertError } = await supabase.from("seat_types").insert({
       name: newSeatName.trim(),
@@ -219,6 +232,7 @@ export default function AdminSettings() {
   }
 
   async function addPass(event: FormEvent<HTMLFormElement>) {
+    if (!(await keepUnsavedEdits("이용권 추가"))) return;
     event.preventDefault();
     if (!supabase || !newPassName.trim()) return;
 
@@ -241,6 +255,7 @@ export default function AdminSettings() {
   }
 
   async function deleteSeatType(id: string, name: string) {
+    if (!(await keepUnsavedEdits("좌석 삭제"))) return;
     if (!supabase) return;
     const ok = await confirmDialog({
       title: `'${name}' 좌석 유형을 삭제할까요?`,
@@ -258,6 +273,7 @@ export default function AdminSettings() {
   }
 
   async function deletePass(id: string, name: string) {
+    if (!(await keepUnsavedEdits("이용권 삭제"))) return;
     if (!supabase) return;
     // 지난 예약의 연결까지 끊어지는 동작이라 이용권 이름을 직접 입력하게 한다.
     const ok = await confirmDialog({
@@ -278,6 +294,7 @@ export default function AdminSettings() {
   }
 
   async function saveDateException(event: FormEvent<HTMLFormElement>) {
+    if (!(await keepUnsavedEdits("예외 일정 저장"))) return;
     event.preventDefault();
     if (!supabase || !newException.date) return;
     setError("");
@@ -298,6 +315,7 @@ export default function AdminSettings() {
   }
 
   async function deleteDateException(date: string) {
+    if (!(await keepUnsavedEdits("예외 일정 삭제"))) return;
     if (!supabase) return;
     const ok = await confirmDialog({
       title: `${date} 예외 일정을 삭제할까요?`,

@@ -2,7 +2,18 @@ import { useState, type FormEvent } from "react";
 import { todayValue } from "../../lib/format";
 import { paymentStatusLabels, paymentStatusOptions } from "../../lib/adminReservations";
 import { buttonClass, tintCard } from "../../lib/ui";
+import { supabase } from "../../lib/supabase";
 import type { PaymentStatus, Pass, ReservationInsert } from "../../lib/types";
+
+// 같은 연락처를 가진 회원을 찾는다(숫자만 비교). 없으면 null.
+async function findProfileIdByPhone(phone: string): Promise<string | null> {
+  if (!supabase) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 9) return null;
+  const { data } = await supabase.from("profiles").select("id,phone").eq("role", "user").limit(200);
+  const match = (data ?? []).find((row) => (row.phone ?? "").replace(/\D/g, "") === digits);
+  return match?.id ?? null;
+}
 
 export default function ManualReservationForm({ passes, onSubmit }: { passes: Pass[]; onSubmit: (payload: ReservationInsert) => void }) {
   const [draft, setDraft] = useState({
@@ -20,12 +31,16 @@ export default function ManualReservationForm({ passes, onSubmit }: { passes: Pa
     payment_status: "unpaid" as PaymentStatus,
   });
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.name.trim() || !draft.phone.trim() || !draft.pass_type) return;
     const pass = passes.find((item) => item.name === draft.pass_type);
+    // 전화·워크인 예약도 회원과 연결해 둔다. 연결이 없으면 입퇴실 화면에서
+    // 입실 버튼이 나오지 않아(출석은 회원 단위로 기록된다) 하루 종일
+    // '미입실'로 남는다. 번호가 같은 회원이 있으면 자동으로 이어 붙인다.
+    const linkedProfileId = await findProfileIdByPhone(draft.phone.trim());
     onSubmit({
-      profile_id: null,
+      profile_id: linkedProfileId,
       pass_id: pass?.id ?? null,
       pass_name_snapshot: pass?.name ?? draft.pass_type,
       price_at_booking: pass?.price ?? null,

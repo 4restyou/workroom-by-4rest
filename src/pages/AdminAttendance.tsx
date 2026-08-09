@@ -140,6 +140,32 @@ export default function AdminAttendance() {
     await load(true);
   }
 
+  // 회원 연결이 없는 예약(전화·워크인)을 번호로 찾은 회원에 이어 붙이고 입실시킨다.
+  async function linkAndCheckIn(reservation: Reservation) {
+    if (!supabase) return;
+    const digits = (reservation.phone ?? "").replace(/\D/g, "");
+    if (digits.length < 9) {
+      setError("연락처가 없어 회원을 찾을 수 없습니다. 아래 '예약 없이 수기 입실 처리'를 이용해 주세요.");
+      return;
+    }
+    setBusy(reservation.id);
+    const { data } = await supabase.from("profiles").select("id,full_name,phone").eq("role", "user").limit(200);
+    const match = (data ?? []).find((row) => (row.phone ?? "").replace(/\D/g, "") === digits);
+    if (!match) {
+      setBusy(null);
+      setError(`${reservation.name}님과 같은 번호의 회원을 찾지 못했습니다. 회원가입 후 다시 시도하거나 수기 입실을 이용해 주세요.`);
+      return;
+    }
+    const { error: linkError } = await supabase.from("reservations").update({ profile_id: match.id }).eq("id", reservation.id);
+    setBusy(null);
+    if (linkError) {
+      setError(linkError.message);
+      return;
+    }
+    await addAttendance(match.id, reservation.id, reservation.name);
+    await load(true);
+  }
+
   async function addAttendance(profileId: string, reservationId: string | null, name: string) {
     if (!supabase) return;
     const ok = await confirmDialog({ title: `${name}님에게 오늘 출근 도장을 찍어줄까요?`, confirmLabel: "도장 찍기" });
@@ -262,6 +288,13 @@ export default function AdminAttendance() {
                   <div className="flex items-center gap-2 sm:justify-end">
                     <span className={badge(tone)}>{state}</span>
                     {!attendance && reservation.status === "confirmed" && reservation.profile_id ? <button className={buttonClass("primary", "sm", "min-h-[44px] px-5")} disabled={busy === reservation.id} onClick={() => void addAttendance(reservation.profile_id!, reservation.id, reservation.name)} type="button">입실</button> : null}
+                    {/* 회원 연결이 없는 전화·워크인 예약은 출석을 기록할 대상이 없다.
+                        번호로 회원을 찾아 이어 붙인 뒤 그대로 입실 처리한다. */}
+                    {!attendance && reservation.status === "confirmed" && !reservation.profile_id ? (
+                      <button className={buttonClass("secondary", "sm", "min-h-[44px] px-4")} disabled={busy === reservation.id} onClick={() => void linkAndCheckIn(reservation)} type="button">
+                        회원 연결 후 입실
+                      </button>
+                    ) : null}
                     {attendance && !attendance.check_out_at ? <button className={buttonClass("primary", "sm", "min-h-[44px] px-5")} disabled={busy === attendance.id} onClick={() => void updateAttendance(attendance.id, { check_out_at: new Date().toISOString() }, "퇴실 처리했습니다.")} type="button">퇴실</button> : null}
                   </div>
                 </div>

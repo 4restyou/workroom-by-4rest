@@ -857,7 +857,7 @@ export default function Reserve() {
                     <span>
                       <span className="block font-bold">신용카드 결제</span>
                       <span className="mt-1 block text-xs font-medium leading-5 text-workroom-muted">
-                        예약 신청 직후 결제하며, 결제가 완료되면 예약도 바로 확정됩니다.
+                        {SITE.booking.onlinePaymentOptionHint}
                       </span>
                     </span>
                   </label>
@@ -892,6 +892,16 @@ export default function Reserve() {
                   onChange={(event) => updateField("message", event.target.value)}
                 />
               </Field>
+
+              {/* 구매 전 취소·환불 고지. 예전에는 결제가 끝난 뒤 완료 시트에서만
+                  볼 수 있어, 결정하는 순간에는 규정을 알 수 없었다. */}
+              <div className="rounded-card border border-workroom-line bg-workroom-background p-3">
+                <p className="text-xs font-bold">취소·환불 안내</p>
+                <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">{SITE.booking.cancellationSummary}</p>
+                <Link className="mt-1 inline-block text-xs font-bold underline underline-offset-4" to="/faq">
+                  자세한 이용·환불 규정 보기 →
+                </Link>
+              </div>
             </div>
           </fieldset>
 

@@ -129,7 +129,34 @@ export default function ReservationCard({
       });
       if (!ok) return;
     }
+    // 일정 변경은 고객에게 자동 통보되지 않는다(문자는 상태 변경에만 붙어 있다).
+    // 운영자가 그 사실을 모른 채 시간을 옮기는 일이 없도록 알린다.
+    const scheduleChanged =
+      bookingDraft.date !== reservation.date ||
+      bookingDraft.start_time !== (reservation.start_time ?? "").slice(0, 5) ||
+      bookingDraft.end_time !== (reservation.end_time ?? "").slice(0, 5);
+    if (scheduleChanged) {
+      const ok = await confirmDialog({
+        title: "이용 일정을 바꿀까요?",
+        description: "고객에게는 자동으로 안내가 가지 않습니다. 저장 후 '안내 문구'로 직접 알려 주세요.",
+        confirmLabel: "변경",
+      });
+      if (!ok) return;
+    }
+
     const selectedPass = passes.find((pass) => pass.name === bookingDraft.pass_type);
+    // 이용권 자체가 바뀔 때만 금액을 다시 매긴다(아래 payload에서 사용).
+    const currentPassName = reservation.pass_name_snapshot || reservation.pass_type;
+    const passChanged = bookingDraft.pass_type !== currentPassName;
+    if (passChanged && selectedPass && selectedPass.price !== reservation.price_at_booking) {
+      const ok = await confirmDialog({
+        title: "이용권을 바꾸면 금액도 함께 바뀝니다",
+        description: `${formatPrice(reservation.price_at_booking ?? 0)} → ${formatPrice(selectedPass.price)}로 변경됩니다.`,
+        confirmLabel: "변경",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     const longTerm = bookingDraft.pass_type.includes("주간권") || bookingDraft.pass_type.includes("월권");
     onSave({
       status,
