@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback } from "../components/AdminPage";
 import { defaultPasses } from "../lib/defaultPasses";
 import { formatPrice, statusLabel } from "../lib/format";
+import { groupLogsByReservation, reservationMoney, sumRevenue, type RevenueLog } from "../lib/revenue";
 import { kstDate, kstHour, kstWeekdayIndex } from "../lib/datetime";
 import { RESERVATION_LIST_COLUMNS } from "../lib/columns";
 import { supabase } from "../lib/supabase";
@@ -57,6 +58,7 @@ export default function AdminStats() {
   const [passFilter, setPassFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<"all" | PaymentStatus>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [paymentLogs, setPaymentLogs] = useState<RevenueLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
@@ -78,19 +80,23 @@ export default function AdminStats() {
   async function loadStats() {
     if (!supabase) return;
     setIsLoading(true); setError("");
-    const [reservationResult, passResult, attendanceResult] = await Promise.all([
+    const [reservationResult, passResult, attendanceResult, logResult] = await Promise.all([
       supabase.from("reservations").select(RESERVATION_LIST_COLUMNS).is("deleted_at", null).order("date", { ascending: false }).limit(3000),
       supabase.from("passes").select("id,name,description,price,is_active,sort_order").order("sort_order", { ascending: true }),
       supabase.from("attendance").select("check_in_at,check_out_at").order("check_in_at", { ascending: false }).limit(6000),
+      // 금액은 결제 원장에서 읽는다(부분 환불은 payment_status로 알 수 없다).
+      supabase.from("reservation_payment_logs").select("reservation_id,action,amount").eq("status", "succeeded").order("created_at", { ascending: false }).limit(6000),
     ]);
     setIsLoading(false);
     if (reservationResult.error) { setError(reservationResult.error.message); return; }
     if (!passResult.error && passResult.data?.length) setPasses(passResult.data);
     setReservations((reservationResult.data ?? []) as Reservation[]);
     if (!attendanceResult.error) setAttendance((attendanceResult.data ?? []) as AttendanceLite[]);
+    if (!logResult.error) setPaymentLogs((logResult.data ?? []) as RevenueLog[]);
   }
 
   const priceByPassName = useMemo(() => new Map(passes.map((pass) => [pass.name, pass.price])), [passes]);
+  const logsByReservation = useMemo(() => groupLogsByReservation(paymentLogs), [paymentLogs]);
   const visible = useMemo(() => reservations.filter((item) => (!startDate || item.date >= startDate) && (!endDate || item.date <= endDate) && (passFilter === "all" || (item.pass_name_snapshot || item.pass_type) === passFilter) && (paymentFilter === "all" || (item.payment_status ?? "unpaid") === paymentFilter) && (statusFilter === "all" || item.status === statusFilter)), [endDate, passFilter, paymentFilter, reservations, startDate, statusFilter]);
 
   const previousRange = useMemo(() => {
@@ -107,10 +113,12 @@ export default function AdminStats() {
     if (!openMetric) return [];
     const active = (item: Reservation) => item.status !== "canceled" && item.status !== "no_show";
     const filters: Record<MetricKey, (item: Reservation) => boolean> = {
-      revenue: (item) => item.payment_status === "paid",
+      // 부분 환불된 예약은 payment_status가 paid로 남고 환불액도 따로 잡혀야 하므로
+      // 두 목록 모두 원장 금액으로 판정한다.
+      revenue: (item) => periodRevenue(item, logsByReservation, priceByPassName) > 0,
       total: () => true,
       receivable: (item) => active(item) && (item.payment_status ?? "unpaid") === "unpaid",
-      refunded: (item) => item.payment_status === "refunded",
+      refunded: (item) => reservationMoney(item, logsByReservation.get(item.id), priceByPassName).refunded > 0,
       confirmed: (item) => item.status === "confirmed" || item.status === "completed",
       noShow: (item) => item.status === "no_show",
       service: (item) => item.payment_status === "service",
@@ -118,30 +126,32 @@ export default function AdminStats() {
     return visible
       .filter(filters[openMetric])
       .sort((a, b) => `${b.date}${b.start_time ?? ""}`.localeCompare(`${a.date}${a.start_time ?? ""}`));
-  }, [openMetric, visible]);
+  }, [logsByReservation, openMetric, priceByPassName, visible]);
 
-  const metricTotal = useMemo(
-    () => metricRows.reduce((sum, item) => sum + reservationRevenue(item, priceByPassName), 0),
-    [metricRows, priceByPassName],
-  );
+  // 펼친 목록의 합계는 그 카드가 보여 준 숫자와 같아야 한다.
+  const metricTotal = useMemo(() => {
+    if (openMetric === "revenue") return metricRows.reduce((sum, item) => sum + periodRevenue(item, logsByReservation, priceByPassName), 0);
+    if (openMetric === "refunded") return metricRows.reduce((sum, item) => sum + reservationMoney(item, logsByReservation.get(item.id), priceByPassName).refunded, 0);
+    return metricRows.reduce((sum, item) => sum + reservationRevenue(item, priceByPassName), 0);
+  }, [logsByReservation, metricRows, openMetric, priceByPassName]);
 
-  const summary = useMemo(() => summarize(visible, priceByPassName), [priceByPassName, visible]);
-  const previousSummary = useMemo(() => summarize(previous, priceByPassName), [previous, priceByPassName]);
+  const summary = useMemo(() => summarize(visible, priceByPassName, logsByReservation), [logsByReservation, priceByPassName, visible]);
+  const previousSummary = useMemo(() => summarize(previous, priceByPassName, logsByReservation), [logsByReservation, previous, priceByPassName]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, { key: string; count: number; completed: number; canceled: number; noShow: number; revenue: number }>();
     visible.forEach((item) => {
       const key = periodKey(item.date, period); const row = groups.get(key) ?? { key, count: 0, completed: 0, canceled: 0, noShow: 0, revenue: 0 };
-      row.count += 1; if (item.status === "completed") row.completed += 1; if (item.status === "canceled") row.canceled += 1; if (item.status === "no_show") row.noShow += 1; if (item.payment_status === "paid") row.revenue += reservationRevenue(item, priceByPassName); groups.set(key, row);
+      row.count += 1; if (item.status === "completed") row.completed += 1; if (item.status === "canceled") row.canceled += 1; if (item.status === "no_show") row.noShow += 1; row.revenue += periodRevenue(item, logsByReservation, priceByPassName); groups.set(key, row);
     });
     return Array.from(groups.values()).sort((a, b) => a.key.localeCompare(b.key)).slice(-16);
-  }, [period, priceByPassName, visible]);
+  }, [logsByReservation, period, priceByPassName, visible]);
 
   const passStats = useMemo(() => {
     const groups = new Map<string, { name: string; count: number; revenue: number }>();
-    visible.forEach((item) => { const name = item.pass_name_snapshot || item.pass_type; const row = groups.get(name) ?? { name, count: 0, revenue: 0 }; row.count += 1; if (item.payment_status === "paid") row.revenue += reservationRevenue(item, priceByPassName); groups.set(name, row); });
+    visible.forEach((item) => { const name = item.pass_name_snapshot || item.pass_type; const row = groups.get(name) ?? { name, count: 0, revenue: 0 }; row.count += 1; row.revenue += periodRevenue(item, logsByReservation, priceByPassName); groups.set(name, row); });
     return Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
-  }, [priceByPassName, visible]);
+  }, [logsByReservation, priceByPassName, visible]);
 
   // 실제 입퇴실(attendance) 기준 이용 패턴 — 선택한 기간의 날짜 범위만 반영한다.
   const usage = useMemo(() => {
@@ -194,7 +204,8 @@ export default function AdminStats() {
         ["집계 단위", periodLabels[period]],
         [],
         ["매출·예약", ""],
-        ["실결제 매출", summary.revenue],
+        ["실결제 매출(환불 차감)", summary.revenue],
+        ["결제 합계(환불 전)", summary.charged],
         ["예약 건수", summary.total],
         ["확정·완료", summary.confirmed + summary.completed],
         ["노쇼", summary.noShow],
@@ -226,24 +237,31 @@ export default function AdminStats() {
       XLSX.utils.book_append_sheet(wb, passSheet, "이용권별");
 
       // 미수금·실결제 매출은 "어떤 예약인지"까지 있어야 대사가 된다.
+      // 금액 열은 결제·환불·잔여를 나눠 적는다. 부분 환불이면 세 값이 모두 다르다.
       const detailSheets: [string, (item: Reservation) => boolean][] = [
-        ["실결제매출", (item) => item.payment_status === "paid"],
+        ["실결제매출", (item) => periodRevenue(item, logsByReservation, priceByPassName) > 0],
         ["미수금", (item) => item.status !== "canceled" && item.status !== "no_show" && (item.payment_status ?? "unpaid") === "unpaid"],
-        ["환불", (item) => item.payment_status === "refunded"],
+        ["환불", (item) => reservationMoney(item, logsByReservation.get(item.id), priceByPassName).refunded > 0],
       ];
       detailSheets.forEach(([title, filter]) => {
         const rows = visible.filter(filter);
         const sheet = XLSX.utils.aoa_to_sheet([
-          ["이용일", "이름", "연락처", "이용권", "예약상태", "결제상태", "금액"],
-          ...rows.map((item) => [
-            item.date,
-            item.name,
-            item.phone ?? "",
-            item.pass_name_snapshot || item.pass_type,
-            statusLabel[item.status] ?? item.status,
-            item.payment_status ?? "unpaid",
-            reservationRevenue(item, priceByPassName),
-          ]),
+          ["이용일", "이름", "연락처", "이용권", "예약상태", "결제상태", "결제액", "환불액", "잔여매출"],
+          ...rows.map((item) => {
+            const money = reservationMoney(item, logsByReservation.get(item.id), priceByPassName);
+            const unpaid = (item.payment_status ?? "unpaid") === "unpaid";
+            return [
+              item.date,
+              item.name,
+              item.phone ?? "",
+              item.pass_name_snapshot || item.pass_type,
+              statusLabel[item.status] ?? item.status,
+              item.payment_status ?? "unpaid",
+              unpaid ? reservationRevenue(item, priceByPassName) : money.charged,
+              money.refunded,
+              unpaid ? 0 : money.net,
+            ];
+          }),
         ]);
         XLSX.utils.book_append_sheet(wb, sheet, title);
       });
@@ -265,7 +283,7 @@ export default function AdminStats() {
   const maxRevenue = Math.max(...grouped.map((item) => item.revenue), 1);
 
   return (
-    <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadStats()} type="button">새로고침</button><button className={buttonClass("primary", "md")} disabled={exporting || !grouped.length} onClick={() => void exportExcel()} type="button">{exporting ? "저장 중…" : "엑셀 저장"}</button></>} description="서비스 예약은 매출과 미수금에서 제외됩니다. 금액은 예약 이용일을 기준으로 집계합니다." title="매출·통계">
+    <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadStats()} type="button">새로고침</button><button className={buttonClass("primary", "md")} disabled={exporting || !grouped.length} onClick={() => void exportExcel()} type="button">{exporting ? "저장 중…" : "엑셀 저장"}</button></>} description="실결제 매출은 환불(부분 환불 포함)을 뺀 금액입니다. 서비스 예약은 매출과 미수금에서 제외되며, 금액은 예약 이용일을 기준으로 집계합니다." title="매출·통계">
       <div className="admin-compact">
         <AdminFeedback error={error} />
         <div className="mb-5 grid gap-3 border-y border-workroom-line bg-white p-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -341,7 +359,7 @@ export default function AdminStats() {
           ) : null}
 
           <section className="mt-7 border border-workroom-line bg-white p-4 sm:p-5">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">기간별 흐름</h2><p className="mt-0.5 text-xs text-workroom-muted">막대는 실결제 매출 기준입니다.</p></div><select className="!min-h-[38px] !w-auto" value={period} onChange={(event) => setPeriod(event.target.value as Period)}>{Object.entries(periodLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">기간별 흐름</h2><p className="mt-0.5 text-xs text-workroom-muted">막대는 환불을 뺀 실결제 매출 기준입니다.</p></div><select className="!min-h-[38px] !w-auto" value={period} onChange={(event) => setPeriod(event.target.value as Period)}>{Object.entries(periodLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
             <div className="grid gap-3">{grouped.map((item) => <div className="grid grid-cols-[82px_1fr_auto] items-center gap-3 text-sm" key={item.key}><span className="text-xs font-semibold tabular-nums text-workroom-muted">{item.key}</span><div className="h-7 bg-workroom-background"><div className="h-full min-w-[2px] bg-workroom-yellow" style={{ width: `${Math.max(2, (item.revenue / maxRevenue) * 100)}%` }} /></div><span className="w-24 text-right text-xs font-semibold tabular-nums">{formatPrice(item.revenue)}</span></div>)}{!grouped.length ? <AdminEmpty>집계할 예약이 없습니다.</AdminEmpty> : null}</div>
           </section>
 
@@ -403,9 +421,26 @@ export default function AdminStats() {
   );
 }
 
-function summarize(items: Reservation[], prices: Map<string, number>) {
+function summarize(items: Reservation[], prices: Map<string, number>, logs: Map<string, RevenueLog[]>) {
   const active = items.filter((item) => item.status !== "canceled" && item.status !== "no_show");
-  return { total: items.length, confirmed: items.filter((item) => item.status === "confirmed").length, completed: items.filter((item) => item.status === "completed").length, noShow: items.filter((item) => item.status === "no_show").length, revenue: items.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + reservationRevenue(item, prices), 0), receivable: active.filter((item) => item.payment_status === "unpaid").reduce((sum, item) => sum + reservationRevenue(item, prices), 0), refunded: items.filter((item) => item.payment_status === "refunded").reduce((sum, item) => sum + reservationRevenue(item, prices), 0), service: items.filter((item) => item.payment_status === "service").length };
+  // 매출·환불은 결제 원장 기준(부분 환불 반영), 미수금은 아직 원장이 없으므로 예약 금액 기준.
+  const money = sumRevenue(items, logs, prices);
+  return {
+    total: items.length,
+    confirmed: items.filter((item) => item.status === "confirmed").length,
+    completed: items.filter((item) => item.status === "completed").length,
+    noShow: items.filter((item) => item.status === "no_show").length,
+    revenue: money.revenue,
+    charged: money.charged,
+    receivable: active.filter((item) => (item.payment_status ?? "unpaid") === "unpaid").reduce((sum, item) => sum + reservationRevenue(item, prices), 0),
+    refunded: money.refunded,
+    service: items.filter((item) => item.payment_status === "service").length,
+  };
+}
+// 기간·이용권별 매출도 환불을 뺀 금액으로 센다. 서비스(무료) 예약은 제외.
+function periodRevenue(item: Reservation, logs: Map<string, RevenueLog[]>, prices: Map<string, number>) {
+  if ((item.payment_status ?? "unpaid") === "service") return 0;
+  return reservationMoney(item, logs.get(item.id), prices).net;
 }
 function reservationRevenue(item: Reservation, prices: Map<string, number>) { return item.price_at_booking ?? prices.get(item.pass_name_snapshot || item.pass_type) ?? 0; }
 function changeRate(current: number, previous: number) { if (!previous) return current ? "이전 기간보다 증가" : "변화 없음"; const rate = Math.round(((current - previous) / previous) * 100); return rate === 0 ? "이전 기간과 같음" : `이전 기간보다 ${Math.abs(rate)}% ${rate > 0 ? "증가" : "감소"}`; }

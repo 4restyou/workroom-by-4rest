@@ -20,9 +20,14 @@ export default function Footer() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.12em] text-workroom-muted">Contact</p>
             <p className="mt-3 text-sm font-medium leading-6 text-workroom-muted">{SITE.address}</p>
-            <a href={`tel:${SITE.phone}`} className="mt-1 inline-block text-sm font-bold underline underline-offset-2">
-              {SITE.phone}
-            </a>
+            <div className="mt-1 grid gap-0.5">
+              <a href={`tel:${SITE.landline}`} className="text-sm font-bold underline underline-offset-2">
+                {SITE.landline}
+              </a>
+              <a href={`tel:${SITE.phone}`} className="text-sm font-bold underline underline-offset-2">
+                {SITE.phone}
+              </a>
+            </div>
           </div>
 
           <div className="flex items-end justify-between gap-4">
@@ -50,7 +55,7 @@ export default function Footer() {
             {" · "}통신판매업신고 {SITE.business.mailOrderNumber}
           </p>
           <p className="mt-0.5 text-xs font-medium leading-6 text-workroom-muted">
-            {SITE.address} · {SITE.phone}
+            {SITE.address} · {SITE.landline} · {SITE.phone}
           </p>
         </div>
 

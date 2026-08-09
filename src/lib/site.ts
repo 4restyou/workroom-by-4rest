@@ -14,6 +14,8 @@ export const SITE = {
   tagline: "필요한 시간만큼 머무는 조용한 작업 공간",
   address: "전남광주통합특별시 동구 충장로5가 96-23, 2층",
   phone: "010-4931-3298",
+  // 카드사·전자상거래법 표시용 유선번호. 사업자 정보 줄과 문의 안내에 함께 노출한다.
+  landline: "070-8211-1734",
   hoursLabel: "08:00–다음 날 01:00",
   booking: {
     memberOnly: true,
