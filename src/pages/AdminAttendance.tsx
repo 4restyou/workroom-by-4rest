@@ -3,18 +3,20 @@ import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/AdminPage";
 import { formatTimeRange, todayValue } from "../lib/format";
 import { kstDate as kstDateShared, kstDateTime, kstTime } from "../lib/datetime";
+import WalkInForm, { type WalkInDraft } from "../components/admin/WalkInForm";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
-import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
+import { isLongTermReservation, readableReservationError, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, type TintColor } from "../lib/ui";
-import type { Reservation } from "../lib/types";
+import type { Pass, Reservation } from "../lib/types";
 import { confirmDialog } from "../lib/confirm";
 import { useSession } from "../lib/sessionContext";
 
 type AttendanceRow = {
   id: string;
-  profile_id: string;
+  // 비회원 워크인은 회원 연결이 없다.
+  profile_id: string | null;
   reservation_id: string | null;
   check_in_at: string;
   check_out_at: string | null;
@@ -55,6 +57,8 @@ export default function AdminAttendance() {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
+  const [passes, setPasses] = useState<Pass[]>([]);
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -71,10 +75,12 @@ export default function AdminAttendance() {
     if (!supabase) return;
     if (!silent) setIsLoading(true);
     const today = todayValue();
-    const [attendanceResult, reservationResult, couponResult] = await Promise.all([
+    const [attendanceResult, reservationResult, couponResult, passResult] = await Promise.all([
       supabase.from("attendance").select("id,profile_id,reservation_id,check_in_at,check_out_at,profile:profiles(full_name,phone)").order("check_in_at", { ascending: false }).limit(500),
       supabase.from("reservations").select("*").is("deleted_at", null).or(`date.eq.${today},access_end_date.gte.${today}`).order("start_time", { ascending: true }).limit(300),
       supabase.from("coupons").select("id,code,label,status,issued_at,used_at,profile:profiles(full_name)").order("issued_at", { ascending: false }).limit(500),
+      // 워크인 접수에 쓸 판매 중인 이용권.
+      supabase.from("passes").select("id,name,description,price,is_active,sort_order,seat_type_id").eq("is_active", true).order("sort_order", { ascending: true }),
     ]);
     setIsLoading(false);
     if (attendanceResult.error || reservationResult.error || couponResult.error) {
@@ -84,6 +90,7 @@ export default function AdminAttendance() {
     setRows((attendanceResult.data ?? []) as unknown as AttendanceRow[]);
     setReservations((reservationResult.data ?? []) as Reservation[]);
     setCoupons((couponResult.data ?? []) as unknown as CouponRow[]);
+    if (!passResult.error) setPasses((passResult.data ?? []) as Pass[]);
     setError("");
   }
 
@@ -141,12 +148,80 @@ export default function AdminAttendance() {
     await load(true);
   }
 
+  // 예약 없이 온 손님을 한 번에 접수한다: 오늘 예약을 확정으로 만들고, 번호가 같은
+  // 회원이 있으면 이어 붙인 뒤 곧바로 입실까지 기록한다. 화면을 옮겨 다닐 필요가
+  // 없어야 카운터에서 실제로 쓰이고, 그래야 매출과 인원에도 잡힌다.
+  async function registerWalkIn(draft: WalkInDraft) {
+    if (!supabase) return;
+    setBusy("walkin");
+    setError("");
+
+    const digits = draft.phone.replace(/\D/g, "");
+    let profileId: string | null = null;
+    if (digits.length >= 9) {
+      const { data } = await supabase.from("profiles").select("id,phone").eq("role", "user").limit(200);
+      profileId = (data ?? []).find((row) => (row.phone ?? "").replace(/\D/g, "") === digits)?.id ?? null;
+    }
+
+    // 금액·좌석은 서버 트리거가 이용권에서 정한다(여기서 보내면 위조 경로가 하나 더 생긴다).
+    const { data: inserted, error: insertError } = await supabase
+      .from("reservations")
+      .insert({
+        profile_id: profileId,
+        name: draft.name,
+        phone: draft.phone || "-",
+        pass_type: draft.pass_type,
+        date: todayValue(),
+        start_time: draft.start_time,
+        end_time: draft.end_time,
+        people: draft.people,
+        message: "예약 없이 방문(워크인)",
+        status: "confirmed",
+        payment_preference: "onsite",
+        payment_status: draft.payment_status,
+        payment_method: draft.payment_status === "service" ? "서비스" : draft.payment_status === "paid" ? "현장결제" : null,
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !inserted) {
+      setBusy(null);
+      setError(readableReservationError(insertError ?? { message: "워크인 접수에 실패했습니다." }));
+      return;
+    }
+
+    // 입실 기록. 회원이면 도장·쿠폰 규칙을 그대로 타도록 RPC를 쓰고,
+    // 비회원이면 회원 연결 없이 출석만 남긴다(스탬프는 쌓이지 않는다).
+    let stampMessage = "";
+    if (profileId) {
+      const { data: stamp } = await supabase.rpc("admin_attendance_stamp", { p_profile_id: profileId, p_reservation_id: inserted.id });
+      const result = stamp as { ok?: boolean; coupon?: boolean } | null;
+      stampMessage = result?.coupon ? " 스탬프를 다 채워 쿠폰도 발급됐어요 🎉" : " 회원으로 확인돼 출근 도장도 찍었어요.";
+    } else {
+      const { error: attendanceError } = await supabase.from("attendance").insert({ profile_id: null, reservation_id: inserted.id });
+      if (attendanceError) {
+        setBusy(null);
+        setWalkInOpen(false);
+        await load(true);
+        setError(attendanceError.message.includes("null value")
+          ? "예약은 등록됐지만 입실 기록에 실패했습니다. 마이그레이션(0041) 적용을 확인해 주세요."
+          : `예약은 등록됐지만 입실 기록에 실패했습니다: ${attendanceError.message}`);
+        return;
+      }
+    }
+
+    setBusy(null);
+    setWalkInOpen(false);
+    setSuccess(`${draft.name}님을 접수하고 입실 처리했어요.${stampMessage}`);
+    await load(true);
+  }
+
   // 회원 연결이 없는 예약(전화·워크인)을 번호로 찾은 회원에 이어 붙이고 입실시킨다.
   async function linkAndCheckIn(reservation: Reservation) {
     if (!supabase) return;
     const digits = (reservation.phone ?? "").replace(/\D/g, "");
     if (digits.length < 9) {
-      setError("연락처가 없어 회원을 찾을 수 없습니다. 아래 '예약 없이 수기 입실 처리'를 이용해 주세요.");
+      setError("연락처가 없어 회원을 찾을 수 없습니다. 위 '예약 없이 오신 손님'으로 접수하거나 아래 수기 입실을 이용해 주세요.");
       return;
     }
     setBusy(reservation.id);
@@ -239,7 +314,7 @@ export default function AdminAttendance() {
 
   return (
     <AdminPage
-      actions={<><button className={buttonClass("secondary", "md")} onClick={() => void load()} type="button">새로고침</button><Link className={buttonClass("secondary", "md")} to="/admin/settings">QR 설정</Link></>}
+      actions={<><button className={buttonClass("accent", "md")} onClick={() => { setView("today"); setWalkInOpen((open) => !open); }} type="button">예약 없이 오신 손님</button><button className={buttonClass("secondary", "md")} onClick={() => void load()} type="button">새로고침</button><Link className={buttonClass("secondary", "md")} to="/admin/settings">QR 설정</Link></>}
       description="오늘 방문 예정자와 실제 입퇴실 기록을 한 화면에서 확인합니다."
       title="입퇴실"
     >
@@ -255,6 +330,10 @@ export default function AdminAttendance() {
         <div className="mb-5 border-y border-workroom-line bg-white px-3 pt-1">
           <AdminTabs items={[{ value: "today", label: "오늘 운영", count: todayReservations.length }, { value: "history", label: "지난 기록" }, { value: "coupons", label: "쿠폰", count: pendingCoupons.length }]} onChange={setView} value={view} />
         </div>
+
+        {walkInOpen ? (
+          <WalkInForm busy={busy === "walkin"} onCancel={() => setWalkInOpen(false)} onSubmit={(draft) => void registerWalkIn(draft)} passes={passes} />
+        ) : null}
 
         {isLoading ? <AdminEmpty>입퇴실 현황을 불러오는 중입니다.</AdminEmpty> : null}
 

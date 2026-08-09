@@ -178,7 +178,8 @@ export type ReservationInsert = {
 
 export type Attendance = {
   id: string;
-  profile_id: string;
+  // 비회원 워크인은 회원 연결이 없다(migration 0041).
+  profile_id: string | null;
   reservation_id: string | null;
   check_in_at: string;
   check_out_at: string | null;

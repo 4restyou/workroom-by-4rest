@@ -150,6 +150,8 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
   // 아니라 휴무·일시정지를 뺀 이용 가능일로 세야 회원이 보는 숫자가 서로 맞는다.
   const usableDates = dates.filter(available);
   const remainingUsable = usableDates.filter((date) => date >= today).length;
+  const daysToEnd = diffDays(today, end);
+  const expiringSoon = today >= start && daysToEnd >= 0 && daysToEnd <= 3;
 
   return (
     <article className={`${card} p-5`}>
@@ -161,6 +163,18 @@ function MembershipCalendar({ attendance, businessHours, dateExceptions, now, re
         </div>
         <StatusBadge status={reservation.status} />
       </div>
+      {/* 만료 뒤에야 알면 회원은 어느 날 갑자기 이용권이 사라진 것처럼 느낀다.
+          마지막 3일은 눈에 띄게 알리고, 연장 경로도 같이 준다. */}
+      {expiringSoon ? (
+        <div className={`${tintCard("yellow")} mt-4 flex flex-wrap items-center justify-between gap-3 p-3`}>
+          <p className="text-sm font-bold">
+            {daysToEnd === 0 ? "오늘이 마지막 이용일이에요." : `이용 기간이 ${daysToEnd}일 뒤 끝나요.`}
+            <span className="ml-1 font-medium text-workroom-muted">마지막 이용일 {formatDate(end)}</span>
+          </p>
+          <Link className={buttonClass("primary", "sm")} to="/reserve">이용권 연장하기</Link>
+        </div>
+      ) : null}
+
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className={`${tintCard("sky")} p-3`}>
           <p className="text-xs font-bold text-workroom-muted">남은 이용일</p>
@@ -267,4 +281,8 @@ function dateRange(start: string, end: string) {
   const result: string[] = [];
   for (let current = start; current <= end; current = addDays(current, 1)) result.push(current);
   return result;
+}
+
+function diffDays(from: string, to: string) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 }

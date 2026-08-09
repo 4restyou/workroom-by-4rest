@@ -31,6 +31,10 @@ type ActionItem = {
   urgent?: boolean;
 };
 
+function daysBetween(from: string, to: string) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+}
+
 function timeMinutes(value?: string | null) {
   if (!value) return null;
   const [hour, minute] = value.slice(0, 5).split(":").map(Number);
@@ -167,6 +171,24 @@ export default function AdminDashboard() {
         });
       }
     });
+
+    // 곧 끝나는 장기 이용권. 만료 뒤에야 알면 재구매를 권할 시점을 놓치고,
+    // 회원은 어느 날 갑자기 이용권이 없어진 것처럼 느낀다.
+    reservations
+      .filter((reservation) => reservation.status === "confirmed" && reservation.access_end_date && (reservation.payment_status ?? "unpaid") !== "refunded")
+      .map((reservation) => ({ reservation, daysLeft: daysBetween(today, reservation.access_end_date as string) }))
+      .filter((item) => item.daysLeft >= 0 && item.daysLeft <= 3)
+      .sort((a, b) => a.daysLeft - b.daysLeft)
+      .slice(0, 6)
+      .forEach(({ daysLeft, reservation }) => {
+        actions.push({
+          key: `expiring-${reservation.id}`,
+          title: `${reservation.name} · 이용권 ${daysLeft === 0 ? "오늘 만료" : `${daysLeft}일 뒤 만료`}`,
+          detail: `${reservation.pass_name_snapshot || reservation.pass_type} · 마지막 이용일 ${formatDate(reservation.access_end_date as string)}`,
+          to: `/admin/reservations?reservation=${reservation.id}`,
+          urgent: daysLeft === 0,
+        });
+      });
 
     // 급한 항목이 조용한 대기 항목에 묻히지 않도록 정렬한다.
     actions.sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)));
