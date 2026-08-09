@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/AdminPage";
 import { formatTimeRange, todayValue } from "../lib/format";
 import { kstDate as kstDateShared, kstDateTime, kstTime } from "../lib/datetime";
+import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
@@ -229,7 +230,8 @@ export default function AdminAttendance() {
   const recent = rows.filter((row) => kstDate(row.check_in_at) !== today).slice(0, 80);
   const todayReservations = useMemo(() => reservations.filter((item) => reservationCoversDate(item, today) && (item.status === "confirmed" || item.status === "pending")), [reservations, today]);
   const todayAttendanceByReservation = new Map(todays.filter((item) => item.reservation_id).map((item) => [item.reservation_id as string, item]));
-  const activeCount = todays.filter((row) => !row.check_out_at).length;
+  // 오늘 운영 대시보드와 같은 기준(단체 예약은 인원수, 워크인은 1명)으로 센다.
+  const activeCount = currentOccupancy(todays.filter((row) => !row.check_out_at), peopleByReservationId(reservations));
   // 예약과 연결되지 않은 오늘 입실(워크인·수기 도장).
   const walkIns = todays.filter((row) => !row.reservation_id);
   const pendingCoupons = coupons.filter((coupon) => coupon.status === "issued");
@@ -244,8 +246,9 @@ export default function AdminAttendance() {
       <div className="admin-compact">
         <AdminFeedback error={error} success={success} />
         <section className="mb-5 grid border-y border-workroom-line bg-white sm:grid-cols-3">
-          <Summary label="오늘 예정" value={`${todayReservations.length}명`} />
-          <Summary label="입실 완료" value={`${todays.length}명`} />
+          {/* 세 지표 모두 '건수'가 아니라 '사람 수'다(단체 예약은 인원수, 워크인은 1명). */}
+          <Summary label="오늘 예정" value={`${todayReservations.reduce((sum, item) => sum + item.people, 0)}명`} />
+          <Summary label="입실 완료" value={`${currentOccupancy(todays, peopleByReservationId(reservations))}명`} />
           <Summary label="현재 이용 중" value={`${activeCount}명`} />
         </section>
 

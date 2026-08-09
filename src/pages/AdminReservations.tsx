@@ -25,7 +25,7 @@ import type {
   ReservationInsert,
 } from "../lib/types";
 import { buttonClass, card, tintCard } from "../lib/ui";
-import { confirmDialog } from "../lib/confirm";
+import { confirmDialog, promptDialog } from "../lib/confirm";
 import { useSession } from "../lib/sessionContext";
 import {
   getConflictCount,
@@ -378,23 +378,35 @@ export default function AdminReservations() {
       : null;
     const suggested = prorated && prorated.refundAmount > 0 && prorated.refundAmount < paid ? prorated.refundAmount : paid;
 
-    const entered = window.prompt(
-      prorated
-        ? prorated.unit === "week"
-          ? `환불 금액을 입력해 주세요.\n전체 ${prorated.totalWeeks}주 중 ${prorated.usedWeeks}주 사용 · 잔여 ${prorated.remainingWeeks}주\n(결제 ${formatPrice(paid)} · 주 단위 정산 ${formatPrice(prorated.refundAmount)})`
-          : `환불 금액을 입력해 주세요.\n전체 ${prorated.totalDays}일 중 ${prorated.usedDays}일 사용 · 잔여 ${prorated.remainingDays}일\n(결제 ${formatPrice(paid)} · 일 단위 정산 ${formatPrice(prorated.refundAmount)})`
-        : `환불 금액을 입력해 주세요. (결제 ${formatPrice(paid)})`,
-      String(suggested),
-    );
-    if (entered === null) return;
-    const amount = Math.floor(Number(entered.replace(/[^0-9]/g, "")));
+    const settlement = prorated
+      ? prorated.unit === "week"
+        ? `전체 ${prorated.totalWeeks}주 중 ${prorated.usedWeeks}주 사용 · 잔여 ${prorated.remainingWeeks}주 · 주 단위 정산 ${formatPrice(prorated.refundAmount)}`
+        : `전체 ${prorated.totalDays}일 중 ${prorated.usedDays}일 사용 · 잔여 ${prorated.remainingDays}일 · 일 단위 정산 ${formatPrice(prorated.refundAmount)}`
+      : "";
+
+    // 금액과 사유를 한 화면에서 받는다(예전에는 window.prompt가 두 번 연달아 떴다).
+    const entered = await promptDialog({
+      title: `${reservation.name}님 환불`,
+      description: `결제 ${formatPrice(paid)}${settlement ? `\n${settlement}` : ""}`,
+      confirmLabel: "다음",
+      fields: [
+        { name: "amount", label: "환불 금액 (원)", defaultValue: String(suggested), numeric: true, required: true, hint: `1원 이상 ${formatPrice(paid)} 이하` },
+        {
+          name: "reason",
+          label: "환불 사유 (고객 안내에 사용)",
+          defaultValue: suggested < paid ? `이용 기간 중 해지 · ${prorated?.unit === "day" ? "일" : "주"} 단위 정산 환불` : "예약 취소에 따른 환불",
+          required: true,
+        },
+      ],
+    });
+    if (!entered) return;
+
+    const amount = Math.floor(Number((entered.amount ?? "").replace(/[^0-9]/g, "")));
     if (!Number.isFinite(amount) || amount <= 0 || amount > paid) {
       setError(`환불 금액은 1원 이상 ${formatPrice(paid)} 이하여야 합니다.`);
       return;
     }
-
-    const reason = window.prompt("환불 사유를 입력해 주세요. (고객 안내에 사용)", amount < paid ? `이용 기간 중 해지 · ${prorated?.unit === "day" ? "일" : "주"} 단위 정산 환불` : "예약 취소에 따른 환불");
-    if (reason === null) return;
+    const reason = entered.reason.trim();
 
     // 돈이 즉시 되돌아가고 취소할 수 없는 동작이라, 금액을 직접 입력해야 열린다.
     const confirmedRefund = await confirmDialog({

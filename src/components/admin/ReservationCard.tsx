@@ -308,6 +308,29 @@ export default function ReservationCard({
               이용 완료
             </button>
           ) : null}
+          {/* 취소는 전화·노쇼로 자주 생기는데, 예전에는 아래 '상태 직접 수정'에서
+              드롭다운을 바꿔 저장해야만 가능했다. 확정과 같은 줄에 둔다. */}
+          {reservation.status === "pending" || reservation.status === "confirmed" ? (
+            <button
+              className={buttonClass("secondary", "sm", "border-red-400")}
+              onClick={() => {
+                void confirmDialog({
+                  title: `${reservation.name}님 예약을 취소할까요?`,
+                  description:
+                    reservation.payment_status === "paid"
+                      ? "고객에게 취소 문자가 발송됩니다. 결제 금액은 자동으로 돌아가지 않으니, 아래 'PG 환불 실행'으로 환불도 따로 처리해 주세요."
+                      : "고객에게 취소 문자가 발송됩니다.",
+                  confirmLabel: "예약 취소",
+                  tone: "danger",
+                }).then((ok) => {
+                  if (ok) onPatch({ status: "canceled" });
+                });
+              }}
+              type="button"
+            >
+              예약 취소
+            </button>
+          ) : null}
         </div>
       </div>
 

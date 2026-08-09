@@ -343,6 +343,9 @@ export default function Home() {
       </Section>
       ) : null}
 
+{/* 로그인한 회원의 홈은 대시보드다. 요금표·이용 안내는 예약 화면과 FAQ에
+    같은 내용이 있어서, 여기서는 접어 두고 링크만 남긴다. */}
+{showMarketing ? (
       <Section id="pricing" eyebrow="Plans / Pricing" title="이용권 안내" accent="yellow">
         <div className="grid gap-3">
           {passes.map((pass) => (
@@ -363,7 +366,9 @@ export default function Home() {
           </div>
         </div>
       </Section>
+      ) : null}
 
+{showMarketing ? (
       <Section eyebrow="Guide" title="이용 전 확인해 주세요" accent="sky">
         <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
           {GUIDE_ITEMS.map(([title, body]) => (
@@ -374,6 +379,26 @@ export default function Home() {
           ))}
         </dl>
       </Section>
+      ) : null}
+
+{showMarketing ? null : (
+      <Section eyebrow="Info" title="필요할 때 바로" accent="sky">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Link className={`${tintCard("yellow")} ${pressable} p-5`} to="/reserve">
+            <p className="text-base font-bold">이용권·요금 보기</p>
+            <p className="mt-1 text-sm font-medium leading-6 text-workroom-ink/75">예약 화면에서 현재 판매 중인 이용권과 금액을 확인합니다.</p>
+          </Link>
+          <Link className={`${tintCard("mint")} ${pressable} p-5`} to="/faq">
+            <p className="text-base font-bold">이용·환불 안내</p>
+            <p className="mt-1 text-sm font-medium leading-6 text-workroom-ink/75">운영 시간, 취소·환불 규정, 자주 묻는 질문을 모아 두었습니다.</p>
+          </Link>
+          <Link className={`${tintCard("lilac")} ${pressable} p-5`} to="/account?tab=reservations">
+            <p className="text-base font-bold">예약 현황</p>
+            <p className="mt-1 text-sm font-medium leading-6 text-workroom-ink/75">신청한 예약의 확정 여부와 결제 내역을 확인합니다.</p>
+          </Link>
+        </div>
+      </Section>
+)}
 
 {showMarketing ? (
       <Section eyebrow="Use cases" title="이런 경우에 이용하기 좋아요" accent="lilac">

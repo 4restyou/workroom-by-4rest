@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminPage, { AdminEmpty } from "./AdminPage";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
+import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
 import { kstDate as kstDateShared } from "../lib/datetime";
@@ -108,11 +109,9 @@ export default function AdminDashboard() {
     const todaySchedule = reservations
       .filter((reservation) => reservationCoversDate(reservation, today) && (reservation.status === "pending" || reservation.status === "confirmed"))
       .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
-    const active = todaySchedule.filter((reservation) => {
-      const row = attendanceByReservation.get(reservation.id);
-      return row && !row.check_out_at;
-    });
-    const activePeople = active.reduce((sum, reservation) => sum + reservation.people, 0);
+    // 워크인(예약 없는 도장)까지 포함해 입퇴실 화면과 같은 기준으로 센다.
+    const openToday = attendance.filter((item) => !item.check_out_at && kstDate(item.check_in_at) === today);
+    const activePeople = currentOccupancy(openToday, peopleByReservationId(reservations));
     const next = todaySchedule.find((reservation) => reservation.status === "confirmed" && !isLongTermReservation(reservation) && !attendanceByReservation.has(reservation.id) && (timeMinutes(reservation.start_time) ?? 0) >= minute);
     const longTerm = todaySchedule.filter((reservation) => isLongTermReservation(reservation));
 
@@ -184,7 +183,8 @@ export default function AdminDashboard() {
       <div className="admin-compact">
         {loadError ? <p className="mb-4 border border-red-400 bg-workroom-danger/30 px-4 py-3 text-sm font-semibold">{loadError}</p> : null}
 
-        <section className="grid border-y border-workroom-line bg-white sm:grid-cols-3 lg:grid-cols-5">
+        {/* 휴대폰에서는 1열이라 지표 5개가 화면 한 판을 다 차지했다. 2열로 접는다. */}
+        <section className="grid grid-cols-2 border-y border-workroom-line bg-white sm:grid-cols-3 lg:grid-cols-5">
           <SummaryCell label="현재 이용 / 정원" value={data ? `${summary.activePeople} / ${data.capacity || "-"}명` : "-"} />
           <SummaryCell label="오늘 예약" value={data ? `${summary.todaySchedule.length}건` : "-"} />
           <SummaryCell label="장기 이용" value={data ? `${summary.longTerm.length}명` : "-"} />
@@ -276,9 +276,9 @@ export default function AdminDashboard() {
 
 function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-b border-workroom-line px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+    <div className="border-b border-r border-workroom-line px-4 py-3.5 last:border-r-0 even:border-r-0 sm:border-b-0 sm:border-r sm:even:border-r sm:last:border-r-0">
       <p className="text-xs font-semibold text-workroom-muted">{label}</p>
-      <p className="mt-1 truncate text-xl font-bold tabular-nums">{value}</p>
+      <p className="mt-1 truncate text-lg font-bold tabular-nums sm:text-xl">{value}</p>
     </div>
   );
 }

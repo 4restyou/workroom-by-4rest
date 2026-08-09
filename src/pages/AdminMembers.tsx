@@ -12,6 +12,7 @@ import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { badge, buttonClass } from "../lib/ui";
 import type { Attendance, Coupon, Profile, Reservation } from "../lib/types";
+import { promptDialog } from "../lib/confirm";
 import { useSession } from "../lib/sessionContext";
 
 type MemberView = "all" | "active" | "noted";
@@ -23,6 +24,7 @@ export default function AdminMembers() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
   // 예약 상세에서 "이용내역 보기"로 넘어올 때 해당 회원을 바로 연다.
   const [searchParams] = useSearchParams();
   const memberParam = searchParams.get("member");
@@ -163,7 +165,33 @@ export default function AdminMembers() {
     }));
   }
 
-  const detail = selectedMember ? <MemberDetail attendance={selectedAttendance} coupons={selectedCoupons} member={selectedMember} onSaveNote={(note) => void saveAdminNote(selectedMember.id, note)} reservations={selectedReservations} /> : null;
+  // 회원을 보고 있는 자리에서 바로 쿠폰을 준다. 예전에는 입퇴실 화면으로 옮겨
+  // 같은 회원을 다시 검색해야 했다.
+  async function issueCoupon(member: Profile) {
+    if (!supabase) return;
+    const name = member.full_name || "회원";
+    const entered = await promptDialog({
+      title: `${name}님에게 쿠폰을 발급할까요?`,
+      description: "쿠폰 이름을 비워 두면 설정에 저장된 기본 보상명으로 발급됩니다.",
+      confirmLabel: "발급",
+      fields: [{ name: "label", label: "쿠폰 이름", defaultValue: "" }],
+    });
+    if (!entered) return;
+    const label = (entered.label ?? "").trim();
+    setBusy(`coupon-${member.id}`);
+    const { data, error: rpcError } = await supabase.rpc("admin_issue_coupon", { p_profile_id: member.id, p_label: label || null });
+    const result = data as { ok?: boolean; message?: string; label?: string } | null;
+    setBusy(null);
+    if (rpcError || !result?.ok) {
+      setError(result?.message ?? rpcError?.message ?? "쿠폰 발급에 실패했습니다.");
+      return;
+    }
+    setError("");
+    setSuccess(`${name}님에게 '${result.label ?? (label || "보상")}' 쿠폰을 발급했어요 🎫`);
+    await loadMembers();
+  }
+
+  const detail = selectedMember ? <MemberDetail attendance={selectedAttendance} coupons={selectedCoupons} issuingCoupon={busy === `coupon-${selectedMember.id}`} member={selectedMember} onIssueCoupon={() => void issueCoupon(selectedMember)} onSaveNote={(note) => void saveAdminNote(selectedMember.id, note)} reservations={selectedReservations} /> : null;
 
   return (
     <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadMembers()} type="button">새로고침</button><button className={buttonClass("secondary", "md")} disabled={!visibleMembers.length} onClick={exportMembers} type="button">CSV 저장</button></>} description="이용권, 다음 예약, 최근 방문을 기준으로 회원을 확인합니다." title="회원">
@@ -198,7 +226,7 @@ export default function AdminMembers() {
   );
 }
 
-function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }: { attendance: Attendance[]; coupons: Coupon[]; member: Profile; onSaveNote: (note: string) => void; reservations: Reservation[] }) {
+function MemberDetail({ attendance, coupons, issuingCoupon, member, onIssueCoupon, onSaveNote, reservations }: { attendance: Attendance[]; coupons: Coupon[]; issuingCoupon: boolean; member: Profile; onIssueCoupon: () => void; onSaveNote: (note: string) => void; reservations: Reservation[] }) {
   const [note, setNote] = useState(member.admin_note ?? "");
   useEffect(() => setNote(member.admin_note ?? ""), [member]);
   const today = todayValue();
@@ -312,6 +340,9 @@ function MemberDetail({ attendance, coupons, member, onSaveNote, reservations }:
     <details className="mt-4 border-t border-workroom-line pt-3">
       <summary className="cursor-pointer text-sm font-semibold">쿠폰 {coupons.length}장</summary>
       <div className="mt-2">
+        <button className={buttonClass("secondary", "sm", "mb-2")} disabled={issuingCoupon} onClick={onIssueCoupon} type="button">
+          {issuingCoupon ? "발급 중…" : "쿠폰 발급"}
+        </button>
         {coupons.map((coupon) => (
           <div className="admin-row flex items-center justify-between py-2 text-sm" key={coupon.id}>
             <span>{coupon.label}</span>

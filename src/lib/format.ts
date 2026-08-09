@@ -1,7 +1,9 @@
 import type { ReservationStatus } from "./types";
 
+// 예약 상태 표기는 여기 한 곳만 본다. 예전에는 화면마다 "대기"·"확인 대기"·
+// "확정 대기"가 섞여 있어 같은 상태가 셋으로 보였다.
 export const statusLabel: Record<ReservationStatus, string> = {
-  pending: "대기",
+  pending: "확인 대기",
   confirmed: "확정",
   canceled: "취소",
   completed: "이용완료",

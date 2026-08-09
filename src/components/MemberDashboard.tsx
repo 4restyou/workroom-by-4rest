@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { statusLabel } from "../lib/format";
 import { getPosition } from "../lib/geo";
 import { supabase } from "../lib/supabase";
 import { kstDate, kstDayLabel, kstToday as kstTodayShared, kstLongDateTime, toKstInputValue, fromKstInputValue } from "../lib/datetime";
@@ -22,11 +23,6 @@ const kstDateOf = kstDate;
 const formatStamp = kstLongDateTime;
 const toKstInput = toKstInputValue;
 const fromKstInput = fromKstInputValue;
-
-const statusLabel: Record<string, string> = {
-  pending: "확정 대기",
-  confirmed: "확정",
-};
 
 type DashData = {
   name: string;

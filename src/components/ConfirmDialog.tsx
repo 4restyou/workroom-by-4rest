@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { subscribeConfirm, type ConfirmRequest } from "../lib/confirm";
+import { subscribeConfirm, type ConfirmRequest, type ConfirmResult, type PromptValues } from "../lib/confirm";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { buttonClass } from "../lib/ui";
 
-type Pending = { request: ConfirmRequest; settle: (ok: boolean) => void };
+type Pending = { request: ConfirmRequest; settle: (result: ConfirmResult) => void };
 
 // lib/confirm의 confirmDialog() 요청을 실제로 그려 주는 단일 마운트 컴포넌트.
 // App에 한 번만 올려 두면 어느 화면에서든 await confirmDialog(...)가 동작한다.
 export default function ConfirmDialog() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [typed, setTyped] = useState("");
+  const [values, setValues] = useState<PromptValues>({});
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const typedInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -20,16 +21,18 @@ export default function ConfirmDialog() {
     return subscribeConfirm((request, settle) => {
       returnFocusRef.current = document.activeElement as HTMLElement | null;
       setTyped("");
+      setValues(Object.fromEntries((request.fields ?? []).map((field) => [field.name, field.defaultValue ?? ""])));
       setPending({ request, settle });
     });
   }, []);
 
-  const close = useCallback((ok: boolean) => {
+  const close = useCallback((result: ConfirmResult) => {
     setPending((current) => {
-      current?.settle(ok);
+      current?.settle(result);
       return null;
     });
     setTyped("");
+    setValues({});
     // 상태 반영 후 포커스를 되돌린다.
     const target = returnFocusRef.current;
     returnFocusRef.current = null;
@@ -42,8 +45,14 @@ export default function ConfirmDialog() {
   // 열릴 때 첫 포커스를 준다. 타이핑 확인이 필요하면 입력칸으로.
   useEffect(() => {
     if (!pending) return;
-    const target = pending.request.requireTyped ? typedInputRef.current : confirmButtonRef.current;
+    // 입력 폼이면 첫 칸으로, 타이핑 확인이 필요하면 그 칸으로, 아니면 확인 버튼으로.
+    const firstField = pending.request.fields?.length
+      ? dialogRef.current?.querySelector<HTMLInputElement>("input[data-prompt-field]")
+      : null;
+    const target = firstField ?? (pending.request.requireTyped ? typedInputRef.current : confirmButtonRef.current);
     target?.focus();
+    // 기본값(제안 환불 금액 등)이 들어 있으면 바로 덮어쓸 수 있게 선택해 둔다.
+    if (firstField) firstField.select();
   }, [pending]);
 
   // Esc로 취소, Tab은 다이얼로그 안에서 순환시킨다(포커스 트랩).
@@ -92,6 +101,9 @@ export default function ConfirmDialog() {
   const { request } = pending;
   const needsTyping = Boolean(request.requireTyped);
   const typingSatisfied = !needsTyping || typed.trim() === request.requireTyped;
+  const fields = request.fields ?? [];
+  const fieldsSatisfied = fields.every((field) => !field.required || (values[field.name] ?? "").trim());
+  const confirmResult: ConfirmResult = fields.length ? values : true;
   const titleId = `confirm-title-${request.id}`;
   const descriptionId = request.description ? `confirm-desc-${request.id}` : undefined;
 
@@ -127,6 +139,28 @@ export default function ConfirmDialog() {
           </div>
         ) : null}
 
+        {fields.length ? (
+          <div className="mt-4 grid gap-3">
+            {fields.map((field) => (
+              <div className="grid gap-1.5" key={field.name}>
+                <label className="text-xs font-black" htmlFor={`confirm-field-${request.id}-${field.name}`}>
+                  {field.label}
+                </label>
+                <input
+                  autoComplete="off"
+                  className="w-full rounded-[6px] border border-workroom-ink bg-workroom-background px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
+                  data-prompt-field
+                  id={`confirm-field-${request.id}-${field.name}`}
+                  inputMode={field.numeric ? "numeric" : undefined}
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  value={values[field.name] ?? ""}
+                />
+                {field.hint ? <p className="text-[11px] font-medium leading-4 text-workroom-muted">{field.hint}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {needsTyping ? (
           <div className="mt-4 grid gap-1.5">
             <label className="text-xs font-black" htmlFor={`confirm-typed-${request.id}`}>
@@ -151,8 +185,8 @@ export default function ConfirmDialog() {
             className={`${buttonClass("primary", "md")} flex-1 ${
               request.tone === "danger" ? "border-red-600 bg-red-500 text-white" : ""
             }`}
-            disabled={!typingSatisfied}
-            onClick={() => close(true)}
+            disabled={!typingSatisfied || !fieldsSatisfied}
+            onClick={() => close(confirmResult)}
             ref={confirmButtonRef}
             type="button"
           >
