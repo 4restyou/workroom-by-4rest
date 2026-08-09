@@ -178,6 +178,22 @@ Deno.serve(async (request) => {
     const row = payload.record;
 
     if (payload.type === "INSERT" && row) {
+      // 운영자가 만든 예약(전화 예약·워크인 접수)은 처음부터 confirmed로 들어온다.
+      // 이때 '접수되었습니다'는 사실과 다르고(이미 확정), '새 예약 신청 · 확인 필요'
+      // 알림은 방금 그 예약을 만든 운영자 자신에게 가는 소음이다.
+      // 회원에게는 확정 문자(출입문 비밀번호 포함)를 대신 보낸다.
+      if (row.status === "confirmed") {
+        if (row.phone) {
+          const accessLine = DOOR_PASSWORD ? `\n출입문 비밀번호: ${DOOR_PASSWORD}` : "";
+          await sendSms(
+            row.phone,
+            `[WORKROOM] ${STATUS_MESSAGE.confirmed}\n${reservationLine(row)}${accessLine}\n${REFUND_NOTICE}\n문의: 010-4931-3298\n${SITE_URL}`,
+            { reservationId: row.id, recipientKind: "member", event: "reservation_confirmed" },
+          );
+        }
+        return new Response("ok", { status: 200 });
+      }
+
       // 온라인 즉시결제(정식 오픈)면 곧바로 '확정' 문자가 가므로 '접수' 문자는 생략한다.
       // 현장결제·테스트(결제링크 안내) 상황에서는 접수 문자를 그대로 보낸다.
       const skipReceivedSms = ONLINE_PAYMENT_LIVE && row.payment_preference !== "onsite";

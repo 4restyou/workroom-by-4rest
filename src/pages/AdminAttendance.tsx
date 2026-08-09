@@ -169,7 +169,7 @@ export default function AdminAttendance() {
       .insert({
         profile_id: profileId,
         name: draft.name,
-        phone: draft.phone || "-",
+        phone: draft.phone,
         pass_type: draft.pass_type,
         date: todayValue(),
         start_time: draft.start_time,
