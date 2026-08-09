@@ -40,7 +40,8 @@ const reservationStatusCardClass: Record<ReservationStatus, string> = {
 type PaymentReceipt = {
   id: string;
   reservation_id: string;
-  action: "confirm" | "refund";
+  // confirm: 단건 카드결제, subscribe: 정기결제 첫 회차, recurring: 4주마다 자동청구
+  action: "confirm" | "refund" | "subscribe" | "recurring";
   amount: number | null;
   created_at: string;
 };
@@ -770,9 +771,16 @@ export default function Account() {
 
 // 결제·환불 기록. 예약 카드의 '결제완료' 배지만으로는 언제 얼마가 결제됐는지,
 // 부분 환불이 있었는지 알 수 없어서 거래기록을 그대로 보여 준다.
+const receiptActionLabel: Record<PaymentReceipt["action"], string> = {
+  confirm: "결제",
+  subscribe: "정기결제 첫 회차",
+  recurring: "정기결제 자동청구",
+  refund: "환불",
+};
+
 function PaymentReceipts({ method, receipts }: { method: string | null; receipts: PaymentReceipt[] }) {
   if (!receipts.length) return null;
-  const paid = receipts.filter((item) => item.action === "confirm").reduce((sum, item) => sum + (item.amount ?? 0), 0);
+  const paid = receipts.filter((item) => item.action !== "refund").reduce((sum, item) => sum + (item.amount ?? 0), 0);
   const refunded = receipts.filter((item) => item.action === "refund").reduce((sum, item) => sum + (item.amount ?? 0), 0);
 
   return (
@@ -784,7 +792,7 @@ function PaymentReceipts({ method, receipts }: { method: string | null; receipts
       <ul className="mt-2 grid gap-1.5">
         {receipts.map((receipt) => (
           <li className="flex flex-wrap items-baseline justify-between gap-2 text-xs font-medium" key={receipt.id}>
-            <span className="font-bold">{receipt.action === "refund" ? "환불" : "결제"}</span>
+            <span className="font-bold">{receiptActionLabel[receipt.action] ?? "결제"}</span>
             <span className="text-workroom-muted">{kstLongDateTime(receipt.created_at)}</span>
             <span className="font-bold tabular-nums">
               {receipt.action === "refund" ? "-" : ""}
