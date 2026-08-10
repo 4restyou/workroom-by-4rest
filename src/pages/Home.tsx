@@ -7,6 +7,7 @@ import PriceCard from "../components/PriceCard";
 import Section from "../components/Section";
 import { defaultPasses } from "../lib/defaultPasses";
 import { CAUTION_ITEMS, FIT_ITEMS, GUIDE_ITEMS } from "../lib/guide";
+import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { badge, buttonClass, card, pressable, tintCard, type TintColor } from "../lib/ui";
 import type { Pass } from "../lib/types";
@@ -105,11 +106,7 @@ export default function Home() {
   useEffect(() => {
     async function loadPasses() {
       if (!hasSupabaseConfig || !supabase) return;
-      const { data, error } = await supabase
-        .from("passes")
-        .select("id,name,description,price,min_people,seat_type_id,is_active,sort_order")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+      const { data, error } = await loadPassesFromDb({ activeOnly: true });
 
       if (!error && data?.length) {
         setPasses(data);

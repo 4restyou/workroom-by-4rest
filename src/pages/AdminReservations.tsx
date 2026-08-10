@@ -10,7 +10,7 @@ import { refundReservationPayment } from "../lib/portone";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { prorateRefund } from "../../supabase/functions/_shared/paymentRules";
 import { ALL_WEEKDAYS, openWeekdaysFromRows } from "../lib/businessHours";
-import { PASS_COLUMNS } from "../lib/columns";
+import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
@@ -107,7 +107,7 @@ export default function AdminReservations() {
       // 결제수단·요청사항까지 편집하므로 여기서는 전체 컬럼이 필요하다.
       // (목록만 쓰는 화면은 lib/columns의 좁은 목록을 사용한다.)
       supabase.from("reservations").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
-      supabase.from("passes").select(PASS_COLUMNS).eq("is_active", true).order("sort_order"),
+      loadPassesFromDb({ activeOnly: true }),
       supabase.from("business_hours").select("weekday,is_closed"),
     ]);
 

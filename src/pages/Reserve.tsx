@@ -18,11 +18,12 @@ import { maxBookingDateValue,
 } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, canSubscribe, payReservation, subscribeMonthly } from "../lib/portone";
+import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { accessEndDate, isLongTermPassName, passUsableDays, readableReservationError } from "../lib/reservations";
 import { hoursForDate, openWeekdaysFrom } from "../lib/businessHours";
-import { PASS_COLUMNS, RESERVATION_AVAILABILITY_COLUMNS } from "../lib/columns";
+import { RESERVATION_AVAILABILITY_COLUMNS } from "../lib/columns";
 import { SITE } from "../lib/site";
 import { badge, buttonClass, card, tintCard } from "../lib/ui";
 import type { BusinessDateException, BusinessHour, Pass, Profile, Reservation, ReservationInsert } from "../lib/types";
@@ -98,11 +99,7 @@ export default function Reserve() {
   useEffect(() => {
     async function loadPasses() {
       if (!hasSupabaseConfig || !supabase) return;
-      const { data, error: passError } = await supabase
-        .from("passes")
-        .select(PASS_COLUMNS)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+      const { data, error: passError } = await loadPassesFromDb({ activeOnly: true });
 
       if (!passError && data?.length) {
         setPasses(data);

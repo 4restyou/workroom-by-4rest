@@ -5,6 +5,7 @@ import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import MoneyInput from "../components/MoneyInput";
 import { todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
+import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import type { BusinessDateException, BusinessHour, Pass, SeatType, SpaceSetting } from "../lib/types";
@@ -50,6 +51,8 @@ export default function AdminSettings() {
   const [locationMsg, setLocationMsg] = useState("");
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([]);
   const [passes, setPasses] = useState<Pass[]>([]);
+  // migration 0043(최소 인원) 적용 여부. 적용 전에는 그 칸을 숨기고 저장에서도 뺀다.
+  const [hasMinPeople, setHasMinPeople] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [dateExceptions, setDateExceptions] = useState<BusinessDateException[]>([]);
   const [newException, setNewException] = useState<BusinessDateException>({
@@ -105,7 +108,7 @@ export default function AdminSettings() {
 
     const [seatResult, passResult, hourResult, exceptionResult, settingResult] = await Promise.all([
       supabase.from("seat_types").select("*").order("sort_order", { ascending: true }),
-      supabase.from("passes").select("id,name,description,price,min_people,seat_type_id,is_active,sort_order").order("sort_order", { ascending: true }),
+      loadPassesFromDb(),
       supabase.from("business_hours").select("*").order("weekday", { ascending: true }),
       supabase.from("business_date_exceptions").select("*").gte("date", todayValue()).order("date", { ascending: true }).limit(100),
       supabase.from("space_settings").select("*"),
@@ -121,6 +124,7 @@ export default function AdminSettings() {
 
     const nextSeats = (seatResult.data ?? []) as SeatType[];
     const nextPasses = (passResult.data ?? []) as Pass[];
+    setHasMinPeople(passResult.hasMinPeople);
     const nextHours = (hourResult.data ?? []) as BusinessHour[];
     const nextSettings = Object.fromEntries(((settingResult.data ?? []) as SpaceSetting[]).map((setting) => [setting.key, setting.value]));
     setSeatTypes(nextSeats);
@@ -153,13 +157,14 @@ export default function AdminSettings() {
           sort_order: Number(seatType.sort_order),
         })),
       ),
+      // migration 0043 전에는 min_people 컬럼이 없어 upsert가 통째로 실패한다.
       supabase.from("passes").upsert(
         passes.map((pass) => ({
           id: pass.id,
           name: pass.name.trim(),
           description: pass.description ?? "",
           price: Number(pass.price),
-          min_people: Math.min(12, Math.max(1, Number(pass.min_people) || 1)),
+          ...(hasMinPeople ? { min_people: Math.min(12, Math.max(1, Number(pass.min_people) || 1)) } : {}),
           seat_type_id: pass.seat_type_id || null,
           is_active: pass.is_active ?? true,
           sort_order: Number(pass.sort_order ?? 0),
@@ -414,7 +419,7 @@ export default function AdminSettings() {
             </p>
             <div className="mt-4 grid gap-3">
               {passes.map((pass, index) => (
-                <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1fr_1.2fr_110px_90px_130px_80px_auto_auto] lg:items-end`} key={pass.id}>
+                <div className={`grid gap-3 ${cardFlat} p-4 lg:items-end ${hasMinPeople ? "lg:grid-cols-[1fr_1.2fr_110px_90px_130px_80px_auto_auto]" : "lg:grid-cols-[1fr_1.3fr_120px_140px_80px_auto_auto]"}`} key={pass.id}>
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     이용권 이름
                     <input value={pass.name} onChange={(event) => updatePass(index, "name", event.target.value)} />
@@ -427,10 +432,12 @@ export default function AdminSettings() {
                     가격(원)
                     <MoneyInput value={pass.price} onChange={(value) => updatePass(index, "price", value)} />
                   </label>
-                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
-                    최소 인원
-                    <input max={12} min={1} type="number" value={pass.min_people ?? 1} onChange={(event) => updatePass(index, "min_people", Number(event.target.value) || 1)} />
-                  </label>
+                  {hasMinPeople ? (
+                    <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                      최소 인원
+                      <input max={12} min={1} type="number" value={pass.min_people ?? 1} onChange={(event) => updatePass(index, "min_people", Number(event.target.value) || 1)} />
+                    </label>
+                  ) : null}
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     좌석
                     <select value={pass.seat_type_id ?? ""} onChange={(event) => updatePass(index, "seat_type_id", event.target.value || null)}>
