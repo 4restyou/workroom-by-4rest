@@ -121,8 +121,11 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
   }
 
   if (!response) return { ok: false, message: "정기결제 창을 여는 데 실패했습니다. (응답 없음 — 채널 키/상점 ID를 확인해 주세요)" };
-  if (response.code !== undefined) return { ok: false, message: response.message ?? "정기결제 등록이 취소되었습니다." };
-  if (!response.billingKey) return { ok: false, message: "카드 등록에 실패했습니다." };
+  // BC카드는 카드사가 정기결제 심사를 거부해 빌링키 발급 자체가 막혀 있다.
+  // PG가 주는 원문만 보여주면 회원이 무엇을 해야 할지 알 수 없으므로 대안을 붙인다.
+  const fallbackHint = `\n${SITE.booking.recurringUnsupportedCards}는 정기결제 등록이 불가합니다. 다른 카드로 등록하시거나 ‘카드로 결제하기’로 이번 회차를 결제해 주세요.`;
+  if (response.code !== undefined) return { ok: false, message: `${response.message ?? "정기결제 등록이 취소되었습니다."}${fallbackHint}` };
+  if (!response.billingKey) return { ok: false, message: `카드 등록에 실패했습니다.${fallbackHint}` };
 
   return confirmBillingIssue(reservation.id, response.billingKey);
 }

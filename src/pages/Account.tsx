@@ -537,11 +537,11 @@ export default function Account() {
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
                               ) : canSubscribe(reservation) ? (
-                                // 정기결제는 카드사별 지원이 확인되기 전까지 보조 선택지다.
-                                // 등록에 실패해도 회원이 막히지 않도록 이번 회차 결제를 앞에 둔다.
+                                // 이번 회차 결제가 기본이고 자동결제는 선택지다. BC카드처럼 정기결제가
+                                // 막힌 카드로 등록에 실패해도 회원이 그 자리에서 결제할 수 있어야 한다.
                                 <div className="grid gap-2">
                                   <button
-                                    className={buttonClass(SITE.booking.recurringPaymentLive ? "secondary" : "accent", "md", "w-full sm:w-auto")}
+                                    className={buttonClass("accent", "md", "w-full sm:w-auto")}
                                     disabled={actionBusy === `pay-${reservation.id}`}
                                     onClick={() => void payNow(reservation)}
                                     type="button"
@@ -549,7 +549,7 @@ export default function Account() {
                                     {actionBusy === `pay-${reservation.id}` ? "결제 진행 중…" : `카드로 결제하기 · ${formatPrice(reservation.price_at_booking ?? 0)}`}
                                   </button>
                                   <button
-                                    className={buttonClass(SITE.booking.recurringPaymentLive ? "accent" : "secondary", "sm", "w-full sm:w-auto")}
+                                    className={buttonClass("secondary", "sm", "w-full sm:w-auto")}
                                     disabled={actionBusy === `sub-${reservation.id}`}
                                     onClick={() => void subscribeNow(reservation)}
                                     type="button"
