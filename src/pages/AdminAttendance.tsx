@@ -80,7 +80,7 @@ export default function AdminAttendance() {
       supabase.from("reservations").select("*").is("deleted_at", null).or(`date.eq.${today},access_end_date.gte.${today}`).order("start_time", { ascending: true }).limit(300),
       supabase.from("coupons").select("id,code,label,status,issued_at,used_at,profile:profiles(full_name)").order("issued_at", { ascending: false }).limit(500),
       // 워크인 접수에 쓸 판매 중인 이용권.
-      supabase.from("passes").select("id,name,description,price,is_active,sort_order,seat_type_id").eq("is_active", true).order("sort_order", { ascending: true }),
+      supabase.from("passes").select("id,name,description,price,min_people,is_active,sort_order,seat_type_id").eq("is_active", true).order("sort_order", { ascending: true }),
     ]);
     setIsLoading(false);
     if (attendanceResult.error || reservationResult.error || couponResult.error) {

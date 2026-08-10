@@ -20,7 +20,10 @@ export type Pass = {
   id: string;
   name: string;
   description: string | null;
+  /** 1인 기준 금액. 실제 청구액은 price x 인원(migration 0043). */
   price: number;
+  /** 이 이용권으로 예약할 수 있는 최소 인원(단체·대관용, 기본 1). */
+  min_people?: number;
   seat_type_id?: string | null;
   is_active?: boolean;
   sort_order?: number;

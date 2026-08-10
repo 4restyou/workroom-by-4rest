@@ -105,7 +105,7 @@ export default function AdminSettings() {
 
     const [seatResult, passResult, hourResult, exceptionResult, settingResult] = await Promise.all([
       supabase.from("seat_types").select("*").order("sort_order", { ascending: true }),
-      supabase.from("passes").select("id,name,description,price,seat_type_id,is_active,sort_order").order("sort_order", { ascending: true }),
+      supabase.from("passes").select("id,name,description,price,min_people,seat_type_id,is_active,sort_order").order("sort_order", { ascending: true }),
       supabase.from("business_hours").select("*").order("weekday", { ascending: true }),
       supabase.from("business_date_exceptions").select("*").gte("date", todayValue()).order("date", { ascending: true }).limit(100),
       supabase.from("space_settings").select("*"),
@@ -159,6 +159,7 @@ export default function AdminSettings() {
           name: pass.name.trim(),
           description: pass.description ?? "",
           price: Number(pass.price),
+          min_people: Math.min(12, Math.max(1, Number(pass.min_people) || 1)),
           seat_type_id: pass.seat_type_id || null,
           is_active: pass.is_active ?? true,
           sort_order: Number(pass.sort_order ?? 0),
@@ -408,11 +409,12 @@ export default function AdminSettings() {
           <section className={`${card} p-5`}>
             <h2 className="text-xl font-bold">이용권 / 가격</h2>
             <p className="mt-1 text-sm font-medium text-workroom-muted">
-              이름, 설명, 가격과 연결 좌석을 관리합니다. 화살표로 예약 화면의 표시 순서를 바꿀 수 있습니다.
+              이름, 설명, 가격과 연결 좌석을 관리합니다. <b>가격은 1인 기준</b>이며 실제 결제 금액은 가격 x 인원입니다.
+              단체·대관처럼 일정 인원 이상만 받는 이용권은 최소 인원을 올려 주세요. 화살표로 예약 화면의 표시 순서를 바꿀 수 있습니다.
             </p>
             <div className="mt-4 grid gap-3">
               {passes.map((pass, index) => (
-                <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1fr_1.3fr_120px_140px_80px_auto_auto] lg:items-end`} key={pass.id}>
+                <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1fr_1.2fr_110px_90px_130px_80px_auto_auto] lg:items-end`} key={pass.id}>
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     이용권 이름
                     <input value={pass.name} onChange={(event) => updatePass(index, "name", event.target.value)} />
@@ -424,6 +426,10 @@ export default function AdminSettings() {
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     가격(원)
                     <MoneyInput value={pass.price} onChange={(value) => updatePass(index, "price", value)} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    최소 인원
+                    <input max={12} min={1} type="number" value={pass.min_people ?? 1} onChange={(event) => updatePass(index, "min_people", Number(event.target.value) || 1)} />
                   </label>
                   <label className="grid gap-1 text-xs font-bold text-workroom-muted">
                     좌석

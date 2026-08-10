@@ -22,9 +22,13 @@ export default function PriceCard({ pass }: PriceCardProps) {
             <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
           </p>
         </div>
-        <p className="shrink-0 border-b-4 border-workroom-yellow px-1 pb-1 text-lg font-bold">
-          {formatPrice(pass.price)}
-        </p>
+        <div className="shrink-0 text-right">
+          <p className="border-b-4 border-workroom-yellow px-1 pb-1 text-lg font-bold">{formatPrice(pass.price)}</p>
+          {/* 결제 금액은 1인 요금 x 인원이다. 단가만 크게 보이면 총액을 오해한다. */}
+          <p className="mt-1 text-[11px] font-bold text-workroom-muted">
+            1인 기준{(pass.min_people ?? 1) > 1 ? ` · ${pass.min_people}명 이상` : ""}
+          </p>
+        </div>
       </div>
     </Link>
   );

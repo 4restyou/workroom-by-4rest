@@ -59,15 +59,22 @@ export default function WalkInForm({
   });
 
   const endTime = draft.end_time || (draft.pass_type ? defaultEnd(start, draft.pass_type) : "");
+  // 단체·대관처럼 최소 인원이 있는 이용권. 서버 트리거(0043)와 같은 규칙이다.
+  const selectedPass = passes.find((pass) => pass.name === draft.pass_type) ?? null;
+  const minPeople = Math.max(1, selectedPass?.min_people ?? 1);
+  const total = selectedPass ? selectedPass.price * (Number(draft.people) || 1) : 0;
 
   function pickPass(name: string) {
     // 이용권을 바꾸면 종료 시각 기본값도 따라 바뀐다(직접 고친 값은 유지하지 않는다).
-    setDraft((current) => ({ ...current, pass_type: name, end_time: "" }));
+    // 최소 인원이 있는 이용권이면 인원도 함께 올린다.
+    const nextMin = Math.max(1, passes.find((pass) => pass.name === name)?.min_people ?? 1);
+    setDraft((current) => ({ ...current, pass_type: name, end_time: "", people: Math.max(current.people, nextMin) }));
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.name.trim() || !draft.pass_type || !endTime) return;
+    if ((Number(draft.people) || 1) < minPeople) return;
     onSubmit({
       name: draft.name.trim(),
       phone: draft.phone.trim(),
@@ -85,7 +92,7 @@ export default function WalkInForm({
         <h2 className="text-lg font-black">예약 없이 오신 손님</h2>
         <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">
           접수하면 오늘 예약이 확정 상태로 만들어지고 입실까지 한 번에 기록됩니다. 연락처가 같은 회원이 있으면 자동으로
-          이어 붙여 출근 도장도 쌓입니다.
+          이어 붙여 출근 도장도 쌓입니다. 금액은 이용권의 1인 요금 × 인원으로 계산됩니다.
         </p>
       </div>
 
@@ -123,7 +130,7 @@ export default function WalkInForm({
           인원
           <input
             max={12}
-            min={1}
+            min={minPeople}
             required
             type="number"
             value={draft.people}
@@ -158,7 +165,7 @@ export default function WalkInForm({
 
       <div className="flex flex-wrap gap-2">
         <button className={buttonClass("primary", "md")} disabled={busy} type="submit">
-          {busy ? "접수 중…" : "접수하고 입실 처리"}
+          {busy ? "접수 중…" : total ? `접수하고 입실 처리 · ${total.toLocaleString("ko-KR")}원` : "접수하고 입실 처리"}
         </button>
         <button className={buttonClass("secondary", "md")} disabled={busy} onClick={onCancel} type="button">
           닫기

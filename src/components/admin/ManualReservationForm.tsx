@@ -31,9 +31,13 @@ export default function ManualReservationForm({ passes, onSubmit }: { passes: Pa
     payment_status: "unpaid" as PaymentStatus,
   });
 
+  const selectedPass = passes.find((item) => item.name === draft.pass_type) ?? null;
+  const minPeople = Math.max(1, selectedPass?.min_people ?? 1);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.name.trim() || !draft.phone.trim() || !draft.pass_type) return;
+    if ((Number(draft.people) || 1) < minPeople) return;
     const pass = passes.find((item) => item.name === draft.pass_type);
     // 전화·워크인 예약도 회원과 연결해 둔다. 연결이 없으면 입퇴실 화면에서
     // 입실 버튼이 나오지 않아(출석은 회원 단위로 기록된다) 하루 종일
@@ -43,7 +47,8 @@ export default function ManualReservationForm({ passes, onSubmit }: { passes: Pa
       profile_id: linkedProfileId,
       pass_id: pass?.id ?? null,
       pass_name_snapshot: pass?.name ?? draft.pass_type,
-      price_at_booking: pass?.price ?? null,
+      // 금액은 서버 트리거가 1인 요금 x 인원으로 확정한다(0043). 여기서 보내는 값은 무시된다.
+      price_at_booking: pass ? pass.price * (Number(draft.people) || 1) : null,
       seat_type_id: pass?.seat_type_id ?? null,
       payment_preference: draft.payment_preference,
       payment_method: draft.payment_status === "service" ? "서비스" : draft.payment_preference === "onsite" ? "현장결제" : null,
@@ -78,7 +83,10 @@ export default function ManualReservationForm({ passes, onSubmit }: { passes: Pa
           <input type="email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
         </label>
         <label className="grid gap-1 text-xs font-bold text-workroom-muted">이용권
-          <select required value={draft.pass_type} onChange={(event) => setDraft((current) => ({ ...current, pass_type: event.target.value }))}>
+          <select required value={draft.pass_type} onChange={(event) => {
+            const nextMin = Math.max(1, passes.find((item) => item.name === event.target.value)?.min_people ?? 1);
+            setDraft((current) => ({ ...current, pass_type: event.target.value, people: Math.max(current.people, nextMin) }));
+          }}>
             <option value="">선택</option>
             {passes.map((pass) => <option key={pass.id} value={pass.name}>{pass.name}</option>)}
             <option value="기타 문의">기타 문의</option>
@@ -94,7 +102,12 @@ export default function ManualReservationForm({ passes, onSubmit }: { passes: Pa
           <input required type="time" value={draft.end_time} onChange={(event) => setDraft((current) => ({ ...current, end_time: event.target.value }))} />
         </label>
         <label className="grid gap-1 text-xs font-bold text-workroom-muted">인원
-          <input min={1} max={12} required type="number" value={draft.people} onChange={(event) => setDraft((current) => ({ ...current, people: Number(event.target.value) }))} />
+          <input min={minPeople} max={12} required type="number" value={draft.people} onChange={(event) => setDraft((current) => ({ ...current, people: Number(event.target.value) }))} />
+          {/* 금액은 서버가 1인 요금 x 인원으로 정한다(0043). 등록 전에 총액을 보여 준다. */}
+          <span className="text-[11px] font-medium text-workroom-muted">
+            {selectedPass ? `1인 ${selectedPass.price.toLocaleString("ko-KR")}원 × ${draft.people}명 = ${(selectedPass.price * (Number(draft.people) || 1)).toLocaleString("ko-KR")}원` : "이용권을 선택하면 금액이 계산됩니다."}
+            {minPeople > 1 ? ` · ${minPeople}명 이상` : ""}
+          </span>
         </label>
         <label className="grid gap-1 text-xs font-bold text-workroom-muted">예약 상태
           <select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as "pending" | "confirmed" }))}>

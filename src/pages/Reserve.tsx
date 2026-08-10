@@ -355,7 +355,15 @@ export default function Reserve() {
 
   function selectPass(passName: string) {
     const window = reservationWindowForPass(passName);
-    setForm((current) => ({ ...current, ...window, pass_type: passName }));
+    // 최소 인원이 있는 이용권을 고르면 인원도 함께 올려 준다. 그대로 두면 다음 단계에서
+    // 곧바로 오류만 보게 된다.
+    const nextMin = Math.max(1, passes.find((pass) => pass.name === passName)?.min_people ?? 1);
+    setForm((current) => ({
+      ...current,
+      ...window,
+      pass_type: passName,
+      people: Math.max(Number(current.people) || 1, nextMin) === Number(current.people) ? current.people : String(Math.max(Number(current.people) || 1, nextMin)),
+    }));
     setCalendarMonth(startOfMonth(new Date(`${window.date}T00:00:00`)));
     trackEvent("reserve_pass_selected", { pass_type: passName });
   }
@@ -368,6 +376,7 @@ export default function Reserve() {
     if (step === 2) {
       const people = Number(form.people);
       if (!Number.isInteger(people) || people < 1 || people > 12) return "인원은 1명부터 12명까지 입력할 수 있습니다.";
+      if (people < minPeople) return `${form.pass_type}은(는) ${minPeople}명 이상부터 예약할 수 있어요.`;
       if (!form.date || form.date < todayValue()) return "오늘 이후 날짜를 선택해 주세요.";
       if (isClosedDay) return "선택하신 날짜는 휴무일입니다. 다른 날짜를 선택해 주세요.";
       if (form.date > maxBookable) return "예약은 오늘부터 2개월 이내 날짜까지만 가능해요.";
@@ -609,6 +618,8 @@ export default function Reserve() {
 
   const groupedPasses = groupPasses(passes);
   const selectedPassInfo = passes.find((pass) => pass.name === form.pass_type) ?? null;
+  // 단체·대관처럼 최소 인원이 있는 이용권. 서버 트리거(0043)와 같은 값을 본다.
+  const minPeople = Math.max(1, selectedPassInfo?.min_people ?? 1);
   const stepLabels = ["이용권", "날짜·시간", "정보·확인"];
 
   return (
@@ -715,7 +726,8 @@ export default function Reserve() {
                           <span className="block text-base font-bold">{pass.name}</span>
                           <span className="mt-1 block text-xs font-medium text-workroom-muted">
                             {pass.description}
-                            {pass.price ? ` · ${formatPrice(pass.price)}` : ""}
+                            {pass.price ? ` · 1인 ${formatPrice(pass.price)}` : ""}
+                            {(pass.min_people ?? 1) > 1 ? ` · ${pass.min_people}명 이상` : ""}
                           </span>
                         </span>
                         <input
@@ -756,8 +768,11 @@ export default function Reserve() {
               <div className="grid content-start gap-4">
                 <label className="grid gap-1 text-sm font-bold">
                   인원
-                  <span className="text-xs font-medium text-workroom-muted">잔여 좌석은 인원 기준으로 확인해요.</span>
-                  <input min={1} max={12} required type="number" value={form.people} onChange={(event) => updateField("people", event.target.value)} />
+                  <span className="text-xs font-medium text-workroom-muted">
+                    잔여 좌석은 인원 기준으로 확인해요. 요금도 인원수만큼 계산됩니다.
+                    {minPeople > 1 ? ` ${form.pass_type}은(는) ${minPeople}명 이상부터 예약할 수 있어요.` : ""}
+                  </span>
+                  <input min={minPeople} max={12} required type="number" value={form.people} onChange={(event) => updateField("people", event.target.value)} />
                 </label>
 
                 {selectedDuration ? (
@@ -960,11 +975,10 @@ export default function Reserve() {
                 <dd className="font-bold">
                   {selectedPassInfo?.price ? (
                     <>
-                      {formatPrice(selectedPassInfo.price)}
-                      <span className="ml-1 font-medium text-workroom-muted">/ 1인</span>
+                      {formatPrice(selectedPassInfo.price * (Number(form.people) || 1))}
                       {Number(form.people) > 1 ? (
                         <span className="mt-0.5 block text-xs font-medium text-workroom-muted">
-                          {form.people}명 · 총 {formatPrice(selectedPassInfo.price * Number(form.people))} · 인원 추가분은 확인 후 안내드려요
+                          1인 {formatPrice(selectedPassInfo.price)} × {form.people}명
                         </span>
                       ) : null}
                     </>

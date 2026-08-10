@@ -23,7 +23,7 @@ export const RESERVATION_SUMMARY_COLUMNS = "id,pass_name_snapshot,pass_type,date
 export const ATTENDANCE_COLUMNS = "id,profile_id,reservation_id,check_in_at,check_out_at";
 
 /** 이용권 목록(가격표·예약 화면). */
-export const PASS_COLUMNS = "id,name,description,price,seat_type_id,is_active,sort_order";
+export const PASS_COLUMNS = "id,name,description,price,min_people,seat_type_id,is_active,sort_order";
 
 /** 회원 목록. */
 export const PROFILE_LIST_COLUMNS = "id,full_name,email,phone,address,admin_note,created_at,role";

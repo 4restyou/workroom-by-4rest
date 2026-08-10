@@ -107,7 +107,7 @@ export default function Home() {
       if (!hasSupabaseConfig || !supabase) return;
       const { data, error } = await supabase
         .from("passes")
-        .select("id,name,description,price,seat_type_id,is_active,sort_order")
+        .select("id,name,description,price,min_people,seat_type_id,is_active,sort_order")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
