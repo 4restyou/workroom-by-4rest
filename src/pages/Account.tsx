@@ -537,26 +537,26 @@ export default function Account() {
                               {reservation.payment_status === "paid" ? (
                                 <span className={badge("mint")}>결제완료 · {formatPrice(reservation.price_at_booking ?? 0)}</span>
                               ) : canSubscribe(reservation) ? (
+                                // 정기결제는 카드사별 지원이 확인되기 전까지 보조 선택지다.
+                                // 등록에 실패해도 회원이 막히지 않도록 이번 회차 결제를 앞에 둔다.
                                 <div className="grid gap-2">
                                   <button
-                                    className={buttonClass("accent", "md", "w-full sm:w-auto")}
-                                    disabled={actionBusy === `sub-${reservation.id}`}
-                                    onClick={() => void subscribeNow(reservation)}
-                                    type="button"
-                                  >
-                                    {actionBusy === `sub-${reservation.id}` ? "카드 등록 중…" : `정기결제 등록 · 매월 ${formatPrice(reservation.price_at_booking ?? 0)}`}
-                                  </button>
-                                  <button
-                                    className={buttonClass("secondary", "sm", "w-full sm:w-auto")}
+                                    className={buttonClass(SITE.booking.recurringPaymentLive ? "secondary" : "accent", "md", "w-full sm:w-auto")}
                                     disabled={actionBusy === `pay-${reservation.id}`}
                                     onClick={() => void payNow(reservation)}
                                     type="button"
                                   >
-                                    {actionBusy === `pay-${reservation.id}` ? "결제 진행 중…" : "이번 회차만 결제"}
+                                    {actionBusy === `pay-${reservation.id}` ? "결제 진행 중…" : `카드로 결제하기 · ${formatPrice(reservation.price_at_booking ?? 0)}`}
                                   </button>
-                                  <p className="text-xs font-medium text-workroom-muted">
-                                    정기결제는 카드가 등록되고 첫 회차가 바로 결제돼요. 이후 4주마다 자동 결제되며 언제든 해지할 수 있어요.
-                                  </p>
+                                  <button
+                                    className={buttonClass(SITE.booking.recurringPaymentLive ? "accent" : "secondary", "sm", "w-full sm:w-auto")}
+                                    disabled={actionBusy === `sub-${reservation.id}`}
+                                    onClick={() => void subscribeNow(reservation)}
+                                    type="button"
+                                  >
+                                    {actionBusy === `sub-${reservation.id}` ? "카드 등록 중…" : "4주마다 자동결제로 등록"}
+                                  </button>
+                                  <p className="text-xs font-medium leading-5 text-workroom-muted">{SITE.booking.recurringHint}</p>
                                 </div>
                               ) : canPayOnline(reservation) ? (
                                 <div className="grid gap-2">

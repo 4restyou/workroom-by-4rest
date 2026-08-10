@@ -1081,26 +1081,30 @@ export default function Reserve() {
             {paymentMessage ? <p className={`${tintCard("mint")} mt-4 p-3 text-sm font-bold`}>{paymentMessage}</p> : null}
             {paymentError ? <p className={`${tintCard("danger")} mt-4 p-3 text-sm font-bold`}>{paymentError}</p> : null}
 
-            {/* 월권은 정기결제(배치) 창, 그 외는 일반 카드(인증) 결제창으로 바로 갈 수 있게 한다. */}
-            {submittedReservation && canSubscribe(submittedReservation.reservation) ? (
-              <button
-                className={buttonClass("accent", "lg", "mt-6 w-full")}
-                disabled={isPaymentBusy}
-                onClick={() => void subscribeSubmittedReservation()}
-                type="button"
-              >
-                {isPaymentBusy ? "카드 등록 중…" : `신용카드 정기결제 등록 · 매월 ${formatPrice(submittedReservation.price ?? 0)}`}
-              </button>
-            ) : null}
+            {/* 카드 결제가 기본이고, 월권은 그 아래에 4주 자동결제를 선택지로 둔다.
+                정기결제는 카드사별 지원이 확인되기 전까지 앞세우지 않는다. */}
             {submittedReservation && canPayOnline(submittedReservation.reservation) ? (
               <button
-                className={buttonClass(canSubscribe(submittedReservation.reservation) ? "secondary" : "accent", "lg", "mt-2 w-full")}
+                className={buttonClass("accent", "lg", "mt-6 w-full")}
                 disabled={isPaymentBusy}
                 onClick={() => void paySubmittedReservation()}
                 type="button"
               >
                 {isPaymentBusy ? "결제 진행 중…" : `신용카드로 ${formatPrice(submittedReservation.price ?? 0)} 결제하기`}
               </button>
+            ) : null}
+            {submittedReservation && canSubscribe(submittedReservation.reservation) ? (
+              <>
+                <button
+                  className={buttonClass("secondary", "lg", "mt-2 w-full")}
+                  disabled={isPaymentBusy}
+                  onClick={() => void subscribeSubmittedReservation()}
+                  type="button"
+                >
+                  {isPaymentBusy ? "카드 등록 중…" : "4주마다 자동결제로 등록"}
+                </button>
+                <p className="mt-2 text-xs font-medium leading-5 text-workroom-muted">{SITE.booking.recurringHint}</p>
+              </>
             ) : null}
             <Link
               className={buttonClass(submittedReservation?.reservation.payment_status === "paid" ? "primary" : "secondary", "lg", "mt-2 w-full")}

@@ -1,11 +1,17 @@
-// 온라인 결제(PG) 정식 오픈 여부. 결제 시스템이 완료되면 true로 바꾸면
-// 예약·안내·FAQ의 '예약 직후 카드 결제/자동 확정' 문구가 한 번에 되살아난다.
+// 단건 카드 결제(PG) 정식 오픈 여부. 10개 카드사 심사가 모두 '완료'로 바뀌어
+// 예약 직후 결제·자동 확정을 정식으로 안내한다.
 // (문자 안내는 supabase/functions/reservation-sms 의 ONLINE_PAYMENT_LIVE도 함께 변경)
-const onlinePaymentLive: boolean = false;
+const onlinePaymentLive: boolean = true;
 
-// 결제창(카드 결제·정기결제) 노출 여부. 카드사 사전 심사에서는 결제창이 실제로
-// 호출되는지(약관·카드사 목록)를 확인하므로, 정식 오픈 문구와 별개로 결제 수단과
-// 버튼을 먼저 노출해야 한다. 심사 통과 후 onlinePaymentLive도 true로 바꾼다.
+// 정기결제(빌링키 자동청구) 정식 오픈 여부는 단건과 따로 둔다.
+// 카드사심사 등록현황에서 '정기과금'이 표기된 카드사(KB국민·하나·하나(외환)·
+// 롯데아멕스·우리)와 표기가 없는 카드사(삼성·신한·현대·NH)가 갈려 있고, BC카드는
+// 비고에 '거부'가 붙어 있다. 전 카드사 지원이 확인되기 전까지는 정기결제를
+// '되면 편한 선택지'로만 안내하고, 기본 결제 수단은 단건으로 둔다.
+const recurringPaymentLive: boolean = false;
+
+// 결제창(카드 결제·정기결제) 노출 여부. 운영 중 결제를 통째로 내려야 할 때 쓰는
+// 비상 스위치다.
 const paymentEnabled: boolean = true;
 
 // Single source of truth for business / contact info used across the site.
@@ -20,6 +26,7 @@ export const SITE = {
   booking: {
     memberOnly: true,
     onlinePaymentLive,
+    recurringPaymentLive,
     paymentEnabled,
     confirmationLabel: onlinePaymentLive
       ? "온라인 결제 예약은 결제 완료 즉시 자동 확정됩니다."
@@ -29,9 +36,13 @@ export const SITE = {
       : "카드 결제는 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
     onsitePayment: "현장 결제(카드·현금)와 별도 확인이 필요한 예약은 운영자가 확인한 뒤 확정합니다.",
     advanceLimitLabel: "예약은 이용일 기준 오늘부터 최대 2개월 이내까지 가능합니다.",
-    recurringNotice: onlinePaymentLive
+    recurringNotice: recurringPaymentLive
       ? "월권(자유석·지정석)은 정기결제로 이용할 수 있습니다. 정기결제 신청·해지는 문의해 주세요."
-      : "월권(자유석·지정석) 정기결제는 준비 중입니다. 현재는 문의 후 결제 링크 또는 현장 결제로 진행됩니다.",
+      : "월권(자유석·지정석)은 이용 기간마다 카드로 결제하시면 됩니다. 4주마다 자동으로 결제되는 정기결제는 일부 카드사만 지원되며, 등록이 되지 않으면 이번 회차만 결제해 주세요.",
+    // 정기결제 버튼 옆에 붙는 짧은 안내. 카드사별 지원 여부가 확정되면 문구를 줄인다.
+    recurringHint: recurringPaymentLive
+      ? "카드가 등록되고 첫 회차가 바로 결제됩니다. 이후 4주마다 자동 결제되며 언제든 해지할 수 있어요."
+      : "카드가 등록되면 첫 회차가 바로 결제되고 이후 4주마다 자동 결제돼요. 다만 카드사에 따라 등록이 안 될 수 있어요 — 그때는 '이번 회차만 결제'를 이용해 주세요.",
     // 결제 수단 선택지의 설명. 정식 오픈 전에는 "즉시 확정"이라고 말하지 않는다.
     onlinePaymentOptionHint: onlinePaymentLive
       ? "예약 신청 직후 결제하며, 결제가 완료되면 예약도 바로 확정됩니다."
@@ -39,7 +50,8 @@ export const SITE = {
     // 예약 신청 직전에 보여줄 취소·환불 요약(구매 전 고지).
     cancellationSummary:
       "이용 시작 전 취소는 전액 환불됩니다. 시작 후에는 시간권·종일권은 환불이 어렵고, 주간권은 남은 일수·월권은 남은 주 단위로 정산해 환불합니다.",
-    // 온라인 결제(PG) 테스트 기간 안내. onlinePaymentLive를 true로 바꾸면 숨겨진다.
+    // 온라인 결제(PG) 테스트 기간 안내. onlinePaymentLive가 true면 어디에도 표시되지 않는다.
+    // (결제를 다시 내려야 할 때를 대비해 문구는 남겨 둔다.)
     paymentTestNotice: "온라인 카드 결제는 현재 카드사 심사 중입니다. 결제가 완료되지 않을 수 있으며, 그 경우 예약 후 관리자가 보내드리는 결제 링크 또는 현장 결제(카드·현금)로 진행됩니다.",
   },
   business: {
