@@ -1,5 +1,8 @@
 import type { Pass } from "./types";
 
+// Supabase 연결이 끊겼을 때만 쓰이는 예비 가격표. 평소에는 DB 값을 보여주지만,
+// 하필 그 순간 손님에게 노출되므로 실제 판매가와 맞춰 둔다.
+// (가격은 1인 기준이며 실제 결제 금액은 가격 x 인원 — migration 0043)
 export const defaultPasses: Pass[] = [
   {
     id: "default-three-hour",
@@ -16,8 +19,8 @@ export const defaultPasses: Pass[] = [
   {
     id: "default-day",
     name: "종일권",
-    description: "08:00-다음 날 01:00 / 커피 1일 3잔",
-    price: 40000,
+    description: "08:00-다음 날 01:00 / 커피 1일 3잔 / 17시 이전 입장 권장",
+    price: 35000,
   },
   {
     id: "default-week",
@@ -39,8 +42,9 @@ export const defaultPasses: Pass[] = [
   },
   {
     id: "default-group-inquiry",
-    name: "단체·모임 이용권",
-    description: "1인 기준 금액이며 인원·시간에 따라 문의 후 확정됩니다. 현재는 일요일만 가능, 09:00~22:00 / 주류·음식 반입 불가, 음료와 간단한 핑거푸드 가능",
-    price: 300000,
+    name: "단체 및 모임 이용권",
+    description: "6인 이상 대관 · 3시간 기준. 일요일 대관은 문의 후 날짜를 열어드립니다. 주류·음식 반입 불가, 음료와 간단한 핑거푸드 가능",
+    price: 25000,
+    min_people: 6,
   },
 ];

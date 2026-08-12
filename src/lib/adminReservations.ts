@@ -180,12 +180,17 @@ export function buildPaymentRequestMessage(reservation: Reservation) {
     "",
     "결제가 완료되어야 이용하실 수 있습니다.",
     deadline,
+    // 늦게 입장하면 종일권이 3시간권보다 비싸진다(35,000원 기준 8시간이 손익분기).
+    // 손님이 모르고 더 내는 일이 없도록 미리 알려 준다.
+    passName.includes("종일") ? "17시 이후 입장하실 예정이면 3시간권이 더 저렴하니 말씀해 주세요." : null,
     "",
     "결제: work-room.kr 로그인 후 ‘내정보 > 예약현황’에서 카드 결제",
     "현장 결제(카드·현금)는 미리 말씀해 주신 경우에만 가능합니다.",
     "",
     "문의: 010-4931-3298",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function paymentDeadlineLine(passName: string) {

@@ -146,9 +146,16 @@ describe("buildPaymentRequestMessage", () => {
     expect(text).toContain("14,000원");
   });
 
-  it("gives a 종일권 booking the 3pm same-day deadline", () => {
+  it("gives a 종일권 booking the 3pm same-day deadline and the late-arrival tip", () => {
     const text = buildPaymentRequestMessage(reservation({ pass_type: "종일권", pass_name_snapshot: "종일권" }));
     expect(text).toContain("이용 당일 오후 3시까지 결제해 주세요.");
+    // 35,000원 종일권은 8시간(=17시 입장)이 3시간권+연장과 손익분기다.
+    expect(text).toContain("17시 이후 입장하실 예정이면 3시간권이 더 저렴하니 말씀해 주세요.");
+  });
+
+  it("does not show the 종일권 tip on other passes", () => {
+    const text = buildPaymentRequestMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }));
+    expect(text).not.toContain("17시 이후 입장");
   });
 
   it("gives a long-term pass the start-date deadline and shows the period start", () => {
