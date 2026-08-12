@@ -32,6 +32,54 @@
 
 ---
 
+# 자동 배포 (GitHub Actions)
+
+## 엣지 함수 — 자동
+
+`main`에 `supabase/functions/**` 변경이 올라가면
+[`.github/workflows/supabase-functions.yml`](../.github/workflows/supabase-functions.yml)이
+모든 함수를 다시 배포합니다. 로컬 터미널에서 `supabase functions deploy`를 칠 일이 없어집니다.
+
+함수마다 인증 게이트가 다르고 그 목록이 워크플로 안에 적혀 있습니다.
+새 함수를 추가하면 `NO_JWT` / `WITH_JWT` 중 맞는 쪽에 이름을 넣어야 합니다.
+(빠뜨리면 그 함수만 영영 배포되지 않습니다.)
+
+- `NO_JWT` — 자체적으로 서명·비밀키·토큰을 검사하는 함수. 웹훅·크론이 여기 속합니다.
+- `WITH_JWT` — 호출자의 액세스 토큰으로 본인을 식별하는 함수(회원 탈퇴 등).
+
+### 준비 (한 번만)
+
+저장소 **Settings > Secrets and variables > Actions**에 등록:
+
+| 시크릿 | 값 |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | https://supabase.com/dashboard/account/tokens 에서 발급 |
+| `SUPABASE_PROJECT_REF` | 대시보드 URL의 `project/<ref>` 부분 |
+
+## 마이그레이션 — 수동 실행만
+
+[`.github/workflows/supabase-migrations.yml`](../.github/workflows/supabase-migrations.yml)은
+Actions 탭에서 직접 실행할 때만 동작합니다. 자동으로 돌지 않습니다.
+
+⚠️ **처음 쓰기 전에**: 지금까지 SQL을 대시보드 편집기에 붙여넣어 실행해 왔다면
+Supabase의 이력 테이블(`supabase_migrations.schema_migrations`)에 아무 기록도 없습니다.
+그 상태에서 `db push`를 돌리면 CLI가 `0001_baseline`부터 전부 다시 실행합니다.
+
+먼저 이미 적용한 버전을 이력에 등록하세요:
+
+```bash
+supabase link --project-ref <ref>
+supabase migration list                      # 현재 CLI가 보는 상태
+supabase migration repair --status applied 0001 0002 ... 0043
+supabase migration list                      # 전부 applied 인지 확인
+```
+
+그 뒤부터는 Actions 탭에서 `action: status`로 현황을 보고,
+새 마이그레이션만 `action: push` + `confirm: apply`로 적용합니다.
+`SUPABASE_DB_PASSWORD` 시크릿(Settings > Database)이 추가로 필요합니다.
+
+---
+
 # 예약 문자 자동발송 (Solapi / CoolSMS)
 
 `supabase/functions/reservation-sms` 가 예약 **생성/상태변경** 시 문자를 보냅니다.

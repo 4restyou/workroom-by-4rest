@@ -16,7 +16,8 @@
 //   SUPABASE_ANON_KEY              - (auto-provided)
 //   ALLOWED_ORIGINS                - optional comma-separated browser origins
 //
-// Deploy: supabase functions deploy portone-payment --no-verify-jwt
+// Deploy: main에 올라가면 .github/workflows/supabase-functions.yml 이 자동 배포한다.
+//         수동: supabase functions deploy portone-payment --no-verify-jwt
 //   (웹훅은 Supabase 인증 헤더 없이 오므로 --no-verify-jwt 필수. 대신 웹훅은
 //    Standard Webhooks 서명으로, refund는 사용자 JWT로 관리자 여부를 검증한다.
 //    confirm은 결제 정보를 포트원 API로 재조회해 금액을 대조하므로 호출 자체는

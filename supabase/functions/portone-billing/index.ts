@@ -13,7 +13,8 @@
 //   CRON_SECRET                    - charge 요청 인증용 공유 비밀
 //   ALLOWED_ORIGINS                - optional
 //
-// Deploy: supabase functions deploy portone-billing --no-verify-jwt
+// Deploy: main에 올라가면 .github/workflows/supabase-functions.yml 이 자동 배포한다.
+//         수동: supabase functions deploy portone-billing --no-verify-jwt
 
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";

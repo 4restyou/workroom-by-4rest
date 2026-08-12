@@ -10,7 +10,8 @@
 //   SOLAPI_API_KEY / SOLAPI_API_SECRET / SMS_SENDER
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY  - (auto-provided)
 //
-// Deploy: supabase functions deploy reservation-end-reminder --no-verify-jwt
+// Deploy: main에 올라가면 .github/workflows/supabase-functions.yml 이 자동 배포한다.
+//         수동: supabase functions deploy reservation-end-reminder --no-verify-jwt
 
 type ReminderRow = {
   reservation_id: string;

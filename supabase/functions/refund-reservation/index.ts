@@ -18,7 +18,8 @@
 //   SUPABASE_ANON_KEY              - (auto-provided)
 //   ALLOWED_ORIGINS                - optional comma-separated browser origins
 //
-// Deploy: supabase functions deploy refund-reservation
+// Deploy: main에 올라가면 .github/workflows/supabase-functions.yml 이 자동 배포한다.
+//         수동: supabase functions deploy refund-reservation
 //   (Verify JWT ON. Origin은 CORS 응답 헤더 계산에만 쓰고 인증으로 쓰지 않는다.)
 
 import { decideCancellation, isUuid } from "../_shared/paymentRules.ts";

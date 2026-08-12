@@ -1,0 +1,85 @@
+name: Supabase functions
+
+# main에 엣지 함수(또는 공용 코드)가 올라가면 자동으로 배포한다.
+# 지금까지는 매번 로컬 터미널에서 `supabase functions deploy`를 손으로 쳤고,
+# 그러다 보니 프론트엔드만 배포되고 함수는 며칠 뒤처지는 일이 있었다.
+#
+# 필요한 저장소 시크릿 (Settings > Secrets and variables > Actions):
+#   SUPABASE_ACCESS_TOKEN  - https://supabase.com/dashboard/account/tokens 에서 발급
+#   SUPABASE_PROJECT_REF   - 프로젝트 참조 ID (대시보드 URL의 project/<ref> 부분)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/supabase-functions.yml"
+  workflow_dispatch:
+
+# 같은 브랜치에서 연속으로 푸시하면 마지막 것만 배포한다(중간 배포가 최신을 덮지 않도록).
+concurrency:
+  group: supabase-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Check secrets
+        env:
+          ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if [ -z "$ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF 시크릿이 없습니다. 저장소 Settings > Secrets에서 등록해 주세요."
+            exit 1
+          fi
+
+      - name: Deploy edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+
+          # 함수마다 인증 게이트가 다르다. 이 목록이 실제 배포 상태와 어긋나면
+          # 웹훅·크론이 401로 죽거나(게이트를 잘못 켠 경우) 회원 전용 함수가
+          # 인증 없이 열린다(잘못 끈 경우). 바꿀 때는 각 함수 상단 주석을 확인할 것.
+
+          # 자체적으로 비밀키·서명·토큰을 검사하므로 Supabase 게이트를 끈다.
+          #   portone-payment       포트원 웹훅(인증 헤더 없이 들어옴) + 서명 검증
+          #   portone-billing       크론 호출 + CRON_SECRET
+          #   reservation-sms       DB 웹훅 + WEBHOOK_SECRET
+          #   admin-reservation-sms 관리자 토큰을 함수가 직접 검증
+          #   reservation-end-reminder / pass-expiry-reminder  크론 + CRON_SECRET
+          NO_JWT="portone-payment portone-billing reservation-sms admin-reservation-sms reservation-end-reminder pass-expiry-reminder"
+
+          # 호출자의 액세스 토큰으로 본인을 식별하는 함수 — 게이트를 켜 둔다.
+          WITH_JWT="delete-account refund-reservation"
+
+          # 새 함수를 만들고 위 목록에 넣는 걸 잊으면 영영 배포되지 않는다.
+          # 디렉터리와 목록이 어긋나면 배포 전에 멈춘다.
+          listed=$(printf "%s\n" $NO_JWT $WITH_JWT | sort)
+          on_disk=$(ls supabase/functions | grep -v '^_' | sort)
+          if [ "$listed" != "$on_disk" ]; then
+            echo "::error::함수 목록과 supabase/functions 디렉터리가 다릅니다. NO_JWT / WITH_JWT 를 확인해 주세요."
+            diff <(echo "$listed") <(echo "$on_disk") || true
+            exit 1
+          fi
+
+          # _shared 코드를 여러 함수가 함께 쓰므로 매번 전부 배포한다.
+          for fn in $NO_JWT; do
+            echo "── $fn (verify_jwt off)"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
+          done
+
+          for fn in $WITH_JWT; do
+            echo "── $fn (verify_jwt on)"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+          done
