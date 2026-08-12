@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addDaysStr,
+  buildPaymentRequestMessage,
   formatCompactPeriod,
   getConflictCount,
   isReservationStatus,
@@ -134,5 +135,37 @@ describe("paymentWorkflowLabel", () => {
   it("결제 상태가 취소 상태보다 우선한다", () => {
     // 취소됐어도 환불이 끝났으면 '환불 완료'로 보여야 한다.
     expect(paymentWorkflowLabel(reservation({ status: "canceled", payment_status: "refunded" }))).toBe("환불 완료");
+  });
+});
+
+describe("buildPaymentRequestMessage", () => {
+  it("tells a 시간권 booking to pay before the start time", () => {
+    const text = buildPaymentRequestMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권", people: 1, price_at_booking: 14000 }));
+    expect(text).toContain("아직 결제 전입니다");
+    expect(text).toContain("이용 시작 시간 전까지 결제해 주세요.");
+    expect(text).toContain("14,000원");
+  });
+
+  it("gives a 종일권 booking the 3pm same-day deadline", () => {
+    const text = buildPaymentRequestMessage(reservation({ pass_type: "종일권", pass_name_snapshot: "종일권" }));
+    expect(text).toContain("이용 당일 오후 3시까지 결제해 주세요.");
+  });
+
+  it("gives a long-term pass the start-date deadline and shows the period start", () => {
+    const text = buildPaymentRequestMessage(
+      reservation({ pass_type: "월권 자유석", pass_name_snapshot: "월권 자유석", access_start_date: "2026-09-01" }),
+    );
+    expect(text).toContain("이용 시작일 전까지 결제해 주세요.");
+    expect(text).toContain("이용 시작:");
+  });
+
+  it("always states that on-site payment needs advance notice", () => {
+    const text = buildPaymentRequestMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }));
+    expect(text).toContain("현장 결제(카드·현금)는 미리 말씀해 주신 경우에만 가능합니다.");
+  });
+
+  it("says the amount will be confirmed later when no price is set", () => {
+    const text = buildPaymentRequestMessage(reservation({ pass_type: "단체 및 모임 이용권", price_at_booking: null }));
+    expect(text).toContain("금액: 확인 후 안내드립니다");
   });
 });

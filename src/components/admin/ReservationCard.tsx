@@ -5,6 +5,7 @@ import { formatDate, formatPrice, formatTimeRange, statusLabel } from "../../lib
 import {
   buildCanceledMessage,
   buildConfirmedMessage,
+  buildPaymentRequestMessage,
   describeAuditLog,
   describePaymentLog,
   formatAuditTime,
@@ -32,6 +33,9 @@ import type {
   ReservationSmsLog,
   ReservationStatus,
 } from "../../lib/types";
+
+// 안내 문구 종류. 결제 전 안내는 미결제 예약에서 가장 자주 쓴다.
+type MessageKind = "confirmed" | "payment" | "canceled";
 
 export default function ReservationCard({
   conflictCount,
@@ -89,7 +93,7 @@ export default function ReservationCard({
     pausedFrom: reservation.access_paused_from ?? "",
     pausedUntil: reservation.access_paused_until ?? "",
   });
-  const [copiedMessage, setCopiedMessage] = useState<"confirmed" | "canceled" | null>(null);
+  const [copiedMessage, setCopiedMessage] = useState<MessageKind | null>(null);
 
   useEffect(() => {
     setStatus(reservation.status);
@@ -184,8 +188,13 @@ export default function ReservationCard({
     });
   }
 
-  async function copyMessage(kind: "confirmed" | "canceled") {
-    const message = kind === "confirmed" ? buildConfirmedMessage(reservation) : buildCanceledMessage(reservation);
+  async function copyMessage(kind: MessageKind) {
+    const message =
+      kind === "confirmed"
+        ? buildConfirmedMessage(reservation)
+        : kind === "payment"
+          ? buildPaymentRequestMessage(reservation)
+          : buildCanceledMessage(reservation);
     await navigator.clipboard.writeText(message);
     setCopiedMessage(kind);
     window.setTimeout(() => setCopiedMessage(null), 1800);
@@ -225,8 +234,9 @@ export default function ReservationCard({
         ) : null}
         <details className="relative">
           <summary className={`${buttonClass("secondary", "sm")} list-none`}>안내 문구</summary>
-          <div className="absolute left-0 top-[calc(100%+6px)] z-10 grid w-40 gap-1 border border-workroom-ink bg-white p-2">
+          <div className="absolute left-0 top-[calc(100%+6px)] z-10 grid w-44 gap-1 border border-workroom-ink bg-white p-2">
             <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("confirmed")} type="button">{copiedMessage === "confirmed" ? "복사됨" : "확정 문구 복사"}</button>
+            <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("payment")} type="button">{copiedMessage === "payment" ? "복사됨" : "결제 안내 복사"}</button>
             <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("canceled")} type="button">{copiedMessage === "canceled" ? "복사됨" : "취소 문구 복사"}</button>
           </div>
         </details>
@@ -306,6 +316,12 @@ export default function ReservationCard({
           {reservation.status === "confirmed" ? (
             <button className={buttonClass("primary", "sm")} onClick={() => onPatch({ status: "completed" })} type="button">
               이용 완료
+            </button>
+          ) : null}
+          {/* 미결제 예약에서 가장 자주 보내는 안내라 드롭다운 안에만 두지 않는다. */}
+          {(reservation.payment_status ?? "unpaid") === "unpaid" && reservation.status !== "canceled" ? (
+            <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("payment")} type="button">
+              {copiedMessage === "payment" ? "복사됨 · 문자에 붙여넣기" : "결제 안내 문구 복사"}
             </button>
           ) : null}
           {/* 취소는 전화·노쇼로 자주 생기는데, 예전에는 아래 '상태 직접 수정'에서

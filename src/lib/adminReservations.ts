@@ -5,6 +5,7 @@
 // 테스트할 수 있다 (src/lib/adminReservations.test.ts).
 
 import { formatDate, formatPrice, formatTimeRange, statusLabel } from "./format";
+import { isLongTermPassName } from "./reservations";
 import { tintCard } from "./ui";
 import type {
   PaymentStatus,
@@ -150,6 +151,47 @@ export function buildConfirmedMessage(reservation: Reservation) {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * 아직 결제하지 않은 예약에 보낼 안내 문구.
+ *
+ * 결제 마감은 이용권 종류마다 다르다.
+ *   시간권  - 이용 시작 시간 전까지
+ *   종일권  - 이용 당일 오후 3시까지
+ *   주간권·월권 - 이용 시작일 전까지
+ * 현장 결제는 준비가 필요하므로 "미리 말씀해 주신 경우에만" 가능하다고 못박는다.
+ */
+export function buildPaymentRequestMessage(reservation: Reservation) {
+  const passName = reservation.pass_name_snapshot || reservation.pass_type;
+  const deadline = paymentDeadlineLine(passName);
+  const when = isLongTermPassName(passName)
+    ? `이용 시작: ${formatDate(reservation.access_start_date ?? reservation.date)}`
+    : `일시: ${formatDate(reservation.date)} ${formatTimeRange(reservation.start_time, reservation.end_time)}`;
+
+  return [
+    "[WORKROOM by 4REST]",
+    `${reservation.name}님, 신청하신 예약은 아직 결제 전입니다.`,
+    "",
+    `이용권: ${passName}`,
+    when,
+    `인원: ${reservation.people}명`,
+    reservation.price_at_booking ? `금액: ${formatPrice(reservation.price_at_booking)}` : "금액: 확인 후 안내드립니다",
+    "",
+    "결제가 완료되어야 이용하실 수 있습니다.",
+    deadline,
+    "",
+    "결제: work-room.kr 로그인 후 ‘내정보 > 예약현황’에서 카드 결제",
+    "현장 결제(카드·현금)는 미리 말씀해 주신 경우에만 가능합니다.",
+    "",
+    "문의: 010-4931-3298",
+  ].join("\n");
+}
+
+function paymentDeadlineLine(passName: string) {
+  if (isLongTermPassName(passName)) return "이용 시작일 전까지 결제해 주세요.";
+  if (passName.includes("종일")) return "이용 당일 오후 3시까지 결제해 주세요.";
+  return "이용 시작 시간 전까지 결제해 주세요.";
 }
 
 export function buildCanceledMessage(reservation: Reservation) {
