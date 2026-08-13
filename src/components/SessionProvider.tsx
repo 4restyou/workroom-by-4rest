@@ -14,6 +14,9 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
   });
   // 언마운트 후 늦게 도착한 응답이 상태를 되살리지 않게 한다.
   const activeRef = useRef(true);
+  // 화면이 다시 보일 때 "지금 알고 있는 로그인 상태"와 비교하기 위한 참조.
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = state.userId;
 
   const load = useCallback(async () => {
     if (!supabase) {
@@ -49,9 +52,26 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
       void load();
     }) ?? { data: { subscription: null } };
 
+    // 홈 화면 앱(PWA)에서 구글 로그인을 하면 iOS가 앱을 잠시 얼려 두고 브라우저를
+    // 띄운다. 돌아올 때 앱은 "얼기 직전 상태"(=로그인 전)로 복원되는데, 그 화면에서는
+    // 로그인 이벤트가 일어난 적이 없어 onAuthStateChange가 터지지 않는다. 저장소에는
+    // 토큰이 있는데 화면만 로그아웃으로 보이던 이유다. 다시 보일 때 직접 확인한다.
+    async function recheck() {
+      if (!supabase || document.visibilityState !== "visible") return;
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user.id ?? null;
+      if (userId !== userIdRef.current) void load();
+    }
+
+    document.addEventListener("visibilitychange", recheck);
+    // bfcache에서 복원될 때는 visibilitychange가 오지 않는 기기가 있다.
+    window.addEventListener("pageshow", recheck);
+
     return () => {
       activeRef.current = false;
       subscription?.unsubscribe();
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("pageshow", recheck);
     };
   }, [load]);
 

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
+import { oauthLeavesApp } from "../lib/pwa";
 import { authErrorMessage, passwordValidationMessage } from "../lib/auth";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
@@ -15,6 +16,8 @@ const modeTitle: Record<AuthMode, string> = {
 };
 
 export default function Auth() {
+  // 홈 화면 앱(iOS)에서는 구글 로그인이 앱 밖 브라우저를 띄운다.
+  const [leavesApp] = useState(oauthLeavesApp);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // 로그인 벽에서 넘어온 경우 원래 가려던 곳으로 돌려보낸다.
@@ -155,20 +158,27 @@ export default function Auth() {
             </p>
           ) : null}
 
-          <button
-            className={buttonClass("secondary", "lg", "w-full")}
-            disabled={isGoogleSubmitting || isSubmitting || !hasSupabaseConfig}
-            onClick={() => void handleGoogleLogin()}
-            type="button"
-          >
-            {isGoogleSubmitting ? "구글로 이동 중…" : "Google로 계속하기"}
-          </button>
+          {/* 홈 화면 앱에서 구글 로그인을 하면 iOS가 앱 밖 브라우저를 띄우고, 돌아와도
+              그 바가 남는다. 그 환경에서는 우리 도메인 안에서 끝나는 이메일 로그인을
+              먼저 보여 주고 구글은 아래에 둔다(이미 구글로 가입한 회원도 있으므로 유지). */}
+          {leavesApp ? null : (
+            <>
+              <button
+                className={buttonClass("secondary", "lg", "w-full")}
+                disabled={isGoogleSubmitting || isSubmitting || !hasSupabaseConfig}
+                onClick={() => void handleGoogleLogin()}
+                type="button"
+              >
+                {isGoogleSubmitting ? "구글로 이동 중…" : "Google로 계속하기"}
+              </button>
 
-          <div className="flex items-center gap-3" aria-hidden="true">
-            <span className="h-px flex-1 bg-workroom-line" />
-            <span className="text-xs font-bold text-workroom-muted">또는</span>
-            <span className="h-px flex-1 bg-workroom-line" />
-          </div>
+              <div className="flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-workroom-line" />
+                <span className="text-xs font-bold text-workroom-muted">또는</span>
+                <span className="h-px flex-1 bg-workroom-line" />
+              </div>
+            </>
+          )}
 
           {mode !== "forgot" ? (
             <div className="grid grid-cols-2 rounded-[6px] border border-workroom-line bg-workroom-background p-1" role="tablist" aria-label="이메일 로그인 방식">
@@ -196,6 +206,12 @@ export default function Auth() {
               ← 로그인으로 돌아가기
             </button>
           )}
+
+          {leavesApp ? (
+            <p className="text-xs font-medium leading-5 text-workroom-muted">
+              홈 화면 앱에서는 이메일 로그인이 앱 안에서 바로 끝납니다. 구글 로그인은 아래에 있습니다.
+            </p>
+          ) : null}
 
           <form className="grid gap-4" onSubmit={handleEmailSubmit}>
             <div>
@@ -280,6 +296,27 @@ export default function Auth() {
               </button>
             ) : null}
           </form>
+
+          {leavesApp ? (
+            <>
+              <div className="flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-workroom-line" />
+                <span className="text-xs font-bold text-workroom-muted">또는</span>
+                <span className="h-px flex-1 bg-workroom-line" />
+              </div>
+              <button
+                className={buttonClass("secondary", "lg", "w-full")}
+                disabled={isGoogleSubmitting || isSubmitting || !hasSupabaseConfig}
+                onClick={() => void handleGoogleLogin()}
+                type="button"
+              >
+                {isGoogleSubmitting ? "구글로 이동 중…" : "Google로 계속하기"}
+              </button>
+              <p className="-mt-2 text-xs font-medium leading-5 text-workroom-muted">
+                구글 로그인은 잠시 브라우저 창이 열립니다. 로그인을 마치면 왼쪽 위 ✕를 눌러 앱으로 돌아와 주세요.
+              </p>
+            </>
+          ) : null}
 
           <p className="text-center text-xs font-medium leading-5 text-workroom-muted">
             회원가입 시 <Link className="font-bold underline underline-offset-2" to="/terms">이용약관</Link> 및{" "}
