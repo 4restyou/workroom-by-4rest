@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminPage, { AdminEmpty } from "./AdminPage";
+import TodayTimeline from "./admin/TodayTimeline";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
@@ -21,6 +22,9 @@ type AdminDashData = {
   inquiries: Array<{ id: string; reservation_id: string | null; created_at: string }>;
   failedSms: Array<{ id: string; reservation_id: string; event: string; created_at: string }>;
   capacity: number;
+  hours: { open_time: string | null; close_time: string | null } | null;
+  unusedCoupons: number;
+  dormant: Array<{ id: string; name: string; days: number }>;
 };
 
 type ActionItem = {
@@ -30,6 +34,42 @@ type ActionItem = {
   to: string;
   urgent?: boolean;
 };
+
+// 오늘의 운영 시간. 특정일 예외가 있으면 그쪽이 이긴다(요일 설정보다 우선).
+function todayHours(
+  today: string,
+  hours: Array<{ weekday: number; open_time: string | null; close_time: string | null; is_closed: boolean }>,
+  exception: { open_time: string | null; close_time: string | null; is_closed: boolean } | null,
+) {
+  if (exception) return exception.is_closed ? null : { open_time: exception.open_time, close_time: exception.close_time };
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const row = hours.find((item) => item.weekday === weekday);
+  if (!row || row.is_closed) return null;
+  return { open_time: row.open_time, close_time: row.close_time };
+}
+
+// 마지막 방문이 30일을 넘긴 회원. 한 번도 오지 않은 회원은 "휴면"이 아니라
+// 아직 시작하지 않은 것이므로 제외한다.
+function dormantMembers(
+  today: string,
+  members: Array<{ id: string; full_name: string | null }>,
+  visits: Array<{ profile_id: string | null; check_in_at: string }>,
+) {
+  const lastVisit = new Map<string, string>();
+  for (const visit of visits) {
+    if (!visit.profile_id) continue;
+    const day = kstDateShared(visit.check_in_at);
+    const seen = lastVisit.get(visit.profile_id);
+    if (!seen || day > seen) lastVisit.set(visit.profile_id, day);
+  }
+  return members
+    .map((member) => {
+      const last = lastVisit.get(member.id);
+      return last ? { id: member.id, name: member.full_name || "이름 미입력", days: daysBetween(last, today) } : null;
+    })
+    .filter((item): item is { id: string; name: string; days: number } => Boolean(item) && (item as { days: number }).days >= 30)
+    .sort((a, b) => b.days - a.days);
+}
 
 function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
@@ -54,10 +94,15 @@ function nowMinutes() {
 
 const kstDate = kstDateShared;
 
-function visitState(reservation: Reservation, attendance?: AttendanceRow) {
+function visitState(reservation: Reservation, attendance?: AttendanceRow, nowMinute?: number) {
   if (reservation.status === "pending") return { label: "확인 대기", tone: "yellow" as const };
   if (attendance?.check_out_at) return { label: "퇴실", tone: "sky" as const };
   if (attendance) return { label: "이용 중", tone: "ink" as const };
+  // 시작하고 15분이 지나도 입실이 없으면 확인이 필요하다.
+  const start = timeMinutes(reservation.start_time);
+  if (nowMinute !== undefined && start !== null && !isLongTermReservation(reservation) && nowMinute > start + 15) {
+    return { label: "미입실", tone: "danger" as const };
+  }
   return { label: "입실 전", tone: "sky" as const };
 }
 
@@ -68,7 +113,7 @@ export default function AdminDashboard() {
   async function load() {
     if (!supabase) return;
     const today = todayValue();
-    const [reservationResult, attendanceResult, inquiryResult, smsResult, seatResult] = await Promise.all([
+    const [reservationResult, attendanceResult, inquiryResult, smsResult, seatResult, hourResult, exceptionResult, couponResult, memberResult, visitResult] = await Promise.all([
       supabase
         .from("reservations")
         .select("*")
@@ -81,6 +126,13 @@ export default function AdminDashboard() {
       supabase.from("reservation_inquiries").select("id,reservation_id,created_at").is("admin_reply", null).order("created_at", { ascending: true }).limit(50),
       supabase.from("reservation_sms_logs").select("id,reservation_id,event,status,created_at").order("created_at", { ascending: false }).limit(100),
       supabase.from("seat_types").select("capacity,is_active").eq("is_active", true),
+      // 타임라인 축은 오늘 운영 시간을 따른다(특정일 단축영업이 있으면 그것을 우선).
+      supabase.from("business_hours").select("weekday,open_time,close_time,is_closed"),
+      supabase.from("business_date_exceptions").select("date,open_time,close_time,is_closed").eq("date", today).maybeSingle(),
+      supabase.from("coupons").select("id").eq("status", "issued").limit(200),
+      // 휴면 판정을 위해 회원과 최근 출석을 가져온다.
+      supabase.from("profiles").select("id,full_name").eq("role", "user").limit(500),
+      supabase.from("attendance").select("profile_id,check_in_at").order("check_in_at", { ascending: false }).limit(2000),
     ]);
 
     if (reservationResult.error || attendanceResult.error) {
@@ -95,6 +147,13 @@ export default function AdminDashboard() {
       inquiries: inquiryResult.error ? [] : (inquiryResult.data ?? []),
       failedSms: smsResult.error ? [] : latestFailedSms((smsResult.data ?? []) as Array<{ id: string; reservation_id: string; event: string; status: string; created_at: string }>),
       capacity: seatResult.error ? 0 : (seatResult.data ?? []).reduce((sum, item) => sum + Number(item.capacity || 0), 0),
+      hours: todayHours(today, hourResult.error ? [] : hourResult.data ?? [], exceptionResult.error ? null : exceptionResult.data),
+      unusedCoupons: couponResult.error ? 0 : (couponResult.data ?? []).length,
+      dormant: dormantMembers(
+        today,
+        memberResult.error ? [] : memberResult.data ?? [],
+        visitResult.error ? [] : visitResult.data ?? [],
+      ),
     });
   }
 
@@ -190,10 +249,34 @@ export default function AdminDashboard() {
         });
       });
 
+    // ── 관계 항목 ────────────────────────────────────────────────
+    // 위 항목들이 "오늘 당장 할 일"이라면, 아래는 놓치면 조용히 손님이 떠나는 일이다.
+    // 급하지 않으므로 urgent를 붙이지 않고 목록 뒤쪽에 둔다.
+
+    // 쿠폰을 받고 아직 안 쓴 회원 — 다시 올 이유를 이미 손에 쥔 사람들이다.
+    if ((data?.unusedCoupons ?? 0) > 0) {
+      actions.push({
+        key: "coupons-unused",
+        title: `사용하지 않은 쿠폰 ${data?.unusedCoupons}장`,
+        detail: "방문하시면 먼저 안내해 주세요.",
+        to: "/admin/attendance",
+      });
+    }
+
+    // 한동안 오지 않은 회원. 이용권이 끝난 뒤 그대로 멀어지는 경우가 많다.
+    (data?.dormant ?? []).slice(0, 5).forEach((member) => {
+      actions.push({
+        key: `dormant-${member.id}`,
+        title: `${member.name} · ${member.days}일째 방문 없음`,
+        detail: "마지막 방문 이후 연락이 없었습니다.",
+        to: `/admin/customer/${member.id}`,
+      });
+    });
+
     // 급한 항목이 조용한 대기 항목에 묻히지 않도록 정렬한다.
     actions.sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)));
 
-    return { actions, activePeople, attendanceByReservation, longTerm, next, todaySchedule, upcoming, unpaidToday, unpaidTodayAmount };
+    return { actions, activePeople, attendanceByReservation, longTerm, minute, next, todaySchedule, upcoming, unpaidToday, unpaidTodayAmount };
   }, [data]);
 
   return (
@@ -247,28 +330,39 @@ export default function AdminDashboard() {
         <section className="mt-7">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold">오늘 이용</h2>
-              <p className="mt-0.5 text-xs font-medium text-workroom-muted">시간권과 장기 이용권을 함께 표시합니다.</p>
+              <h2 className="text-lg font-bold">오늘 일정</h2>
+              <p className="mt-0.5 text-xs font-medium text-workroom-muted">
+                시간축에서 빈 시간과 겹치는 시간을 함께 봅니다. 블록을 누르면 그 손님의 카드가 열립니다.
+              </p>
             </div>
-            <Link className="text-sm font-semibold underline underline-offset-4" to={`/admin/reservations?date=${todayValue()}&status=all`}>전체 보기</Link>
+            <Link className="text-sm font-semibold underline underline-offset-4" to={`/admin/reservations?date=${todayValue()}&status=all`}>목록으로 보기</Link>
           </div>
           {data && summary.todaySchedule.length ? (
-            <div className="border-y border-workroom-line bg-white">
-              {summary.todaySchedule.map((reservation) => {
-                const attendance = summary.attendanceByReservation.get(reservation.id);
-                const state = visitState(reservation, attendance);
-                return (
-                  <Link className="admin-row grid gap-2 px-4 py-3.5 hover:bg-workroom-background sm:grid-cols-[110px_1fr_auto] sm:items-center" key={reservation.id} to={`/admin/reservations?reservation=${reservation.id}`}>
-                    <p className="text-sm font-bold tabular-nums">{isLongTermReservation(reservation) ? "장기 이용" : formatTimeRange(reservation.start_time, reservation.end_time)}</p>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{reservation.name} · {reservation.people}명</p>
-                      <p className="mt-0.5 truncate text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type} · {paymentLabel(reservation)}</p>
-                    </div>
-                    <span className={badge(state.tone)}>{state.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
+            <>
+              <TodayTimeline
+                closeTime={data.hours?.close_time ?? null}
+                nowMinute={summary.minute}
+                openTime={data.hours?.open_time ?? null}
+                reservations={summary.todaySchedule}
+                stateOf={(reservation) => visitState(reservation, summary.attendanceByReservation.get(reservation.id), summary.minute)}
+              />
+              <div className="mt-3 border-y border-workroom-line bg-white">
+                {summary.todaySchedule.map((reservation) => {
+                  const attendance = summary.attendanceByReservation.get(reservation.id);
+                  const state = visitState(reservation, attendance, summary.minute);
+                  return (
+                    <Link className="admin-row grid gap-2 px-4 py-3 hover:bg-workroom-background sm:grid-cols-[110px_1fr_auto] sm:items-center" key={reservation.id} to={reservation.profile_id ? `/admin/customer/${reservation.profile_id}` : `/admin/reservations?reservation=${reservation.id}`}>
+                      <p className="text-sm font-bold tabular-nums">{isLongTermReservation(reservation) ? "장기 이용" : formatTimeRange(reservation.start_time, reservation.end_time)}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{reservation.name} · {reservation.people}명</p>
+                        <p className="mt-0.5 truncate text-xs font-medium text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type} · {paymentLabel(reservation)}</p>
+                      </div>
+                      <span className={badge(state.tone)}>{state.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
           ) : data ? <AdminEmpty>오늘 예정된 이용이 없습니다.</AdminEmpty> : <AdminEmpty>예약을 불러오는 중입니다.</AdminEmpty>}
         </section>
 

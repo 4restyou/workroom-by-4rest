@@ -277,7 +277,7 @@ function MemberDetail({ attendance, coupons, issuingCoupon, member, onIssueCoupo
   })();
 
   return <article className="border border-workroom-line bg-white p-4 sm:p-5">
-    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-workroom-line pb-4"><div><h2 className="text-2xl font-bold">{member.full_name || "이름 미입력"}</h2><div className="mt-2 flex flex-wrap gap-2">{member.phone ? <a className={buttonClass("secondary", "sm")} href={`tel:${member.phone}`}>전화</a> : null}<a className={buttonClass("secondary", "sm")} href={`mailto:${member.email}`}>이메일</a></div></div><p className="text-xs font-medium text-workroom-muted">가입 {formatDate(member.created_at.slice(0, 10))}</p></header>
+    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-workroom-line pb-4"><div><h2 className="text-2xl font-bold">{member.full_name || "이름 미입력"}</h2><div className="mt-2 flex flex-wrap gap-2">{member.phone ? <a className={buttonClass("secondary", "sm")} href={`tel:${member.phone}`}>전화</a> : null}<a className={buttonClass("secondary", "sm")} href={`mailto:${member.email}`}>이메일</a><Link className={buttonClass("accent", "sm")} to={`/admin/customer/${member.id}`}>고객 카드 열기</Link></div></div><p className="text-xs font-medium text-workroom-muted">가입 {formatDate(member.created_at.slice(0, 10))}</p></header>
     <div className="grid border-b border-workroom-line sm:grid-cols-2"><InfoCell
         label="현재 이용권"
         value={activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · 남은 ${passDaysLeft}일` : "사용 중인 이용권 없음"}

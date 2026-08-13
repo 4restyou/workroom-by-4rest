@@ -226,10 +226,10 @@ export default function ReservationCard({
         <a className={buttonClass("secondary", "sm")} href={`sms:${reservation.phone}`}>
           문자 보내기
         </a>
-        {/* 이 예약자가 실제로 얼마나 이용했는지 바로 확인할 수 있게 연결한다. */}
+        {/* 이 손님의 이용권·방문·결제·문자를 한 화면에서 볼 수 있게 연결한다. */}
         {reservation.profile_id ? (
-          <Link className={buttonClass("secondary", "sm")} to={`/admin/members?member=${reservation.profile_id}`}>
-            이용내역 보기
+          <Link className={buttonClass("secondary", "sm")} to={`/admin/customer/${reservation.profile_id}`}>
+            고객 카드 열기
           </Link>
         ) : null}
         <details className="relative">

@@ -357,6 +357,7 @@ export default function AdminSettings() {
     <AdminPage
       actions={<><Link className={buttonClass("secondary", "md")} to="/admin/stats">매출·통계</Link><button className={buttonClass(hasChanges ? "accent" : "secondary", "md")} disabled={isSaving || !hasChanges} onClick={saveAll} type="button">{isSaving ? "저장 중" : "변경사항 저장"}</button></>}
       description="자주 바꾸는 운영시간과 휴무일, 가격, 안내, 출석 설정을 나누어 관리합니다."
+      hideSearch
       title="설정"
     >
       <div className="admin-compact">

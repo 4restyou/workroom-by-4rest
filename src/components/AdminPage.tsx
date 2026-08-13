@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
+import AdminSearch from "./admin/AdminSearch";
 
 export default function AdminPage({
   actions,
   children,
   description,
+  hideSearch,
   title,
 }: {
   actions?: ReactNode;
   children: ReactNode;
   description?: ReactNode;
+  /** 검색이 의미 없는 화면(설정 등)에서만 끈다. */
+  hideSearch?: boolean;
   title: string;
 }) {
   return (
@@ -19,7 +23,11 @@ export default function AdminPage({
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
             {description ? <div className="mt-1.5 text-sm font-medium leading-6 text-workroom-muted">{description}</div> : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
+          {/* 손님을 찾는 일은 어느 화면에서나 생기므로 검색은 늘 같은 자리에 둔다. */}
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            {hideSearch ? null : <AdminSearch />}
+            {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+          </div>
         </header>
         {children}
       </section>
