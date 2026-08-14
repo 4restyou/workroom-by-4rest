@@ -32,6 +32,21 @@ export default function Auth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
+  // 홈 화면 앱에서 구글 로그인을 누르면 iOS가 앱을 얼려 두고 다른 창을 띄운다.
+  // 돌아오면 얼기 직전 상태가 복원되므로 버튼이 "구글로 이동 중…"에 영영 멈춰
+  // 고장 난 것처럼 보인다. 화면이 다시 보이면 버튼을 원래대로 돌린다.
+  useEffect(() => {
+    function resetPending() {
+      if (document.visibilityState === "visible") setIsGoogleSubmitting(false);
+    }
+    document.addEventListener("visibilitychange", resetPending);
+    window.addEventListener("pageshow", resetPending);
+    return () => {
+      document.removeEventListener("visibilitychange", resetPending);
+      window.removeEventListener("pageshow", resetPending);
+    };
+  }, []);
+
   useEffect(() => {
     async function redirectIfSignedIn() {
       if (!supabase) return;
