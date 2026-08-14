@@ -12,7 +12,7 @@ type AuthMode = "login" | "signup" | "forgot";
 const modeTitle: Record<AuthMode, string> = {
   login: "이메일로 로그인",
   signup: "이메일로 회원가입",
-  forgot: "비밀번호 찾기",
+  forgot: "비밀번호 만들기 · 찾기",
 };
 
 export default function Auth() {
@@ -158,9 +158,24 @@ export default function Auth() {
             </p>
           ) : null}
 
-          {/* 홈 화면 앱에서 구글 로그인을 하면 iOS가 앱 밖 브라우저를 띄우고, 돌아와도
-              그 바가 남는다. 그 환경에서는 우리 도메인 안에서 끝나는 이메일 로그인을
-              먼저 보여 주고 구글은 아래에 둔다(이미 구글로 가입한 회원도 있으므로 유지). */}
+          {/* iOS 16.4부터 홈 화면 앱은 Safari와 저장소를 공유하지 않는다. 구글 로그인은
+              앱 밖 브라우저에서 끝나므로 그 세션을 앱이 볼 수 없다 — 우회가 아니라
+              구조적 제약이라, 앱 안에서 끝나는 이메일 로그인으로 안내한다. */}
+          {leavesApp ? (
+            <div className={`${tintCard("yellow")} p-4`}>
+              <p className="text-sm font-bold leading-6">홈 화면 앱에서는 이메일로 로그인해 주세요.</p>
+              <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">
+                구글 로그인은 앱 밖 브라우저에서 이루어져 앱으로 로그인이 이어지지 않습니다(iOS 제한).
+                구글로 가입하셨다면 비밀번호를 한 번만 만들면 그 뒤로는 앱에서 바로 로그인됩니다.
+              </p>
+              {mode !== "forgot" ? (
+                <button className={buttonClass("primary", "sm", "mt-3")} onClick={() => changeMode("forgot")} type="button">
+                  비밀번호 만들기 · 재설정
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {leavesApp ? null : (
             <>
               <button
@@ -207,12 +222,6 @@ export default function Auth() {
             </button>
           )}
 
-          {leavesApp ? (
-            <p className="text-xs font-medium leading-5 text-workroom-muted">
-              홈 화면 앱에서는 이메일 로그인이 앱 안에서 바로 끝납니다. 구글 로그인은 아래에 있습니다.
-            </p>
-          ) : null}
-
           <form className="grid gap-4" onSubmit={handleEmailSubmit}>
             <div>
               <h3 className="text-lg font-bold">{modeTitle[mode]}</h3>
@@ -220,7 +229,7 @@ export default function Auth() {
                 {mode === "signup"
                   ? "가입 후 이메일 인증을 완료하고 회원정보를 입력해 주세요."
                   : mode === "forgot"
-                    ? "가입한 이메일로 비밀번호 재설정 링크를 보내드립니다."
+                    ? "가입한 이메일로 링크를 보내드립니다. 구글로 가입하셨더라도 여기서 비밀번호를 만들 수 있습니다."
                     : "가입한 이메일과 비밀번호를 입력해 주세요."}
               </p>
             </div>
@@ -313,7 +322,7 @@ export default function Auth() {
                 {isGoogleSubmitting ? "구글로 이동 중…" : "Google로 계속하기"}
               </button>
               <p className="-mt-2 text-xs font-medium leading-5 text-workroom-muted">
-                구글 로그인은 잠시 브라우저 창이 열립니다. 로그인을 마치면 왼쪽 위 ✕를 눌러 앱으로 돌아와 주세요.
+                구글 로그인은 브라우저에서 열리며, 그 로그인은 앱으로 이어지지 않습니다. 브라우저에서 계속 이용하실 때만 사용해 주세요.
               </p>
             </>
           ) : null}
