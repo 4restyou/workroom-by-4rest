@@ -161,20 +161,6 @@ export default function Auth() {
           {/* iOS 16.4부터 홈 화면 앱은 Safari와 저장소를 공유하지 않는다. 구글 로그인은
               앱 밖 브라우저에서 끝나므로 그 세션을 앱이 볼 수 없다 — 우회가 아니라
               구조적 제약이라, 앱 안에서 끝나는 이메일 로그인으로 안내한다. */}
-          {leavesApp ? (
-            <div className={`${tintCard("yellow")} p-4`}>
-              <p className="text-sm font-bold leading-6">홈 화면 앱에서는 이메일로 로그인해 주세요.</p>
-              <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">
-                구글 로그인은 앱 밖 브라우저에서 이루어져 앱으로 로그인이 이어지지 않습니다(iOS 제한).
-                구글로 가입하셨다면 비밀번호를 한 번만 만들면 그 뒤로는 앱에서 바로 로그인됩니다.
-              </p>
-              {mode !== "forgot" ? (
-                <button className={buttonClass("primary", "sm", "mt-3")} onClick={() => changeMode("forgot")} type="button">
-                  비밀번호 만들기 · 재설정
-                </button>
-              ) : null}
-            </div>
-          ) : null}
 
           {leavesApp ? null : (
             <>
@@ -322,7 +308,11 @@ export default function Auth() {
                 {isGoogleSubmitting ? "구글로 이동 중…" : "Google로 계속하기"}
               </button>
               <p className="-mt-2 text-xs font-medium leading-5 text-workroom-muted">
-                구글 로그인은 브라우저에서 열리며, 그 로그인은 앱으로 이어지지 않습니다. 브라우저에서 계속 이용하실 때만 사용해 주세요.
+                홈 화면 앱에서는 구글 로그인이 브라우저에서 열려 앱으로 이어지지 않습니다. 구글로 가입하셨다면{" "}
+                <button className="font-bold underline underline-offset-2" onClick={() => changeMode("forgot")} type="button">
+                  비밀번호 만들기
+                </button>
+                로 한 번만 설정해 주세요.
               </p>
             </>
           ) : null}
