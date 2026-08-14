@@ -26,6 +26,10 @@ type ReservationRow = {
   pass_type: string;
   pass_name_snapshot: string | null;
   payment_preference: "online" | "onsite" | null;
+  payment_status: string | null;
+  payment_method: string | null;
+  price_at_booking: number | null;
+  people: number | null;
 };
 
 type WebhookPayload = {
@@ -240,6 +244,21 @@ Deno.serve(async (request) => {
             recipientKind: "member",
             event: row.status === "confirmed" ? "reservation_confirmed" : row.status === "canceled" ? "reservation_canceled" : "reservation_no_show",
           },
+        );
+      }
+
+      // Operator-facing: 회원이 온라인으로 결제하면 예약이 자동 확정된다. 운영자가
+      // 누른 게 아니라 손님이 스스로 끝낸 흐름이라, 알리지 않으면 돈이 들어온 사실을
+      // 모른 채 지나간다. 운영자가 직접 확정한 경우(현장결제·서비스)는 본인이 방금
+      // 한 일이므로 보내지 않는다 — 결제 수단으로 구분한다.
+      const paidNow = (previous.payment_status ?? "unpaid") !== "paid" && row.payment_status === "paid";
+      const paidOnline = (row.payment_method ?? "").startsWith("포트원");
+      if (ADMIN_PHONE && paidNow && paidOnline) {
+        const amount = row.price_at_booking ? `${row.price_at_booking.toLocaleString("ko-KR")}원 ` : "";
+        await sendSms(
+          ADMIN_PHONE,
+          `[WORKROOM] 온라인 결제 완료 · 예약 확정\n${row.name} / ${reservationLine(row)}${row.people ? ` / ${row.people}명` : ""}\n${amount}${row.payment_method ?? ""}\n${SITE_URL}`,
+          { reservationId: row.id, recipientKind: "admin", event: "admin_payment_received" },
         );
       }
 

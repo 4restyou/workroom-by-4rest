@@ -267,7 +267,9 @@ export function smsEventLabel(event: string) {
     reservation_no_show: "노쇼 안내 문자",
     admin_cancellation: "관리자 취소 알림",
     admin_schedule_changed: "관리자 변경 알림",
+    admin_payment_received: "관리자 결제 완료 알림",
     reservation_end_reminder: "종료 20분 전 안내",
+    pass_expiry_reminder: "이용권 만료 임박 안내",
     manual_confirmed: "확정 문자 재전송",
     manual_canceled: "취소 문자 재전송",
   };
