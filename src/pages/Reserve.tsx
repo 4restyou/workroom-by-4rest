@@ -68,6 +68,9 @@ export default function Reserve() {
   const [form, setForm] = useState(emptyForm);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 손님이 오류를 신고해도 "무슨 문구였는지 기억 안 난다"로 끝나면 원인을 못 찾는다.
+  // 화면에 짧은 참조 코드를 함께 남겨 스크린샷 한 장으로 추적할 수 있게 한다.
+  const [errorRef, setErrorRef] = useState("");
   const [isPaymentBusy, setIsPaymentBusy] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState("");
   const [paymentError, setPaymentError] = useState("");
@@ -416,6 +419,7 @@ export default function Reserve() {
       return;
     }
     setError("");
+    setErrorRef("");
     setSuccess(false);
 
     if (!supabase) {
@@ -563,6 +567,7 @@ export default function Reserve() {
     if (!createdReservation) {
       console.error("[reservation] insert failed", { code: submitError?.code, message: submitError?.message ?? "missing inserted row" });
       setError(readableReservationError(submitError ?? { message: "예약 정보를 확인하지 못했습니다." }));
+      setErrorRef(`RES-${submitError?.code ?? "UNKNOWN"}`);
       return;
     }
 
@@ -1015,7 +1020,16 @@ export default function Reserve() {
             </div>
           ) : null}
 
-          {error ? <p className={`${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
+          {error ? (
+            <div className={`${tintCard("danger")} p-4`}>
+              <p className="text-sm font-bold leading-6">{error}</p>
+              {errorRef ? (
+                <p className="mt-1.5 text-xs font-medium text-workroom-muted">
+                  문의 시 이 코드를 함께 알려주시면 빠르게 확인해 드립니다 · {errorRef}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Sticky action bar (mobile) / inline (desktop) */}
           <div className="sticky bottom-0 z-20 -mx-4 border-t-2 border-workroom-ink bg-workroom-background/95 px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-1">
