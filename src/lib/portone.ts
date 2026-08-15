@@ -75,13 +75,21 @@ export async function payReservation(reservation: Reservation): Promise<PayResul
 }
 
 // 서버 검증 호출. 리디렉션 복귀 페이지에서도 재사용한다.
-export async function confirmPayment(paymentId: string): Promise<PayResult> {
+export async function confirmPayment(paymentId: string, attempt = 0): Promise<PayResult> {
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
   const { data, error } = await supabase.functions.invoke("portone-payment", {
     body: { type: "confirm", paymentId },
   });
-  const result = data as { ok?: boolean; message?: string } | null;
+  const result = data as { ok?: boolean; pending?: boolean; message?: string } | null;
   if (error) return { ok: false, message: await invokeErrorMessage(error, "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요.") };
+
+  // 카드사 앱을 거친 결제는 승인 반영이 몇 초 늦을 수 있다. 서버가 '대기'라고
+  // 알려 주면 조금 기다렸다 다시 확인한다(조회만 반복하므로 중복 청구는 없다).
+  if (result?.pending && attempt < 2) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    return confirmPayment(paymentId, attempt + 1);
+  }
+
   if (!result?.ok) return { ok: false, message: result?.message ?? "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요." };
   return { ok: true, message: result.message ?? "결제가 완료되었습니다." };
 }

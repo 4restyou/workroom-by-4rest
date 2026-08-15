@@ -555,7 +555,9 @@ export default function Reserve() {
       people,
       name: form.name.trim(),
       phone: form.phone.trim(),
-      price: selectedPass?.price ?? null,
+      // 실제 청구 금액은 서버가 정한다(1인 요금 x 인원 — migration 0043). 이용권 정가를
+      // 그대로 쓰면 여러 명 예약에서 화면 금액과 카드 결제 금액이 달라진다.
+      price: (createdReservation as Reservation).price_at_booking ?? selectedPass?.price ?? null,
       paymentPreference: form.payment_preference,
     });
     trackEvent("reservation_submitted", {

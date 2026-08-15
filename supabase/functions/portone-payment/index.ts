@@ -198,6 +198,19 @@ type PortonePayment = {
   customData?: string | null;
 };
 
+// 카드사 앱으로 넘어갔다 오는 결제(앱 전환)는 결제창이 닫힌 뒤에도 승인 반영이
+// 1~2초 늦다. 그 순간 조회하면 아직 READY/PENDING이라 "결제가 완료되지 않았습니다"로
+// 실패 처리되는데, 실제로는 곧 승인된다. 손님은 실패한 줄 알고 다시 결제하려 한다.
+const PENDING_STATUSES = new Set(["READY", "PENDING", "PAY_PENDING"]);
+
+function isPendingStatus(status: string | undefined) {
+  return PENDING_STATUSES.has(status ?? "");
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchPortonePayment(paymentId: string): Promise<PortonePayment | null> {
   const resp = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
     headers: { Authorization: `PortOne ${PORTONE_API_SECRET}` },
@@ -216,9 +229,16 @@ function reservationIdFromCustomData(payment: PortonePayment): string | null {
 }
 
 // 결제 검증: PortOne에서 결제를 조회해 예약과 대조 후 결제완료·예약확정 반영.
-async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status: number; message: string }> {
-  const payment = await fetchPortonePayment(paymentId);
+async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status: number; message: string; pending?: boolean }> {
+  let payment = await fetchPortonePayment(paymentId);
   if (!payment) return { ok: false, status: 404, message: "결제 정보를 찾을 수 없습니다." };
+
+  // 아직 승인 반영 전이면 잠깐 기다렸다 다시 본다. 조회만 반복하므로 중복 청구
+  // 위험은 없다.
+  for (let attempt = 0; attempt < 3 && isPendingStatus(payment.status); attempt += 1) {
+    await sleep(1200);
+    payment = (await fetchPortonePayment(paymentId)) ?? payment;
+  }
 
   const reservationId = reservationIdFromCustomData(payment);
   if (!reservationId) return { ok: false, status: 400, message: "결제에 연결된 예약 정보가 없습니다." };
@@ -253,6 +273,18 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
   }
 
   if (decision.kind === "reject") {
+    // 재시도 후에도 승인 대기면 실패가 아니라 '지연'이다. 웹훅(Transaction.Paid)이
+    // 뒤늦게 도착하면 이 함수가 다시 호출돼 예약이 확정되므로, 손님에게 실패라고
+    // 말하면 안 된다(다시 결제하려다 이중 결제가 난다).
+    if (isPendingStatus(payment.status)) {
+      await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", amount: paidAmount, provider_code: payment.status ?? "PENDING", message: "승인 확인 대기 — 웹훅으로 반영 예정" });
+      return {
+        ok: false,
+        pending: true,
+        status: 200,
+        message: "결제 승인 확인이 조금 늦어지고 있습니다. 결제가 완료되었다면 잠시 뒤 예약현황에 자동으로 반영됩니다. 다시 결제하지 말아 주세요.",
+      };
+    }
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "failed", amount: paidAmount, provider_code: decision.code, message: decision.message });
     return {
       ok: false,
@@ -328,7 +360,7 @@ Deno.serve(async (request) => {
       const paymentId = body.paymentId;
       if (!isPaymentId(paymentId)) return json({ ok: false, message: "잘못된 결제 요청입니다." }, 400, headers);
       const result = await confirmPayment(paymentId);
-      return json({ ok: result.ok, message: result.message }, result.status, headers);
+      return json({ ok: result.ok, pending: result.pending ?? false, message: result.message }, result.status, headers);
     }
 
     // ---- 관리자 환불 ----
