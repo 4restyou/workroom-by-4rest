@@ -94,6 +94,12 @@ export function addDaysStr(dateStr: string, days: number): string {
 // 작성된 트리거 메시지는 그대로 쓰고, 그 외 DB 원문은 노출하지 않는다.
 export function readableReservationError(error: { code?: string; message?: string }) {
   const message = error.message?.trim() ?? "";
+  // 중복 신청(23505 unique_violation). 오류 화면을 보고 다시 신청했는데 사실은
+  // 첫 신청이 이미 저장된 경우라, "실패"가 아니라 "이미 있다"고 말해야 한다.
+  // (migration 0044의 reservations_no_duplicate_active)
+  if (error.code === "23505" || message.includes("reservations_no_duplicate_active")) {
+    return "이미 같은 이용권·시간으로 신청하신 예약이 있습니다. ‘내정보 > 예약현황’에서 확인해 주세요.";
+  }
   const customerFacing = ["예약", "운영 시간", "휴무일", "좌석", "종료 시간"].some((word) => message.includes(word));
   if (customerFacing) return message;
   if (error.code === "42501") return "로그인 정보가 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.";

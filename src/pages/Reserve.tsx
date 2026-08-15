@@ -537,10 +537,30 @@ export default function Reserve() {
     };
 
     setIsSubmitting(true);
-    const { data: createdReservation, error: submitError } = await supabase.from("reservations").insert(payload).select("*").single();
+    const insertResult = await supabase.from("reservations").insert(payload).select("*").single();
+    let createdReservation = insertResult.data;
+    const submitError = insertResult.error;
+
+    // 중복 신청(23505): 오류를 보고 다시 신청했지만 첫 신청이 이미 저장돼 있던
+    // 경우다. 새 예약을 만드는 대신 그 예약을 찾아 이어서 결제까지 가게 한다.
+    // (여기서 실패라고만 말하면 손님이 또 처음부터 신청해 예약이 계속 늘어난다.)
+    if (submitError?.code === "23505" && profile?.id) {
+      const { data: existing } = await supabase
+        .from("reservations")
+        .select("*")
+        .eq("profile_id", profile.id)
+        .eq("pass_type", form.pass_type)
+        .eq("date", form.date)
+        .eq("start_time", form.start_time)
+        .is("deleted_at", null)
+        .in("status", ["pending", "confirmed"])
+        .maybeSingle();
+      if (existing) createdReservation = existing;
+    }
+
     setIsSubmitting(false);
 
-    if (submitError || !createdReservation) {
+    if (!createdReservation) {
       console.error("[reservation] insert failed", { code: submitError?.code, message: submitError?.message ?? "missing inserted row" });
       setError(readableReservationError(submitError ?? { message: "예약 정보를 확인하지 못했습니다." }));
       return;

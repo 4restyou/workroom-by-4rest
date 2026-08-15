@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isLongTermReservation, reservationCoversDate, reservationEndTime, reservationPassName, reservationStartTime } from "./reservations";
+import {
+  isLongTermReservation,
+  readableReservationError,
+  reservationCoversDate,
+  reservationEndTime,
+  reservationPassName,
+  reservationStartTime,
+} from "./reservations";
 import type { Reservation } from "./types";
 
 function reservation(overrides: Partial<Reservation> = {}) {
@@ -61,5 +68,27 @@ describe("reservation helpers", () => {
   it("moves an overnight end time to the next calendar day", () => {
     const item = reservation({ start_time: "22:00:00", end_time: "01:00:00" });
     expect(new Date(reservationEndTime(item)).toISOString()).toBe("2026-07-19T16:00:00.000Z");
+  });
+});
+
+describe("readableReservationError", () => {
+  it("explains a duplicate submission instead of calling it a failure", () => {
+    // 오류 화면을 보고 다시 신청했지만 첫 신청이 이미 저장돼 있던 경우.
+    const text = readableReservationError({ code: "23505", message: 'duplicate key value violates unique constraint "reservations_no_duplicate_active"' });
+    expect(text).toContain("이미 같은 이용권·시간으로 신청하신 예약이 있습니다");
+  });
+
+  it("passes trigger messages written for customers straight through", () => {
+    expect(readableReservationError({ message: "선택하신 날짜는 휴무일입니다." })).toBe("선택하신 날짜는 휴무일입니다.");
+  });
+
+  it("asks the member to sign in again when the session expired", () => {
+    expect(readableReservationError({ code: "42501", message: "permission denied" })).toContain("다시 로그인");
+  });
+
+  it("hides raw database text behind a generic message", () => {
+    expect(readableReservationError({ code: "22P02", message: 'invalid input syntax for type uuid: "x"' })).toBe(
+      "처리 중 문제가 생겼습니다. 입력 내용을 확인하거나 잠시 후 다시 시도해 주세요.",
+    );
   });
 });
