@@ -28,6 +28,7 @@ const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
 const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = (Deno.env.get("SMS_SENDER") ?? "").replace(/\D/g, "");
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://work-room.kr";
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -83,7 +84,7 @@ async function sendReminder(row: ReminderRow) {
       message: {
         to: phone,
         from: SMS_SENDER,
-        text: `[WORKROOM] ${row.member_name}님, 예약 종료까지 약 20분 남았습니다.\n종료 ${row.end_time.slice(0, 5)} · 연장이 필요하면 운영자에게 문의해 주세요.\n010-4931-3298`,
+        text: `[WORKROOM] ${row.member_name}님, 예약 종료까지 약 20분 남았습니다.\n종료 ${row.end_time.slice(0, 5)}\n더 이용하시려면 예약 화면에서 ‘추가 1시간’을 신청·결제해 주세요. 좌석 여유가 있으면 바로 연장됩니다.\n${SITE_URL}\n문의 010-4931-3298`,
       },
     }),
   });

@@ -103,7 +103,16 @@ function CurrentReservation({ attendance, now, reservation, today }: { attendanc
           <div className="mt-3 h-2 overflow-hidden rounded-pill bg-workroom-line/60">
             <div className="h-full rounded-pill bg-workroom-ink transition-[width]" style={{ width: `${progress}%` }} />
           </div>
-          {warning ? <p className="mt-2 text-xs font-bold">종료 20분 전입니다. 연장이 필요하면 운영자에게 문의해 주세요.</p> : null}
+          {/* 연장은 '추가 1시간' 이용권으로 회원이 직접 할 수 있다. 예전에는 문의하라고만
+              안내해 운영자가 매번 대신 처리해야 했다. */}
+          {warning ? (
+            <div className="mt-2">
+              <p className="text-xs font-bold">종료 20분 전입니다.</p>
+              <Link className={buttonClass("primary", "sm", "mt-1.5")} to="/reserve?pass=%EC%B6%94%EA%B0%80%201%EC%8B%9C%EA%B0%84">
+                1시간 연장하기
+              </Link>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
