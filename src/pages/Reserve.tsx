@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Calendar from "../components/Calendar";
 import Section from "../components/Section";
 import { trackEvent } from "../lib/analytics";
@@ -17,7 +17,8 @@ import { maxBookingDateValue,
   todayValue,
 } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
-import { canPayOnline, canSubscribe, payReservation, subscribeMonthly } from "../lib/portone";
+import { canPayOnline, canSubscribe, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly, type UpgradeQuote } from "../lib/portone";
+import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
@@ -64,6 +65,7 @@ type SubmittedReservation = {
 
 export default function Reserve() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [passes, setPasses] = useState<Pass[]>(defaultPasses);
   const [form, setForm] = useState(emptyForm);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -71,6 +73,10 @@ export default function Reserve() {
   // 손님이 오류를 신고해도 "무슨 문구였는지 기억 안 난다"로 끝나면 원인을 못 찾는다.
   // 화면에 짧은 참조 코드를 함께 남겨 스크린샷 한 장으로 추적할 수 있게 한다.
   const [errorRef, setErrorRef] = useState("");
+  // 오늘 이미 시간권을 결제한 회원이 종일권을 새로 사려 할 때, 차액만 내는 길을 알려 준다.
+  // (새로 결제하면 시간권 값을 그냥 버리는 셈이 된다.)
+  const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
+  const [upgradeBusy, setUpgradeBusy] = useState(false);
   const [isPaymentBusy, setIsPaymentBusy] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState("");
   const [paymentError, setPaymentError] = useState("");
@@ -642,6 +648,33 @@ export default function Reserve() {
 
   const groupedPasses = groupPasses(passes);
   const selectedPassInfo = passes.find((pass) => pass.name === form.pass_type) ?? null;
+  const dayPassSelected = form.pass_type.includes("종일");
+
+  useEffect(() => {
+    // 로그인한 회원이 종일권을 골랐을 때만 확인한다. 전환할 게 없으면 조용히 넘어간다.
+    if (!profile || !dayPassSelected) { setUpgradeQuote(null); return; }
+    let alive = true;
+    void (async () => {
+      const quoted = await fetchDayPassUpgradeQuote();
+      if (!alive) return;
+      setUpgradeQuote(quoted.ok ? quoted.quote : null);
+    })();
+    return () => { alive = false; };
+  }, [dayPassSelected, profile]);
+
+  async function startUpgrade() {
+    if (!upgradeQuote || !profile) return;
+    setUpgradeBusy(true);
+    const result = await confirmAndUpgrade(upgradeQuote, {
+      name: profile.full_name ?? form.name,
+      phone: profile.phone ?? form.phone,
+      email: profile.email ?? null,
+    });
+    setUpgradeBusy(false);
+    if (!result) return;
+    if (!result.ok) { setError(result.message); return; }
+    navigate("/account?tab=reservations");
+  }
   // 단체·대관처럼 최소 인원이 있는 이용권. 서버 트리거(0043)와 같은 값을 본다.
   const minPeople = Math.max(1, selectedPassInfo?.min_people ?? 1);
   const stepLabels = ["이용권", "날짜·시간", "정보·확인"];
@@ -1017,6 +1050,21 @@ export default function Reserve() {
                   </>
                 ) : null}
               </dl>
+            </div>
+          ) : null}
+
+          {/* 오늘 시간권을 이미 결제한 회원이 종일권을 새로 사려는 순간. 새로 결제하면
+              먼저 낸 돈을 버리는 셈이라, 차액만 내는 길을 여기서 알려 준다. */}
+          {upgradeQuote ? (
+            <div className={`${tintCard("yellow")} p-4`}>
+              <p className="text-sm font-bold leading-6">오늘 이용 중인 시간권이 있어요.</p>
+              <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">
+                새로 결제하지 마시고 종일권으로 바꾸시면 이미 결제하신 금액을 뺀 차액만 내시면 됩니다.
+                바꾸면 오늘 마감까지 이용하실 수 있어요.
+              </p>
+              <button className={buttonClass("primary", "sm", "mt-3")} disabled={upgradeBusy} onClick={() => void startUpgrade()} type="button">
+                {upgradeBusy ? "처리 중…" : "종일권으로 바꾸기"}
+              </button>
             </div>
           ) : null}
 

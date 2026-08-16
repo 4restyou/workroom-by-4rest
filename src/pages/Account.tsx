@@ -7,7 +7,8 @@ import AccountProfileForm from "../components/AccountProfileForm";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { kstLongDateTime } from "../lib/datetime";
 import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
-import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly, upgradeToDayPass } from "../lib/portone";
+import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly } from "../lib/portone";
+import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
 import { isLongTermReservation, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
@@ -327,26 +328,13 @@ export default function Account() {
       return;
     }
 
-    const { quote } = quoted;
-    const ok = await confirmDialog({
-      title: quote.amountDue > 0 ? `${quote.dayPassName}으로 변경할까요?` : `추가 결제 없이 ${quote.dayPassName}으로 변경할까요?`,
-      description:
-        quote.amountDue > 0
-          ? `${quote.dayPassName} ${formatPrice(quote.dayPassTotal)}\n이미 결제하신 금액 ${formatPrice(quote.alreadyPaid)}\n추가 결제 ${formatPrice(quote.amountDue)}\n\n변경하면 오늘 마감까지 이용하실 수 있어요.`
-          : `이미 결제하신 금액(${formatPrice(quote.alreadyPaid)})이 ${quote.dayPassName} 금액 이상이라 추가 결제 없이 변경됩니다.\n오늘 마감까지 이용하실 수 있어요.`,
-      confirmLabel: quote.amountDue > 0 ? "결제하고 변경" : "변경하기",
-    });
-    if (!ok) {
-      setActionBusy(null);
-      return;
-    }
-
-    const result = await upgradeToDayPass(quote, {
+    const result = await confirmAndUpgrade(quoted.quote, {
       name: profile?.full_name ?? "",
       phone: profile?.phone ?? "",
       email: profile?.email ?? null,
     });
     setActionBusy(null);
+    if (!result) return;
     if (!result.ok) {
       setError(result.message);
       return;
