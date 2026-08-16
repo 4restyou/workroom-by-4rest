@@ -11,6 +11,8 @@ import {
   prorateRefund,
   type CancelInput,
   type ConfirmInput,
+  decideDayPassUpgrade,
+  quoteDayPassUpgrade,
 } from "../../supabase/functions/_shared/paymentRules";
 
 function confirmInput(overrides: Partial<ConfirmInput> = {}): ConfirmInput {
@@ -304,5 +306,74 @@ describe("prorateRefund (주 단위 정산)", () => {
 
   it("기간 정보가 잘못되면 0원으로 막는다(자동 환불 금지)", () => {
     expect(prorateRefund({ paidAmount: 100000, startDate: "", endDate: "", onDate: "2026-08-01" }).refundAmount).toBe(0);
+  });
+});
+
+describe("quoteDayPassUpgrade", () => {
+  it("charges only the difference", () => {
+    // 3시간권 14,000을 낸 손님이 35,000짜리 종일권으로 바꾸는 경우.
+    expect(quoteDayPassUpgrade({ alreadyPaid: 14000, dayPassTotal: 35000 })).toEqual({
+      alreadyPaid: 14000,
+      dayPassTotal: 35000,
+      amountDue: 21000,
+      alreadyCovered: false,
+    });
+  });
+
+  it("charges nothing once the day-pass price is already covered", () => {
+    // 3시간권 + 추가 1시간 6회 = 38,000. 더 받지 않는다.
+    const quote = quoteDayPassUpgrade({ alreadyPaid: 38000, dayPassTotal: 35000 });
+    expect(quote.amountDue).toBe(0);
+    expect(quote.alreadyCovered).toBe(true);
+  });
+
+  it("treats an exact match as already covered", () => {
+    expect(quoteDayPassUpgrade({ alreadyPaid: 35000, dayPassTotal: 35000 }).alreadyCovered).toBe(true);
+  });
+
+  it("never returns a negative amount", () => {
+    expect(quoteDayPassUpgrade({ alreadyPaid: 99000, dayPassTotal: 35000 }).amountDue).toBe(0);
+  });
+});
+
+describe("decideDayPassUpgrade", () => {
+  const paidDifference = {
+    alreadyPaid: 14000,
+    dayPassTotal: 35000,
+    providerStatus: "PAID",
+    providerCurrency: "KRW",
+    providerAmount: 21000,
+  };
+
+  it("applies the upgrade when the difference is paid exactly", () => {
+    expect(decideDayPassUpgrade(paidDifference)).toEqual({ kind: "apply_paid", amount: 21000 });
+  });
+
+  it("upgrades with no payment when the price is already covered", () => {
+    expect(decideDayPassUpgrade({ ...paidDifference, alreadyPaid: 40000, providerStatus: undefined, providerAmount: 0 })).toEqual({
+      kind: "apply_free",
+    });
+  });
+
+  it("rejects a short payment", () => {
+    // 차액을 손님이 정하게 두면 종일권을 헐값에 가져갈 수 있다.
+    const decision = decideDayPassUpgrade({ ...paidDifference, providerAmount: 1000 });
+    expect(decision).toMatchObject({ kind: "reject", code: "AMOUNT_MISMATCH" });
+  });
+
+  it("rejects an overpayment too", () => {
+    expect(decideDayPassUpgrade({ ...paidDifference, providerAmount: 30000 })).toMatchObject({ kind: "reject" });
+  });
+
+  it("rejects a payment that is not settled", () => {
+    expect(decideDayPassUpgrade({ ...paidDifference, providerStatus: "READY" })).toMatchObject({ kind: "reject", code: "READY" });
+  });
+
+  it("rejects a non-KRW payment", () => {
+    expect(decideDayPassUpgrade({ ...paidDifference, providerCurrency: "USD" })).toMatchObject({ kind: "reject" });
+  });
+
+  it("rejects when the day pass has no price", () => {
+    expect(decideDayPassUpgrade({ ...paidDifference, dayPassTotal: 0 })).toMatchObject({ kind: "reject", code: "NO_DAY_PASS" });
   });
 });

@@ -229,3 +229,69 @@ export function prorateRefund(input: ProrateInput): ProrateResult {
     remainingDays: Math.max(0, totalDays - Math.min(totalDays, elapsed + 1)),
   };
 }
+
+// ── 종일권 전환(업그레이드) ───────────────────────────────────────────
+//
+// 시간권으로 들어온 손님이 하루 종일 머물기로 마음을 바꾸는 일이 잦다. 매번
+// '추가 1시간'을 반복해 사면 종일권보다 비싸지므로, 이미 낸 돈을 빼고 차액만
+// 받아 종일권으로 바꿔 준다. 이미 낸 돈이 종일권 값을 넘겼다면 더 받지 않는다.
+//
+// 차액은 반드시 서버에서 계산한다. 클라이언트가 보낸 금액을 믿으면 "차액
+// 1,000원입니다" 하고 종일권을 가져갈 수 있다.
+
+export type UpgradeQuoteInput = {
+  /** 오늘 이 회원이 시간권류로 이미 결제한 금액(환불 차감 후). */
+  alreadyPaid: number;
+  /** 종일권 정가 x 인원. */
+  dayPassTotal: number;
+};
+
+export type UpgradeQuote = {
+  alreadyPaid: number;
+  dayPassTotal: number;
+  /** 추가로 받아야 할 금액. 0이면 결제 없이 바로 전환한다. */
+  amountDue: number;
+  /** 이미 종일권 값 이상을 낸 경우. */
+  alreadyCovered: boolean;
+};
+
+export function quoteDayPassUpgrade(input: UpgradeQuoteInput): UpgradeQuote {
+  const alreadyPaid = Math.max(0, Math.floor(Number(input.alreadyPaid) || 0));
+  const dayPassTotal = Math.max(0, Math.floor(Number(input.dayPassTotal) || 0));
+  const amountDue = Math.max(0, dayPassTotal - alreadyPaid);
+  return { alreadyPaid, dayPassTotal, amountDue, alreadyCovered: amountDue === 0 };
+}
+
+export type UpgradePaymentInput = UpgradeQuoteInput & {
+  providerStatus: string | undefined;
+  providerCurrency: string | undefined;
+  providerAmount: number;
+};
+
+export type UpgradeDecision =
+  /** 결제 없이 바로 종일권으로 바꾼다. */
+  | { kind: "apply_free" }
+  /** 결제가 확인됐고 금액도 맞다 → 종일권으로 바꾼다. */
+  | { kind: "apply_paid"; amount: number }
+  | { kind: "reject"; code: string; message: string };
+
+export function decideDayPassUpgrade(input: UpgradePaymentInput): UpgradeDecision {
+  const quote = quoteDayPassUpgrade(input);
+  if (quote.dayPassTotal <= 0) {
+    return { kind: "reject", code: "NO_DAY_PASS", message: "종일권 금액을 확인하지 못했습니다." };
+  }
+  if (quote.alreadyCovered) return { kind: "apply_free" };
+
+  if (input.providerStatus !== "PAID") {
+    return { kind: "reject", code: input.providerStatus ?? "UNKNOWN", message: "결제가 완료되지 않았습니다." };
+  }
+  // 차액과 정확히 일치해야 한다. 부분 결제도 초과 결제도 받지 않는다.
+  if (input.providerCurrency !== "KRW" || input.providerAmount !== quote.amountDue) {
+    return {
+      kind: "reject",
+      code: "AMOUNT_MISMATCH",
+      message: `결제 금액(${input.providerAmount})이 전환 차액(${quote.amountDue})과 다릅니다.`,
+    };
+  }
+  return { kind: "apply_paid", amount: quote.amountDue };
+}

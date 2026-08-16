@@ -7,7 +7,7 @@ import AccountProfileForm from "../components/AccountProfileForm";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { kstLongDateTime } from "../lib/datetime";
 import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
-import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, payReservation, subscribeMonthly } from "../lib/portone";
+import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly, upgradeToDayPass } from "../lib/portone";
 import { isLongTermReservation, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
@@ -315,6 +315,49 @@ export default function Account() {
     setEditingId(null);
   }
 
+  // 시간권 → 종일권 전환. 차액은 서버가 계산하고 서버가 다시 검증한다.
+  // 버튼에는 금액을 적지 않고, 여기 확인 단계에서 얼마가 빠지고 얼마를 더 내는지 보여 준다.
+  async function upgradeToDay() {
+    setError("");
+    setActionBusy("upgrade");
+    const quoted = await fetchDayPassUpgradeQuote();
+    if (!quoted.ok) {
+      setActionBusy(null);
+      setError(quoted.message);
+      return;
+    }
+
+    const { quote } = quoted;
+    const ok = await confirmDialog({
+      title: quote.amountDue > 0 ? `${quote.dayPassName}으로 변경할까요?` : `추가 결제 없이 ${quote.dayPassName}으로 변경할까요?`,
+      description:
+        quote.amountDue > 0
+          ? `${quote.dayPassName} ${formatPrice(quote.dayPassTotal)}\n이미 결제하신 금액 ${formatPrice(quote.alreadyPaid)}\n추가 결제 ${formatPrice(quote.amountDue)}\n\n변경하면 오늘 마감까지 이용하실 수 있어요.`
+          : `이미 결제하신 금액(${formatPrice(quote.alreadyPaid)})이 ${quote.dayPassName} 금액 이상이라 추가 결제 없이 변경됩니다.\n오늘 마감까지 이용하실 수 있어요.`,
+      confirmLabel: quote.amountDue > 0 ? "결제하고 변경" : "변경하기",
+    });
+    if (!ok) {
+      setActionBusy(null);
+      return;
+    }
+
+    const result = await upgradeToDayPass(quote, {
+      name: profile?.full_name ?? "",
+      phone: profile?.phone ?? "",
+      email: profile?.email ?? null,
+    });
+    setActionBusy(null);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setSuccess(result.message);
+    // 예약·결제 내역이 모두 바뀌므로 다시 읽는다.
+    const { data } = await supabase!.from("reservations").select("*").eq("profile_id", profile!.id).order("date", { ascending: false });
+    setReservations((data ?? []) as Reservation[]);
+    void loadReceipts();
+  }
+
   async function payNow(reservation: Reservation) {
     setError("");
     setActionBusy(`pay-${reservation.id}`);
@@ -449,7 +492,15 @@ export default function Account() {
             {activeTab === "reservations" && profile.role !== "admin" ? (
               <>
               {!SITE.booking.onlinePaymentLive ? <p className={`mb-4 ${tintCard("yellow")} p-4 text-sm font-bold leading-6`}>{SITE.booking.paymentTestNotice}</p> : null}
-              <MemberReservationDashboard attendance={attendance} businessHours={businessHours} dateExceptions={dateExceptions} now={now} reservations={reservations} />
+              <MemberReservationDashboard
+                attendance={attendance}
+                businessHours={businessHours}
+                dateExceptions={dateExceptions}
+                now={now}
+                onUpgradeToDayPass={() => void upgradeToDay()}
+                reservations={reservations}
+                upgradeBusy={actionBusy === "upgrade"}
+              />
               {subscriptions.some((sub) => sub.status !== "canceled") ? (
                 <section className={`${card} p-5`}>
                   <h2 className="text-xl font-bold">정기결제</h2>

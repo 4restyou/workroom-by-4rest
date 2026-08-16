@@ -28,6 +28,7 @@ type ReservationRow = {
   payment_preference: "online" | "onsite" | null;
   payment_status: string | null;
   payment_method: string | null;
+  upgraded_into: string | null;
   price_at_booking: number | null;
   people: number | null;
 };
@@ -229,9 +230,13 @@ Deno.serve(async (request) => {
       const timeChanged =
         row.date !== previous.date || row.start_time !== previous.start_time || row.end_time !== previous.end_time;
 
+      // 종일권 전환으로 합쳐진 예약은 취소된 것이 아니다. 취소 문자를 보내면
+      // 손님이 예약이 없어진 줄 알고 놀란다(전환 안내는 전환된 예약 쪽에서 한다).
+      const mergedIntoUpgrade = Boolean(row.upgraded_into) && !previous.upgraded_into;
+
       // Member-facing: status moved to confirmed / canceled / no_show.
       const message = STATUS_MESSAGE[row.status];
-      if (statusChanged && message && row.phone) {
+      if (statusChanged && message && row.phone && !mergedIntoUpgrade) {
         const policyLine = row.status === "confirmed" ? `\n${REFUND_NOTICE}` : "";
         const accessLine = row.status === "confirmed" && DOOR_PASSWORD
           ? `\n출입문 비밀번호: ${DOOR_PASSWORD}`
@@ -264,7 +269,7 @@ Deno.serve(async (request) => {
 
       // Operator-facing: every cancellation should be visible even when the
       // member cancels from their own reservation page.
-      if (ADMIN_PHONE && statusChanged && row.status === "canceled") {
+      if (ADMIN_PHONE && statusChanged && row.status === "canceled" && !mergedIntoUpgrade) {
         await sendSms(
           ADMIN_PHONE,
           `[WORKROOM] 예약 취소\n${row.name} / ${reservationLine(row)}\n예약관리에서 확인해 주세요.\n${SITE_URL}`,

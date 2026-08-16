@@ -11,10 +11,13 @@ type Props = {
   dateExceptions: BusinessDateException[];
   now: number;
   reservations: Reservation[];
+  /** 시간권으로 이용 중일 때 종일권으로 바꾸는 동작. 금액은 결제 단계에서 안내한다. */
+  onUpgradeToDayPass?: () => void;
+  upgradeBusy?: boolean;
 };
 
 const kstDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" });
-export default function MemberReservationDashboard({ attendance, businessHours, dateExceptions, now, reservations }: Props) {
+export default function MemberReservationDashboard({ attendance, businessHours, dateExceptions, now, onUpgradeToDayPass, reservations, upgradeBusy }: Props) {
   const today = kstDate(new Date(now));
   const activeReservations = reservations.filter((item) => !item.deleted_at && (item.status === "pending" || item.status === "confirmed"));
   const current = activeReservations.find((reservation) => isCurrentReservation(reservation, today, now, businessHours, dateExceptions));
@@ -35,7 +38,14 @@ export default function MemberReservationDashboard({ attendance, businessHours, 
       </div>
 
       {focus ? (
-        <CurrentReservation reservation={focus} attendance={attendance} now={now} today={today} />
+        <CurrentReservation
+          attendance={attendance}
+          now={now}
+          onUpgradeToDayPass={onUpgradeToDayPass}
+          reservation={focus}
+          today={today}
+          upgradeBusy={upgradeBusy}
+        />
       ) : (
         <div className={`${card} p-5`}>
           <p className="text-lg font-black">예정된 예약이 없습니다</p>
@@ -58,7 +68,14 @@ export default function MemberReservationDashboard({ attendance, businessHours, 
   );
 }
 
-function CurrentReservation({ attendance, now, reservation, today }: { attendance: Attendance[]; now: number; reservation: Reservation; today: string }) {
+function CurrentReservation({ attendance, now, onUpgradeToDayPass, reservation, today, upgradeBusy }: {
+  attendance: Attendance[];
+  now: number;
+  onUpgradeToDayPass?: () => void;
+  reservation: Reservation;
+  today: string;
+  upgradeBusy?: boolean;
+}) {
   const isLong = isLongTermReservation(reservation);
   const periodStart = reservation.access_start_date ?? reservation.date;
   const periodEnd = reservation.access_end_date ?? reservation.date;
@@ -71,6 +88,9 @@ function CurrentReservation({ attendance, now, reservation, today }: { attendanc
   const remaining = using ? end - now : beforeStart ? start - now : 0;
   const warning = using && remaining <= 20 * 60 * 1000;
   const progress = using ? Math.min(100, Math.max(0, ((now - start) / Math.max(1, end - start)) * 100)) : 0;
+  // 시간권으로 이용 중일 때만 종일권 전환을 제안한다.
+  const passName = reservationPassName(reservation);
+  const canUpgrade = using && !isLong && passName.includes("시간") && !passName.includes("종일");
 
   let headline = "다음 예약";
   let timing = `${formatDate(reservation.date)} · ${formatTimeRange(reservation.start_time, reservation.end_time)}`;
@@ -104,13 +124,27 @@ function CurrentReservation({ attendance, now, reservation, today }: { attendanc
             <div className="h-full rounded-pill bg-workroom-ink transition-[width]" style={{ width: `${progress}%` }} />
           </div>
           {/* 연장은 '추가 1시간' 이용권으로 회원이 직접 할 수 있다. 예전에는 문의하라고만
-              안내해 운영자가 매번 대신 처리해야 했다. */}
+              안내해 운영자가 매번 대신 처리해야 했다.
+              오래 머물 손님에게는 종일권 전환이 더 싸다 — 시간 단위로 반복해 사면
+              금세 종일권 값을 넘기기 때문이다. 금액은 결제 단계에서 안내한다. */}
           {warning ? (
             <div className="mt-2">
               <p className="text-xs font-bold">종료 20분 전입니다.</p>
-              <Link className={buttonClass("primary", "sm", "mt-1.5")} to="/reserve?pass=%EC%B6%94%EA%B0%80%201%EC%8B%9C%EA%B0%84">
-                1시간 연장하기
-              </Link>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                <Link className={buttonClass("primary", "sm")} to="/reserve?pass=%EC%B6%94%EA%B0%80%201%EC%8B%9C%EA%B0%84">
+                  1시간 연장하기
+                </Link>
+                {canUpgrade && onUpgradeToDayPass ? (
+                  <button className={buttonClass("accent", "sm")} disabled={upgradeBusy} onClick={onUpgradeToDayPass} type="button">
+                    {upgradeBusy ? "확인 중…" : "종일권으로 변경"}
+                  </button>
+                ) : null}
+              </div>
+              {canUpgrade ? (
+                <p className="mt-1.5 text-xs font-medium leading-5 text-workroom-muted">
+                  오래 머무실 예정이면 종일권이 더 저렴할 수 있어요. 이미 결제하신 금액을 뺀 차액만 결제됩니다.
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

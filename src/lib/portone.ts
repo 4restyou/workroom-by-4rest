@@ -208,3 +208,68 @@ export async function refundReservationPayment(reservationId: string, reason: st
   if (error || !result?.ok) return { ok: false, message: result?.message ?? "환불 처리에 실패했습니다." };
   return { ok: true, message: result.message ?? "환불이 완료되었습니다." };
 }
+
+// ── 종일권 전환 ───────────────────────────────────────────────────────
+//
+// 시간권으로 들어온 손님이 하루 종일 머물기로 바꾸는 경우. 이미 낸 돈을 뺀 차액만
+// 받는다. 차액은 서버가 계산하고 서버가 다시 검증한다 — 여기서 만든 값은 결제창에
+// 넣는 용도일 뿐 신뢰의 근거가 아니다.
+
+export type UpgradeQuote = {
+  reservationId: string;
+  amountDue: number;
+  alreadyPaid: number;
+  dayPassTotal: number;
+  dayPassName: string;
+};
+
+export async function fetchDayPassUpgradeQuote(): Promise<{ ok: true; quote: UpgradeQuote } | { ok: false; message: string }> {
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
+  const { data, error } = await supabase.functions.invoke("portone-payment", { body: { type: "upgrade_quote" } });
+  if (error) return { ok: false, message: await invokeErrorMessage(error, "전환 금액을 확인하지 못했습니다.") };
+  const result = data as (UpgradeQuote & { ok?: boolean; message?: string }) | null;
+  if (!result?.ok) return { ok: false, message: result?.message ?? "전환 금액을 확인하지 못했습니다." };
+  return { ok: true, quote: result };
+}
+
+export async function upgradeToDayPass(quote: UpgradeQuote, customer: { name: string; phone: string; email?: string | null }): Promise<PayResult> {
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요." };
+
+  // 이미 낸 금액이 종일권 이상이면 결제창을 열지 않는다.
+  if (quote.amountDue <= 0) {
+    const { data, error } = await supabase.functions.invoke("portone-payment", { body: { type: "upgrade_free" } });
+    if (error) return { ok: false, message: await invokeErrorMessage(error, "전환에 실패했습니다.") };
+    const result = data as { ok?: boolean; message?: string } | null;
+    if (!result?.ok) return { ok: false, message: result?.message ?? "전환에 실패했습니다." };
+    return { ok: true, message: result.message ?? "종일권으로 전환되었습니다." };
+  }
+
+  if (!STORE_ID || !CHANNEL_KEY) return { ok: false, message: "온라인 결제가 아직 준비되지 않았습니다." };
+  const paymentId = `wr-up-${quote.reservationId.slice(0, 8)}-${Date.now()}`;
+
+  let response: Awaited<ReturnType<typeof PortOne.requestPayment>>;
+  try {
+    response = await PortOne.requestPayment({
+      storeId: STORE_ID,
+      channelKey: CHANNEL_KEY,
+      paymentId,
+      orderName: `WORKROOM ${quote.dayPassName} 전환 차액`,
+      totalAmount: quote.amountDue,
+      currency: "CURRENCY_KRW",
+      payMethod: "CARD",
+      customData: { reservationId: quote.reservationId, upgrade: true },
+      redirectUrl: `${window.location.origin}/payment/portone`,
+      customer: {
+        fullName: customer.name,
+        phoneNumber: customer.phone,
+        ...(customer.email ? { email: customer.email } : {}),
+      },
+    });
+  } catch (error) {
+    return { ok: false, message: `결제창 오류: ${error instanceof Error ? error.message : String(error)}` };
+  }
+
+  if (!response) return { ok: false, message: "결제창을 여는 데 실패했습니다." };
+  if (response.code !== undefined) return { ok: false, message: response.message ?? "결제가 취소되었습니다." };
+  return confirmPayment(response.paymentId ?? paymentId);
+}

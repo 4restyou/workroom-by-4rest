@@ -23,7 +23,7 @@
 //    confirm은 결제 정보를 포트원 API로 재조회해 금액을 대조하므로 호출 자체는
 //    막지 않는다 — Origin 헤더는 인증 수단이 아니라 CORS 응답 계산에만 쓴다.)
 
-import { decidePaymentConfirmation, isPaymentId, isUuid } from "../_shared/paymentRules.ts";
+import { decideDayPassUpgrade, decidePaymentConfirmation, isPaymentId, isUuid, quoteDayPassUpgrade } from "../_shared/paymentRules.ts";
 
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
 const PORTONE_WEBHOOK_SECRET = Deno.env.get("PORTONE_WEBHOOK_SECRET") ?? "";
@@ -159,6 +159,138 @@ async function sumSucceededRefunds(reservationId: string): Promise<number> {
   }
 }
 
+
+// ── 종일권 전환 ───────────────────────────────────────────────────────
+//
+// 오늘 이 회원이 시간권류로 낸 돈을 모아 종일권 정가와 견준다. 금액 계산은 전부
+// 여기(서버)서 한다 — 클라이언트가 보낸 차액을 믿으면 종일권을 헐값에 가져갈 수 있다.
+
+type UpgradeSource = {
+  id: string;
+  profile_id: string | null;
+  people: number | null;
+  price_at_booking: number | null;
+  payment_status: string | null;
+  pass_type: string;
+  pass_name_snapshot: string | null;
+  start_time: string | null;
+  status: string;
+};
+
+function isTimePassName(name: string) {
+  return name.includes("시간") && !name.includes("종일") && !name.includes("주간") && !name.includes("월권");
+}
+
+function kstToday() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** 오늘 이 회원의 시간권·연장 예약(전환 대상). */
+async function todayTimePassReservations(profileId: string): Promise<UpgradeSource[]> {
+  const today = kstToday();
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/reservations?profile_id=eq.${profileId}&date=eq.${today}&deleted_at=is.null&status=in.(pending,confirmed)&upgraded_into=is.null&select=id,profile_id,people,price_at_booking,payment_status,pass_type,pass_name_snapshot,start_time,status&order=start_time.asc`,
+    { headers: serviceHeaders },
+  );
+  if (!resp.ok) return [];
+  const rows = (await resp.json()) as UpgradeSource[];
+  return rows.filter((row) => isTimePassName(row.pass_name_snapshot || row.pass_type));
+}
+
+/** 한 예약에서 실제로 받은 금액(환불 차감). 원장이 없으면 현장 결제로 보고 예약 금액을 쓴다. */
+async function netPaidFor(reservation: UpgradeSource): Promise<number> {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/reservation_payment_logs?reservation_id=eq.${reservation.id}&status=eq.succeeded&select=action,amount`,
+    { headers: serviceHeaders },
+  );
+  let charged = 0;
+  let refunded = 0;
+  if (resp.ok) {
+    const rows = (await resp.json()) as Array<{ action: string; amount: number | null }>;
+    for (const row of rows) {
+      const amount = Number(row.amount ?? 0);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      if (row.action === "refund") refunded += amount;
+      else charged += amount;
+    }
+  }
+  if (charged === 0 && (reservation.payment_status === "paid" || reservation.payment_status === "refunded")) {
+    charged = Number(reservation.price_at_booking ?? 0);
+  }
+  if (refunded === 0 && reservation.payment_status === "refunded") refunded = charged;
+  return Math.max(0, charged - refunded);
+}
+
+async function activeDayPass(): Promise<{ name: string; price: number; seat_type_id: string | null } | null> {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/passes?is_active=eq.true&select=name,price,seat_type_id&order=sort_order.asc`,
+    { headers: serviceHeaders },
+  );
+  if (!resp.ok) return null;
+  const rows = (await resp.json()) as Array<{ name: string; price: number; seat_type_id: string | null }>;
+  return rows.find((row) => row.name.includes("종일")) ?? null;
+}
+
+async function buildUpgradeQuote(profileId: string) {
+  const sources = await todayTimePassReservations(profileId);
+  if (!sources.length) return { error: "오늘 이용 중인 시간권 예약이 없습니다." as const };
+  const dayPass = await activeDayPass();
+  if (!dayPass) return { error: "종일권을 판매하고 있지 않습니다." as const };
+
+  // 인원은 가장 이른 예약을 기준으로 본다(연장은 같은 인원으로 이어지는 것이 정상).
+  const primary = sources[0];
+  const people = Math.max(1, Number(primary.people ?? 1));
+  const paidList = await Promise.all(sources.map(netPaidFor));
+  const alreadyPaid = paidList.reduce((sum, value) => sum + value, 0);
+  const quote = quoteDayPassUpgrade({ alreadyPaid, dayPassTotal: dayPass.price * people });
+  return { dayPass, people, primary, quote, sources };
+}
+
+/** 전환 실행: 대표 예약을 종일권으로 바꾸고 나머지는 그 예약으로 합친다. */
+async function applyUpgrade(
+  primary: UpgradeSource,
+  sources: UpgradeSource[],
+  dayPass: { name: string; seat_type_id: string | null },
+  closeTime: string,
+): Promise<boolean> {
+  // 합쳐질 예약을 먼저 비운다. 그래야 종일권이 정원 검사에서 자기 자신과 겹치지 않는다.
+  for (const source of sources) {
+    if (source.id === primary.id) continue;
+    const ok = await updateReservation(source.id, { status: "canceled", upgraded_into: primary.id });
+    if (!ok) return false;
+  }
+  return updateReservation(primary.id, {
+    pass_type: dayPass.name,
+    pass_name_snapshot: dayPass.name,
+    end_time: closeTime,
+    status: "confirmed",
+    payment_status: "paid",
+  });
+}
+
+/** 오늘 마감 시각(특정일 예외 우선). 종일권 종료 시간으로 쓴다. */
+async function todayCloseTime(): Promise<string> {
+  const today = kstToday();
+  const exception = await fetch(
+    `${SUPABASE_URL}/rest/v1/business_date_exceptions?date=eq.${today}&select=close_time,is_closed`,
+    { headers: serviceHeaders },
+  );
+  if (exception.ok) {
+    const rows = (await exception.json()) as Array<{ close_time: string | null; is_closed: boolean }>;
+    if (rows[0] && !rows[0].is_closed && rows[0].close_time) return rows[0].close_time;
+  }
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const hours = await fetch(
+    `${SUPABASE_URL}/rest/v1/business_hours?weekday=eq.${weekday}&select=close_time`,
+    { headers: serviceHeaders },
+  );
+  if (hours.ok) {
+    const rows = (await hours.json()) as Array<{ close_time: string | null }>;
+    if (rows[0]?.close_time) return rows[0].close_time;
+  }
+  return "01:00:00";
+}
+
 async function recordPaymentLog(log: {
   reservation_id: string;
   profile_id?: string | null;
@@ -228,6 +360,65 @@ function reservationIdFromCustomData(payment: PortonePayment): string | null {
   }
 }
 
+/** 종일권 전환 차액 결제인지. 금액 기준이 예약 금액이 아니라 차액이라 따로 판정한다. */
+function isUpgradePayment(payment: PortonePayment): boolean {
+  try {
+    return JSON.parse(payment.customData ?? "")?.upgrade === true;
+  } catch {
+    return false;
+  }
+}
+
+
+/** 차액 결제가 끝난 뒤(또는 차액이 0일 때) 종일권으로 바꾼다. */
+async function finishUpgrade(
+  reservation: ReservationRow,
+  paidAmount: number,
+  payment: PortonePayment | null,
+): Promise<{ ok: boolean; status: number; message: string; pending?: boolean }> {
+  if (!reservation.profile_id) return { ok: false, status: 400, message: "회원 예약만 종일권으로 전환할 수 있습니다." };
+
+  const built = await buildUpgradeQuote(reservation.profile_id);
+  if ("error" in built) return { ok: false, status: 400, message: built.error };
+
+  const decision = decideDayPassUpgrade({
+    alreadyPaid: built.quote.alreadyPaid,
+    dayPassTotal: built.quote.dayPassTotal,
+    providerStatus: payment?.status,
+    providerCurrency: payment?.currency,
+    providerAmount: paidAmount,
+  });
+
+  if (decision.kind === "reject") {
+    await recordPaymentLog({ reservation_id: reservation.id, profile_id: reservation.profile_id, action: "confirm", status: "failed", amount: paidAmount, provider_code: decision.code, message: `종일권 전환 실패 · ${decision.message}` });
+    return {
+      ok: false,
+      status: 400,
+      message: decision.code === "AMOUNT_MISMATCH" ? "결제 금액이 전환 차액과 일치하지 않습니다." : "결제가 완료되지 않았습니다.",
+    };
+  }
+
+  const closeTime = await todayCloseTime();
+  const applied = await applyUpgrade(built.primary, built.sources, built.dayPass, closeTime);
+  if (!applied) {
+    await recordPaymentLog({ reservation_id: built.primary.id, profile_id: reservation.profile_id, action: "confirm", status: "failed", amount: paidAmount, provider_code: "DB_UPDATE_FAILED", message: "종일권 전환 반영 실패" });
+    return { ok: false, status: 500, message: "결제는 완료되었지만 전환에 실패했습니다. 운영자에게 문의해 주세요." };
+  }
+
+  await recordPaymentLog({
+    reservation_id: built.primary.id,
+    profile_id: reservation.profile_id,
+    action: "confirm",
+    status: "succeeded",
+    amount: decision.kind === "apply_paid" ? decision.amount : 0,
+    message: decision.kind === "apply_paid"
+      ? `종일권 전환 · 차액 ${decision.amount}원 결제`
+      : "종일권 전환 · 이미 낸 금액이 종일권 이상이라 추가 결제 없음",
+  });
+
+  return { ok: true, status: 200, message: "종일권으로 전환되었습니다. 마감까지 이용하실 수 있어요." };
+}
+
 // 결제 검증: PortOne에서 결제를 조회해 예약과 대조 후 결제완료·예약확정 반영.
 async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status: number; message: string; pending?: boolean }> {
   let payment = await fetchPortonePayment(paymentId);
@@ -247,6 +438,11 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
   if (!reservation) return { ok: false, status: 404, message: "예약을 찾을 수 없습니다." };
 
   const paidAmount = Number(payment.amount?.total ?? 0);
+
+  // 종일권 전환 차액 결제는 기준 금액이 예약 금액이 아니라 '종일권 정가 - 이미 낸 돈'이다.
+  if (isUpgradePayment(payment)) {
+    return finishUpgrade(reservation, paidAmount, payment);
+  }
   // 판정은 순수 규칙 모듈에 맡긴다(테스트 대상: src/lib/paymentRules.test.ts).
   const decision = decidePaymentConfirmation({
     reservationStatus: reservation.status,
@@ -361,6 +557,41 @@ Deno.serve(async (request) => {
       if (!isPaymentId(paymentId)) return json({ ok: false, message: "잘못된 결제 요청입니다." }, 400, headers);
       const result = await confirmPayment(paymentId);
       return json({ ok: result.ok, pending: result.pending ?? false, message: result.message }, result.status, headers);
+    }
+
+    // ---- 종일권 전환: 차액 조회 / 차액이 0이면 바로 전환 ----
+    if (type === "upgrade_quote" || type === "upgrade_free") {
+      const origin = request.headers.get("Origin");
+      if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ ok: false, message: "허용되지 않은 요청입니다." }, 403, headers);
+
+      const authHeader = request.headers.get("Authorization") ?? "";
+      const userResp = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authHeader, apikey: ANON } });
+      if (!userResp.ok) return json({ ok: false, message: "로그인이 필요합니다." }, 401, headers);
+      const user = (await userResp.json()) as { id?: string };
+      if (!isUuid(user.id)) return json({ ok: false, message: "로그인이 필요합니다." }, 401, headers);
+
+      const built = await buildUpgradeQuote(user.id);
+      if ("error" in built) return json({ ok: false, message: built.error }, 400, headers);
+
+      if (type === "upgrade_quote") {
+        return json({
+          ok: true,
+          reservationId: built.primary.id,
+          amountDue: built.quote.amountDue,
+          alreadyPaid: built.quote.alreadyPaid,
+          dayPassTotal: built.quote.dayPassTotal,
+          dayPassName: built.dayPass.name,
+        }, 200, headers);
+      }
+
+      // 차액이 남아 있으면 결제를 거쳐야 한다. 여기서 통과시키면 공짜로 전환된다.
+      if (built.quote.amountDue > 0) {
+        return json({ ok: false, message: "추가 결제가 필요합니다.", amountDue: built.quote.amountDue }, 400, headers);
+      }
+      const primary = await getReservation(built.primary.id);
+      if (!primary) return json({ ok: false, message: "예약을 찾을 수 없습니다." }, 404, headers);
+      const result = await finishUpgrade(primary, 0, null);
+      return json({ ok: result.ok, message: result.message }, result.status, headers);
     }
 
     // ---- 관리자 환불 ----

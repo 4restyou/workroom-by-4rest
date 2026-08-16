@@ -140,6 +140,8 @@ export type Reservation = {
   access_weekdays: number[] | null;
   access_paused_from: string | null;
   access_paused_until: string | null;
+  /** 종일권 전환으로 이 예약이 합쳐진 대상. 값이 있으면 취소가 아니라 전환이다. */
+  upgraded_into?: string | null;
   end_reminder_attempted_at: string | null;
   end_reminder_sent_at: string | null;
   payment_key?: string | null;
