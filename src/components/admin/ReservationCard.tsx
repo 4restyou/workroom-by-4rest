@@ -21,6 +21,7 @@ import {
 } from "../../lib/adminReservations";
 import { confirmDialog } from "../../lib/confirm";
 import { isLongTermReservation, accessEndDate, passUsableDays } from "../../lib/reservations";
+import { checkReservationPrice } from "../../lib/reservationPrice";
 import { buttonClass, tintCard } from "../../lib/ui";
 import type { ReservationEdit } from "../../lib/adminReservations";
 import type {
@@ -94,6 +95,7 @@ export default function ReservationCard({
     pausedUntil: reservation.access_paused_until ?? "",
   });
   const [copiedMessage, setCopiedMessage] = useState<MessageKind | null>(null);
+  const priceCheck = checkReservationPrice(reservation, passes.find((pass) => pass.name === (reservation.pass_name_snapshot || reservation.pass_type))?.price);
 
   useEffect(() => {
     setStatus(reservation.status);
@@ -245,6 +247,16 @@ export default function ReservationCard({
       {conflictCount > 0 ? (
         <p className={`${tintCard("yellow")} mt-4 p-3 text-sm font-bold`}>
           같은 시간대에 겹치는 예약이 {conflictCount}건 있습니다. 확정 전에 시간을 확인해 주세요.
+        </p>
+      ) : null}
+
+      {/* 금액이 이용권 정가 x 인원과 어긋난 예약. 회원 화면에서는 결제가 막히므로
+          운영자가 먼저 알아야 한다(이용권을 다시 선택해 저장하면 바로잡힌다). */}
+      {priceCheck?.mismatched ? (
+        <p className={`${tintCard("danger")} mt-4 p-3 text-sm font-bold leading-6`}>
+          예약 금액이 잘못 저장돼 있습니다. 저장된 금액 {formatPrice(priceCheck.actual)} · 정상 금액 {formatPrice(priceCheck.expected)}
+          ({reservation.people}명 기준). 아래 ‘예약자·일정 수정’에서 이용권을 다시 선택해 저장하면 바로잡힙니다.
+          그 전에는 회원이 결제할 수 없습니다.
         </p>
       ) : null}
 

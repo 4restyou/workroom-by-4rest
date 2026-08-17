@@ -10,6 +10,8 @@ import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
 import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly } from "../lib/portone";
 import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
 import { isLongTermReservation, passPeriodWeeks, readableReservationError } from "../lib/reservations";
+import { checkReservationPrice } from "../lib/reservationPrice";
+import { loadPasses } from "../lib/passes";
 import { ensureCurrentProfile } from "../lib/profiles";
 import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
@@ -72,6 +74,8 @@ export default function Account() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRow[]>([]);
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
+  // 결제 직전에 금액이 이용권 정가 x 인원과 맞는지 대조하기 위한 정가표.
+  const [passPrices, setPassPrices] = useState<Map<string, number>>(new Map());
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
@@ -150,6 +154,9 @@ export default function Account() {
           setReservations((reservationResult.data ?? []) as Reservation[]);
           void loadSubscriptions();
           void loadReceipts();
+          void loadPasses({ activeOnly: true }).then(({ data }) => {
+            if (data) setPassPrices(new Map(data.map((pass) => [pass.name, pass.price])));
+          });
           setInquiries((inquiryResult.data ?? []) as ReservationInquiry[]);
           setAttendance((attendanceResult.data ?? []) as Attendance[]);
           setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
@@ -346,8 +353,23 @@ export default function Account() {
     void loadReceipts();
   }
 
+  /**
+   * 예약 금액이 이용권 정가 x 인원과 어긋나면 결제를 열지 않는다.
+   * 어긋난 채로 결제하면 화면 금액과 다른 금액이 승인된다(2인 예약에 1인분 청구 등).
+   */
+  function blockedByPriceMismatch(reservation: Reservation): boolean {
+    const check = checkReservationPrice(reservation, passPrices.get(reservation.pass_name_snapshot || reservation.pass_type));
+    if (!check?.mismatched) return false;
+    setError(
+      `예약 금액이 잘못 저장되어 있어 결제를 진행할 수 없습니다. (표시 ${formatPrice(check.actual)} · 정상 ${formatPrice(check.expected)})\n` +
+        `운영자에게 알려주시면 금액을 바로잡아 드립니다. ${SITE.phone}`,
+    );
+    return true;
+  }
+
   async function payNow(reservation: Reservation) {
     setError("");
+    if (blockedByPriceMismatch(reservation)) return;
     setActionBusy(`pay-${reservation.id}`);
     try {
       const result = await payReservation(reservation);
@@ -367,6 +389,7 @@ export default function Account() {
 
   async function subscribeNow(reservation: Reservation) {
     setError("");
+    if (blockedByPriceMismatch(reservation)) return;
     setActionBusy(`sub-${reservation.id}`);
     try {
       const result = await subscribeMonthly(reservation);
