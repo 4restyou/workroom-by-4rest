@@ -718,7 +718,8 @@ export default function AdminReservations() {
               <p className="text-sm font-semibold">예약 상세</p>
               <span className="w-[70px]" />
             </div>
-            <div className="mx-auto max-w-2xl p-3 pb-24">
+            {/* 하단 탭바가 오버레이 위에 떠 있으므로 그만큼 아래를 비운다. */}
+            <div className="mx-auto max-w-2xl p-3 pb-[calc(env(safe-area-inset-bottom)+6rem)]">
               {/* 오버레이가 화면을 덮으므로 피드백도 안에서 한 번 더 보여준다. */}
               <AdminFeedback error={error} success={success} />
               {reservationCard}

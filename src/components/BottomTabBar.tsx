@@ -161,7 +161,7 @@ export default function BottomTabBar() {
       {moreOpen ? (
         <button
           aria-label="메뉴 닫기"
-          className="fixed inset-0 z-20 cursor-default bg-black/35 sm:hidden"
+          className="fixed inset-0 z-[74] cursor-default bg-black/35 sm:hidden"
           onClick={() => setMoreOpen(false)}
           type="button"
         />
@@ -169,7 +169,7 @@ export default function BottomTabBar() {
 
       {moreOpen ? (
         <div
-          className="fixed inset-x-0 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-30 px-3 sm:hidden"
+          className="fixed inset-x-0 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-[76] px-3 sm:hidden"
           role="menu"
           aria-label="더보기 메뉴"
         >
@@ -194,9 +194,12 @@ export default function BottomTabBar() {
         </div>
       ) : null}
 
+      {/* 예약·회원 상세는 전체화면 오버레이(z-70)로 열린다. 탭바가 그 아래에 있으면
+          상세를 보는 동안 메뉴가 통째로 사라져 '뒤로'밖에 길이 없다. 오버레이 위,
+          토스트(z-80)·확인창(z-90) 아래에 둬서 어디서든 메뉴는 남아 있게 한다. */}
       <nav
         aria-label="주요 메뉴"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-[75] border-t border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5">
           {tabs.map((tab) => {
