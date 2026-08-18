@@ -1,40 +1,44 @@
-import React, { lazy } from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import App from "./App";
+import ApplyAppUpdate from "./components/ApplyAppUpdate";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireAdmin from "./components/RequireAdmin";
 import ScrollToTop from "./components/ScrollToTop";
 import SessionProvider from "./components/SessionProvider";
 import Home from "./pages/Home";
 import { initAnalytics } from "./lib/analytics";
+import { watchForAppUpdate } from "./lib/appUpdate";
+import { lazyPage } from "./lib/lazyPage";
 import "./styles/globals.css";
 
 // Home stays eager (landing page); everything else is code-split so visitors
 // don't download the admin/booking pages up front.
-const Account = lazy(() => import("./pages/Account"));
-const AdminAttendance = lazy(() => import("./pages/AdminAttendance"));
-const AdminCustomer = lazy(() => import("./pages/AdminCustomer"));
-const AdminHome = lazy(() => import("./pages/AdminHome"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
-const AdminMembers = lazy(() => import("./pages/AdminMembers"));
-const AdminReservations = lazy(() => import("./pages/AdminReservations"));
-const AdminSettings = lazy(() => import("./pages/AdminSettings"));
-const AdminStats = lazy(() => import("./pages/AdminStats"));
-const Attendance = lazy(() => import("./pages/Attendance"));
-const Auth = lazy(() => import("./pages/Auth"));
-const Board = lazy(() => import("./pages/Board"));
-const CheckIn = lazy(() => import("./pages/CheckIn"));
-const Directory = lazy(() => import("./pages/Directory"));
-const DirectoryEdit = lazy(() => import("./pages/DirectoryEdit"));
-const Faq = lazy(() => import("./pages/Faq"));
-const PaymentPortone = lazy(() => import("./pages/PaymentPortone"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const Reserve = lazy(() => import("./pages/Reserve"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Terms = lazy(() => import("./pages/Terms"));
+const Account = lazyPage(() => import("./pages/Account"));
+const AdminAttendance = lazyPage(() => import("./pages/AdminAttendance"));
+const AdminCustomer = lazyPage(() => import("./pages/AdminCustomer"));
+const AdminHome = lazyPage(() => import("./pages/AdminHome"));
+const AdminLogin = lazyPage(() => import("./pages/AdminLogin"));
+const AdminMembers = lazyPage(() => import("./pages/AdminMembers"));
+const AdminReservations = lazyPage(() => import("./pages/AdminReservations"));
+const AdminSettings = lazyPage(() => import("./pages/AdminSettings"));
+const AdminStats = lazyPage(() => import("./pages/AdminStats"));
+const Attendance = lazyPage(() => import("./pages/Attendance"));
+const Auth = lazyPage(() => import("./pages/Auth"));
+const Board = lazyPage(() => import("./pages/Board"));
+const CheckIn = lazyPage(() => import("./pages/CheckIn"));
+const Directory = lazyPage(() => import("./pages/Directory"));
+const DirectoryEdit = lazyPage(() => import("./pages/DirectoryEdit"));
+const Faq = lazyPage(() => import("./pages/Faq"));
+const PaymentPortone = lazyPage(() => import("./pages/PaymentPortone"));
+const Privacy = lazyPage(() => import("./pages/Privacy"));
+const Reserve = lazyPage(() => import("./pages/Reserve"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
+const Terms = lazyPage(() => import("./pages/Terms"));
 
 initAnalytics();
+watchForAppUpdate();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -42,6 +46,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <SessionProvider>
       <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
         <ScrollToTop />
+        <ApplyAppUpdate />
         <Routes>
         <Route element={<App />}>
           <Route index element={<Home />} />
