@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AdminPage, { AdminEmpty } from "./AdminPage";
 import TodayTimeline from "./admin/TodayTimeline";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
+import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminders";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
@@ -23,7 +24,7 @@ type AdminDashData = {
   failedSms: Array<{ id: string; reservation_id: string; event: string; created_at: string }>;
   capacity: number;
   hours: { open_time: string | null; close_time: string | null } | null;
-  unusedCoupons: number;
+  coupons: IssuedCoupon[];
   dormant: Array<{ id: string; name: string; days: number }>;
 };
 
@@ -129,7 +130,7 @@ export default function AdminDashboard() {
       // 타임라인 축은 오늘 운영 시간을 따른다(특정일 단축영업이 있으면 그것을 우선).
       supabase.from("business_hours").select("weekday,open_time,close_time,is_closed"),
       supabase.from("business_date_exceptions").select("date,open_time,close_time,is_closed").eq("date", today).maybeSingle(),
-      supabase.from("coupons").select("id").eq("status", "issued").limit(200),
+      supabase.from("coupons").select("id,profile_id,label").eq("status", "issued").limit(200),
       // 휴면 판정을 위해 회원과 최근 출석을 가져온다.
       supabase.from("profiles").select("id,full_name").eq("role", "user").limit(500),
       supabase.from("attendance").select("profile_id,check_in_at").order("check_in_at", { ascending: false }).limit(2000),
@@ -148,7 +149,7 @@ export default function AdminDashboard() {
       failedSms: smsResult.error ? [] : latestFailedSms((smsResult.data ?? []) as Array<{ id: string; reservation_id: string; event: string; status: string; created_at: string }>),
       capacity: seatResult.error ? 0 : (seatResult.data ?? []).reduce((sum, item) => sum + Number(item.capacity || 0), 0),
       hours: todayHours(today, hourResult.error ? [] : hourResult.data ?? [], exceptionResult.error ? null : exceptionResult.data),
-      unusedCoupons: couponResult.error ? 0 : (couponResult.data ?? []).length,
+      coupons: couponResult.error ? [] : ((couponResult.data ?? []) as IssuedCoupon[]),
       dormant: dormantMembers(
         today,
         memberResult.error ? [] : memberResult.data ?? [],
@@ -253,15 +254,16 @@ export default function AdminDashboard() {
     // 위 항목들이 "오늘 당장 할 일"이라면, 아래는 놓치면 조용히 손님이 떠나는 일이다.
     // 급하지 않으므로 urgent를 붙이지 않고 목록 뒤쪽에 둔다.
 
-    // 쿠폰을 받고 아직 안 쓴 회원 — 다시 올 이유를 이미 손에 쥔 사람들이다.
-    if ((data?.unusedCoupons ?? 0) > 0) {
+    // 쿠폰을 받고 아직 안 쓴 회원 중, 오늘 오는 사람만. 쿠폰은 몇 달 뒤에 쓸 수도
+    // 있어서 무조건 띄우면 목록에서 영영 사라지지 않는다(그러면 아무도 안 읽는다).
+    couponRemindersForToday(data?.coupons ?? [], todaySchedule).forEach((reminder) => {
       actions.push({
-        key: "coupons-unused",
-        title: `사용하지 않은 쿠폰 ${data?.unusedCoupons}장`,
-        detail: "방문하시면 먼저 안내해 주세요.",
-        to: "/admin/attendance",
+        key: `coupon-${reminder.profileId}`,
+        title: `${reminder.name} · 사용하지 않은 쿠폰 ${reminder.count}장`,
+        detail: reminder.label ? `오늘 방문 · ${reminder.label}` : "오늘 방문 · 안내해 주세요.",
+        to: `/admin/customer/${reminder.profileId}`,
       });
-    }
+    });
 
     // 한동안 오지 않은 회원. 이용권이 끝난 뒤 그대로 멀어지는 경우가 많다.
     (data?.dormant ?? []).slice(0, 5).forEach((member) => {
