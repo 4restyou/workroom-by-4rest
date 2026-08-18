@@ -4,6 +4,7 @@ import Calendar from "../components/Calendar";
 import Section from "../components/Section";
 import { trackEvent } from "../lib/analytics";
 import { defaultPasses } from "../lib/defaultPasses";
+import { activeDiscount, discountLabel } from "../lib/discount";
 import { computeFullDates, peakConcurrentInWindow, toMinutes, type IntervalInput } from "../lib/availability";
 import { maxBookingDateValue,
   formatDate,
@@ -677,6 +678,10 @@ export default function Reserve() {
   }
   // 단체·대관처럼 최소 인원이 있는 이용권. 서버 트리거(0043)와 같은 값을 본다.
   const minPeople = Math.max(1, selectedPassInfo?.min_people ?? 1);
+  // 할인 중이면 손님이 보는 금액도 할인가여야 한다. 실제 청구 금액은 서버가
+  // 같은 규칙으로 다시 계산한다(migration 0047).
+  const selectedDiscount = selectedPassInfo ? activeDiscount(selectedPassInfo, todayValue()) : null;
+  const selectedUnitPrice = selectedDiscount ? selectedDiscount.price : selectedPassInfo?.price ?? 0;
   const stepLabels = ["이용권", "날짜·시간", "정보·확인"];
 
   return (
@@ -770,6 +775,7 @@ export default function Reserve() {
                   <legend className="mb-1 text-xs font-bold text-workroom-muted">{group.name}</legend>
                   {group.items.map((pass) => {
                     const isSelected = form.pass_type === pass.name;
+                    const passDiscount = activeDiscount(pass, todayValue());
                     return (
                       <label
                         className={`flex cursor-pointer items-center justify-between gap-3 rounded-card border px-4 py-3 transition-colors duration-100 ${
@@ -783,9 +789,23 @@ export default function Reserve() {
                           <span className="block text-base font-bold">{pass.name}</span>
                           <span className="mt-1 block text-xs font-medium text-workroom-muted">
                             {pass.description}
-                            {pass.price ? ` · 1인 ${formatPrice(pass.price)}` : ""}
+                            {pass.price ? (
+                              passDiscount ? (
+                                <>
+                                  {" · 1인 "}
+                                  <s>{formatPrice(pass.price)}</s> <b className="text-workroom-ink">{formatPrice(passDiscount.price)}</b>
+                                </>
+                              ) : (
+                                ` · 1인 ${formatPrice(pass.price)}`
+                              )
+                            ) : ""}
                             {(pass.min_people ?? 1) > 1 ? ` · ${pass.min_people}명 이상` : ""}
                           </span>
+                          {passDiscount ? (
+                            <span className="mt-1 inline-block rounded-pill border border-workroom-ink bg-workroom-yellow px-2 py-0.5 text-[11px] font-bold">
+                              {discountLabel(passDiscount)}
+                            </span>
+                          ) : null}
                         </span>
                         <input
                           checked={isSelected}
@@ -1032,10 +1052,15 @@ export default function Reserve() {
                 <dd className="font-bold">
                   {selectedPassInfo?.price ? (
                     <>
-                      {formatPrice(selectedPassInfo.price * (Number(form.people) || 1))}
+                      {formatPrice(selectedUnitPrice * (Number(form.people) || 1))}
                       {Number(form.people) > 1 ? (
                         <span className="mt-0.5 block text-xs font-medium text-workroom-muted">
-                          1인 {formatPrice(selectedPassInfo.price)} × {form.people}명
+                          1인 {formatPrice(selectedUnitPrice)} × {form.people}명
+                        </span>
+                      ) : null}
+                      {selectedDiscount ? (
+                        <span className="mt-0.5 block text-xs font-medium text-workroom-muted">
+                          정가 {formatPrice(selectedPassInfo.price * (Number(form.people) || 1))} · {discountLabel(selectedDiscount)}
                         </span>
                       ) : null}
                     </>

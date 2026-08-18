@@ -24,6 +24,10 @@ export type Pass = {
   price: number;
   /** 이 이용권으로 예약할 수 있는 최소 인원(단체·대관용, 기본 1). */
   min_people?: number;
+  /** 할인율(%). 0이면 할인 없음(migration 0047). */
+  discount_percent?: number | null;
+  /** 할인 마지막 날(YYYY-MM-DD). 이 날까지 예약하면 할인가로 잡힌다. */
+  discount_until?: string | null;
   seat_type_id?: string | null;
   is_active?: boolean;
   sort_order?: number;
@@ -128,6 +132,10 @@ export type Reservation = {
   pass_id: string | null;
   pass_name_snapshot: string | null;
   price_at_booking: number | null;
+  /** 할인 전 금액(정가 x 인원). migration 0047 전 예약은 없다. */
+  list_price_at_booking?: number | null;
+  /** 예약 시점에 적용된 할인율(%). */
+  discount_percent_at_booking?: number | null;
   seat_type_id: string | null;
   payment_method: string | null;
   payment_status: PaymentStatus | null;

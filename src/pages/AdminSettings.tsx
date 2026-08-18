@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import MoneyInput from "../components/MoneyInput";
-import { todayValue } from "../lib/format";
+import { activeDiscount, discountDeadlineLabel } from "../lib/discount";
+import { formatPrice, todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { supabase } from "../lib/supabase";
@@ -38,7 +39,13 @@ const settingLabels: Record<(typeof settingKeys)[number], string> = {
 };
 
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
-type SettingsTab = "operation" | "products" | "guidance" | "checkin";
+type SettingsTab = "operation" | "products" | "discount" | "guidance" | "checkin";
+
+/** 화면에서 들어온 할인율을 저장 가능한 값으로 다듬는다. */
+function cleanPercent(value: unknown): number {
+  const percent = Math.round(Number(value) || 0);
+  return Math.min(90, Math.max(0, percent));
+}
 
 function settingsSnapshot(seats: SeatType[], passRows: Pass[], hours: BusinessHour[], values: Record<string, string>) {
   return JSON.stringify({ seats, passRows, hours, values });
@@ -53,6 +60,11 @@ export default function AdminSettings() {
   const [passes, setPasses] = useState<Pass[]>([]);
   // migration 0043(최소 인원) 적용 여부. 적용 전에는 그 칸을 숨기고 저장에서도 뺀다.
   const [hasMinPeople, setHasMinPeople] = useState(false);
+  const [hasDiscount, setHasDiscount] = useState(false);
+  const today = todayValue();
+  // 일괄 적용 입력 — 저장 버튼을 누르기 전까지는 화면 상태만 바꾼다.
+  const [bulkPercent, setBulkPercent] = useState(0);
+  const [bulkUntil, setBulkUntil] = useState("");
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [dateExceptions, setDateExceptions] = useState<BusinessDateException[]>([]);
   const [newException, setNewException] = useState<BusinessDateException>({
@@ -125,6 +137,7 @@ export default function AdminSettings() {
     const nextSeats = (seatResult.data ?? []) as SeatType[];
     const nextPasses = (passResult.data ?? []) as Pass[];
     setHasMinPeople(passResult.hasMinPeople);
+    setHasDiscount(passResult.hasDiscount);
     const nextHours = (hourResult.data ?? []) as BusinessHour[];
     const nextSettings = Object.fromEntries(((settingResult.data ?? []) as SpaceSetting[]).map((setting) => [setting.key, setting.value]));
     setSeatTypes(nextSeats);
@@ -137,6 +150,16 @@ export default function AdminSettings() {
 
   async function saveAll() {
     if (!supabase) return;
+
+    // 종료일 없는 할인은 잊혀진 채 계속 돌아간다. 서버도 막지만, 저장을 눌러 놓고
+    // 데이터베이스 오류 문구를 보게 하는 대신 여기서 먼저 알린다.
+    const missingUntil = passes.find((pass) => cleanPercent(pass.discount_percent) > 0 && !pass.discount_until);
+    if (missingUntil) {
+      setError(`'${missingUntil.name}' 할인의 마지막 날을 정해 주세요.`);
+      setTab("discount");
+      return;
+    }
+
     const ok = await confirmDialog({
       title: "좌석·이용권·운영시간 설정을 저장할까요?",
       description: "가격과 노출 여부 변경은 즉시 예약 화면에 반영됩니다.",
@@ -165,6 +188,13 @@ export default function AdminSettings() {
           description: pass.description ?? "",
           price: Number(pass.price),
           ...(hasMinPeople ? { min_people: Math.min(12, Math.max(1, Number(pass.min_people) || 1)) } : {}),
+          // migration 0047 전에는 할인 컬럼이 없어 upsert가 통째로 실패한다.
+          ...(hasDiscount
+            ? {
+                discount_percent: cleanPercent(pass.discount_percent),
+                discount_until: cleanPercent(pass.discount_percent) > 0 ? pass.discount_until || null : null,
+              }
+            : {}),
           seat_type_id: pass.seat_type_id || null,
           is_active: pass.is_active ?? true,
           sort_order: Number(pass.sort_order ?? 0),
@@ -366,7 +396,7 @@ export default function AdminSettings() {
         <AdminFeedback error={error} success={success} />
 
         <div className="mb-5 border-y border-workroom-line bg-white px-3 pt-1">
-          <AdminTabs items={[{ value: "operation", label: "운영시간·휴무" }, { value: "products", label: "좌석·이용권" }, { value: "guidance", label: "예약·안내" }, { value: "checkin", label: "출석·QR" }]} onChange={setTab} value={tab} />
+          <AdminTabs items={[{ value: "operation", label: "운영시간·휴무" }, { value: "products", label: "좌석·이용권" }, { value: "discount", label: "할인" }, { value: "guidance", label: "예약·안내" }, { value: "checkin", label: "출석·QR" }]} onChange={setTab} value={tab} />
         </div>
 
         <div className="grid gap-5">
@@ -487,6 +517,91 @@ export default function AdminSettings() {
             </form>
           </section>
           </> : null}
+
+          {tab === "discount" ? (
+          <section className={`${card} p-5`}>
+            <h2 className="text-xl font-bold">할인</h2>
+            <p className="mt-1 text-sm font-medium text-workroom-muted">
+              이용권마다 할인율과 마지막 날을 정합니다. <b>그 날까지 들어온 예약</b>이 할인가로 잡히고, 다음 날부터는 그대로 두어도 정가로 돌아갑니다.
+              이미 잡힌 예약의 금액은 할인이 끝나도 바뀌지 않습니다. 예약 화면과 결제 금액에도 같은 할인가가 적용됩니다.
+            </p>
+            {!hasDiscount ? (
+              <p className={`${tintCard("yellow")} mt-4 p-3 text-sm font-bold`}>
+                할인은 데이터베이스 준비(마이그레이션 0047)가 끝나야 켜집니다. 지금 입력한 값은 저장되지 않습니다.
+              </p>
+            ) : null}
+
+            <div className="mt-4 grid gap-3">
+              {passes.map((pass, index) => {
+                const percent = cleanPercent(pass.discount_percent);
+                const until = pass.discount_until ?? "";
+                const price = Number(pass.price) || 0;
+                const running = activeDiscount({ price, discount_percent: percent, discount_until: until || null }, today);
+                return (
+                  <div className={`grid gap-3 ${cardFlat} p-4 lg:grid-cols-[1.2fr_110px_170px_1.1fr] lg:items-end`} key={pass.id}>
+                    <div>
+                      <p className="text-sm font-bold">{pass.name}</p>
+                      <p className="mt-0.5 text-xs font-medium text-workroom-muted">정가 {formatPrice(price)} / 1인</p>
+                    </div>
+                    <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                      할인율(%)
+                      <input
+                        max={90}
+                        min={0}
+                        type="number"
+                        value={percent}
+                        onChange={(event) => updatePass(index, "discount_percent", cleanPercent(event.target.value))}
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                      마지막 날
+                      <input
+                        type="date"
+                        value={until}
+                        onChange={(event) => updatePass(index, "discount_until", event.target.value || null)}
+                      />
+                    </label>
+                    <p className="text-sm font-bold lg:pb-3">
+                      {percent <= 0 ? (
+                        <span className="font-medium text-workroom-muted">할인 없음</span>
+                      ) : running ? (
+                        <>
+                          {formatPrice(running.price)} / 1인{" "}
+                          <span className="font-medium text-workroom-muted">· {discountDeadlineLabel(running.until)}</span>
+                        </>
+                      ) : (
+                        <span className="font-medium text-workroom-muted">
+                          {until ? "기한이 지나 정가로 판매 중입니다." : "마지막 날을 정해 주세요."}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 전체 판촉("이번 주 20%")은 이용권마다 따로 넣기 번거롭다. 한 번에 걸고 한 번에 내린다. */}
+            <div className={`mt-4 grid gap-3 ${cardFlat} p-4 sm:grid-cols-[110px_170px_auto_auto] sm:items-end`}>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                할인율(%)
+                <input max={90} min={0} type="number" value={bulkPercent} onChange={(event) => setBulkPercent(cleanPercent(event.target.value))} />
+              </label>
+              <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                마지막 날
+                <input type="date" value={bulkUntil} onChange={(event) => setBulkUntil(event.target.value)} />
+              </label>
+              <button className={buttonClass("secondary", "md")} onClick={applyBulkDiscount} type="button">
+                전체 이용권에 적용
+              </button>
+              <button className={buttonClass("secondary", "md")} onClick={clearAllDiscounts} type="button">
+                할인 모두 해제
+              </button>
+            </div>
+            <p className="mt-2 text-xs font-medium text-workroom-muted">
+              위 두 버튼은 아래 목록의 값을 채워 줄 뿐입니다. 실제 적용은 <b>저장</b>을 눌러야 됩니다.
+            </p>
+          </section>
+          ) : null}
 
           {tab === "operation" ? <>
           <section className={`${card} p-5`}>
@@ -744,6 +859,28 @@ export default function AdminSettings() {
 
   function updatePass<K extends keyof Pass>(index: number, key: K, value: Pass[K]) {
     setPasses((current) => current.map((pass, itemIndex) => (itemIndex === index ? { ...pass, [key]: value } : pass)));
+  }
+
+  function applyBulkDiscount() {
+    if (bulkPercent > 0 && !bulkUntil) {
+      setError("일괄 적용하려면 마지막 날을 먼저 정해 주세요.");
+      return;
+    }
+    setError("");
+    setPasses((current) =>
+      current.map((pass) => ({
+        ...pass,
+        discount_percent: bulkPercent,
+        discount_until: bulkPercent > 0 ? bulkUntil : null,
+      })),
+    );
+  }
+
+  function clearAllDiscounts() {
+    setError("");
+    setBulkPercent(0);
+    setBulkUntil("");
+    setPasses((current) => current.map((pass) => ({ ...pass, discount_percent: 0, discount_until: null })));
   }
 
   function updateBusinessHour<K extends keyof BusinessHour>(index: number, key: K, value: BusinessHour[K]) {

@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import AccountProfileForm from "../components/AccountProfileForm";
+import { bookingDiscountNote } from "../lib/discount";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { kstLongDateTime } from "../lib/datetime";
 import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
@@ -587,6 +588,10 @@ export default function Account() {
                             <div className="mt-3">
                               <span className={badge("sky")}>서비스 이용 · 결제 없음</span>
                             </div>
+                          ) : null}
+
+                          {bookingDiscountNote(reservation) ? (
+                            <p className="mt-2 text-xs font-bold text-workroom-muted">{bookingDiscountNote(reservation)}</p>
                           ) : null}
 
                           <PaymentReceipts

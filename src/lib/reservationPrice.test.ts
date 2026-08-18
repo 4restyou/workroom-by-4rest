@@ -41,6 +41,28 @@ describe("checkReservationPrice", () => {
     expect(checkReservationPrice(reservation(), 0)).toBeNull();
   });
 
+  it("accepts a booking made while a discount was running", () => {
+    // 20% 할인으로 잡힌 2인 예약. 정가로만 대조하면 멀쩡한 예약이 전부 막힌다.
+    const check = checkReservationPrice(
+      reservation({ people: 2, price_at_booking: 22400, discount_percent_at_booking: 20 }),
+      14000,
+    );
+    expect(check).toEqual({ expected: 22400, actual: 22400, mismatched: false });
+  });
+
+  it("still flags a discounted booking stored at the wrong amount", () => {
+    const check = checkReservationPrice(
+      reservation({ people: 2, price_at_booking: 11200, discount_percent_at_booking: 20 }),
+      14000,
+    );
+    expect(check).toEqual({ expected: 22400, actual: 11200, mismatched: true });
+  });
+
+  it("treats a booking made before discounts existed as full price", () => {
+    // migration 0047 이전 예약에는 할인 기록 자체가 없다.
+    expect(checkReservationPrice(reservation({ price_at_booking: 14000 }), 14000)?.mismatched).toBe(false);
+  });
+
   it("flags a booking with no stored amount", () => {
     expect(checkReservationPrice(reservation({ price_at_booking: null }), 14000)).toEqual({
       expected: 14000,

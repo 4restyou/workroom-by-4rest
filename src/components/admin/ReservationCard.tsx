@@ -19,6 +19,7 @@ import {
   smsStatusLabel,
   statusOptions,
 } from "../../lib/adminReservations";
+import { bookingDiscountNote, discountedPrice } from "../../lib/discount";
 import { confirmDialog } from "../../lib/confirm";
 import { isLongTermReservation, accessEndDate, passUsableDays } from "../../lib/reservations";
 import { checkReservationPrice } from "../../lib/reservationPrice";
@@ -154,10 +155,16 @@ export default function ReservationCard({
     // 이용권 자체가 바뀔 때만 금액을 다시 매긴다(아래 payload에서 사용).
     const currentPassName = reservation.pass_name_snapshot || reservation.pass_type;
     const passChanged = bookingDraft.pass_type !== currentPassName;
-    if (passChanged && selectedPass && selectedPass.price !== reservation.price_at_booking) {
+    // 서버가 다시 계산할 금액(정가 x 인원, 예약에 걸린 할인 유지 — migration 0043/0047)을
+    // 그대로 보여 준다. 1인 정가만 보여 주면 여러 명 예약에서 실제 금액과 다르다.
+    const nextPrice = selectedPass
+      ? discountedPrice(selectedPass.price, Number(reservation.discount_percent_at_booking ?? 0)) *
+        Math.max(1, Number(reservation.people ?? 1))
+      : null;
+    if (passChanged && selectedPass && nextPrice !== reservation.price_at_booking) {
       const ok = await confirmDialog({
         title: "이용권을 바꾸면 금액도 함께 바뀝니다",
-        description: `${formatPrice(reservation.price_at_booking ?? 0)} → ${formatPrice(selectedPass.price)}로 변경됩니다.`,
+        description: `${formatPrice(reservation.price_at_booking ?? 0)} → ${formatPrice(nextPrice ?? 0)}로 변경됩니다.`,
         confirmLabel: "변경",
         tone: "danger",
       });
@@ -176,7 +183,7 @@ export default function ReservationCard({
       pass_type: bookingDraft.pass_type,
       pass_id: selectedPass?.id ?? null,
       pass_name_snapshot: selectedPass?.name ?? bookingDraft.pass_type,
-      price_at_booking: selectedPass?.price ?? reservation.price_at_booking,
+      price_at_booking: nextPrice ?? reservation.price_at_booking,
       seat_type_id: selectedPass?.seat_type_id ?? null,
       access_start_date: longTerm ? accessDraft.start : null,
       access_end_date: longTerm ? accessDraft.end : null,
@@ -366,7 +373,12 @@ export default function ReservationCard({
         <dt className="font-bold text-workroom-muted">이용권</dt>
         <dd className="font-bold">{reservation.pass_name_snapshot || reservation.pass_type}</dd>
         <dt className="font-bold text-workroom-muted">예약가</dt>
-        <dd className="font-bold">{reservation.price_at_booking ? formatPrice(reservation.price_at_booking) : "-"}</dd>
+        <dd className="font-bold">
+          {reservation.price_at_booking ? formatPrice(reservation.price_at_booking) : "-"}
+          {bookingDiscountNote(reservation) ? (
+            <span className="mt-0.5 block text-xs font-medium text-workroom-muted">{bookingDiscountNote(reservation)}</span>
+          ) : null}
+        </dd>
         <dt className="font-bold text-workroom-muted">날짜</dt>
         <dd className="font-bold">{formatDate(reservation.date)}</dd>
         <dt className="font-bold text-workroom-muted">시간</dt>
