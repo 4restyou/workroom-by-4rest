@@ -138,6 +138,15 @@ revoke all on function public.reservation_charge_amount(uuid) from public, anon,
 grant execute on function public.reservation_charge_amount(uuid) to service_role;
 
 -- 이미 있는 예약은 할인 전 금액이 곧 정가다.
-update public.reservations
-set list_price_at_booking = price_at_booking
-where list_price_at_booking is null and price_at_booking is not null;
+--
+-- 예약을 건드리면 '본인 예약만 수정할 수 있습니다'(guard_reservation_member_update)에
+-- 걸린다. SQL 편집기나 마이그레이션에서는 auth.role()이 비어 있어 회원으로 취급되기
+-- 때문이다. 이 트랜잭션 동안만 service_role로 선언하고 채운다.
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+  update public.reservations
+  set list_price_at_booking = price_at_booking
+  where list_price_at_booking is null and price_at_booking is not null;
+end $$;
