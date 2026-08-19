@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeConfirm, type ConfirmRequest, type ConfirmResult, type PromptValues } from "../lib/confirm";
+import { lockScroll } from "../lib/scrollLock";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { buttonClass } from "../lib/ui";
 
@@ -89,11 +90,7 @@ export default function ConfirmDialog() {
   // 다이얼로그가 떠 있는 동안 뒤 배경이 스크롤되지 않게 한다.
   useEffect(() => {
     if (!pending) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return lockScroll();
   }, [pending]);
 
   if (!pending) return null;

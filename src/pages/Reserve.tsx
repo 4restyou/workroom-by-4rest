@@ -21,6 +21,7 @@ import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, canSubscribe, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly, type UpgradeQuote } from "../lib/portone";
 import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
+import { lockScroll } from "../lib/scrollLock";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { accessEndDate, isLongTermPassName, passUsableDays, readableReservationError } from "../lib/reservations";
@@ -236,12 +237,11 @@ export default function Reserve() {
       }
     }
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockScroll();
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
     };
   }, [success]);
 

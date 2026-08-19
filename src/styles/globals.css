@@ -26,16 +26,22 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 가로 넘침 차단과 rubber-band 억제는 '스크롤하는 요소' 한 곳에만 건다.
+   html 과 body 양쪽에 overflow 를 걸면 스크롤 상자가 둘이 된다(html 에 overflow 가
+   있으면 body 의 값이 뷰포트로 전파되지 않고, body 의 overflow-x 는 overflow-y 를
+   auto 로 만든다). 그 상태에서 body 에 overscroll-behavior:contain 이 걸려 있으면
+   body 에서 시작한 터치가 바깥 스크롤러로 이어지지 못해, 안드로이드에서 페이지가
+   아예 안 움직이는 것처럼 보인다. */
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  overflow-x: hidden;
   font-weight: 500;
   word-break: keep-all;
   -webkit-text-size-adjust: 100%;
@@ -105,14 +111,10 @@ button {
   cursor: pointer;
 }
 
-/* App-like touch polish: drop the grey tap-flash on mobile, keep overscroll
-   from chaining to the page background (rubber-band), and don't let long-press
-   select the interactive chrome. */
+/* App-like touch polish: drop the grey tap-flash on mobile. (rubber-band 억제는
+   위 html 규칙에 있다 — 스크롤러가 아닌 body 에 걸면 스크롤을 막는다.) */
 * {
   -webkit-tap-highlight-color: transparent;
-}
-body {
-  overscroll-behavior-y: contain;
 }
 
 /* Text-like fields, selects and textareas. -webkit-appearance:none is the key
