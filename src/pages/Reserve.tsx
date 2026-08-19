@@ -1105,7 +1105,7 @@ export default function Reserve() {
           ) : null}
 
           {/* Sticky action bar (mobile) / inline (desktop) */}
-          <div className="sticky bottom-0 z-20 -mx-4 border-t-2 border-workroom-ink bg-workroom-background/95 px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-1">
+          <div className="sticky bottom-0 z-20 -mx-4 border-t-2 border-workroom-ink bg-workroom-background px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-1">
             <div className="mx-auto flex max-w-5xl gap-3">
               {step > 1 ? (
                 <button className={buttonClass("secondary", "lg", "flex-1 sm:flex-none sm:px-8")} onClick={() => goToStep(step - 1)} type="button">

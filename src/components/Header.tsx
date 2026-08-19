@@ -31,7 +31,11 @@ export default function Header({ adminMode }: HeaderProps) {
     "shrink-0 rounded-[4px] border border-workroom-ink bg-workroom-surface px-2.5 py-1.5 text-xs font-bold text-workroom-ink transition-colors hover:bg-workroom-ink hover:text-white sm:px-3 sm:text-sm";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-workroom-ink bg-workroom-background/95 backdrop-blur">
+    // 반투명 + backdrop-blur 는 쓰지 않는다. 스크롤과 겹치는 고정 요소에 블러가
+    // 걸리면 안드로이드 크롬이 스크롤을 GPU에 맡기지 못하고 매 프레임 메인
+    // 스레드에서 다시 그린다(첫 터치가 늦게 먹는 원인). 95% 불투명 뒤의 블러는
+    // 어차피 보이지도 않았다.
+    <header className="sticky top-0 z-40 border-b border-workroom-ink bg-workroom-background">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <Link
           className="flex min-w-0 shrink-0 items-center gap-2 bg-workroom-background"

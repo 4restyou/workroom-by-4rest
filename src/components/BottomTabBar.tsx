@@ -199,7 +199,7 @@ export default function BottomTabBar() {
           토스트(z-80)·확인창(z-90) 아래에 둬서 어디서든 메뉴는 남아 있게 한다. */}
       <nav
         aria-label="주요 메뉴"
-        className="fixed inset-x-0 bottom-0 z-[75] border-t border-workroom-ink bg-workroom-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-[75] border-t border-workroom-ink bg-workroom-background pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5">
           {tabs.map((tab) => {
