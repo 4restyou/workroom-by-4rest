@@ -71,6 +71,13 @@ describe("labels", () => {
     ).toBe("정가 28,000원 · 20% 할인 (5,600원 절약)");
   });
 
+  it("counts a coupon the same way", () => {
+    // 이용권 할인은 없고 쿠폰만 쓴 월권 예약.
+    expect(
+      bookingDiscountNote({ price_at_booking: 224100, list_price_at_booking: 249000, coupon_percent_at_booking: 10 }),
+    ).toBe("정가 249,000원 · 10% 할인 (24,900원 절약)");
+  });
+
   it("stays quiet on a booking that had no discount", () => {
     expect(bookingDiscountNote({ price_at_booking: 28000, list_price_at_booking: 28000 })).toBeNull();
     // migration 0047 이전 예약 — 할인 기록 자체가 없다.

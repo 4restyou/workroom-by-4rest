@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import StatusBadge from "../components/StatusBadge";
 import MemberReservationDashboard from "../components/MemberReservationDashboard";
 import AccountProfileForm from "../components/AccountProfileForm";
+import { couponQuote, usableCoupons } from "../lib/coupon";
 import { bookingDiscountNote } from "../lib/discount";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { kstLongDateTime } from "../lib/datetime";
@@ -18,7 +19,7 @@ import { SITE } from "../lib/site";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, card, cardFlat, tintCard } from "../lib/ui";
-import type { Attendance, BusinessDateException, BusinessHour, Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
+import type { Attendance, Coupon, BusinessDateException, BusinessHour, Profile, Reservation, ReservationInquiry, ReservationStatus } from "../lib/types";
 import { confirmDialog } from "../lib/confirm";
 
 type AccountTab = "reservations" | "profile";
@@ -87,6 +88,7 @@ export default function Account() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState({ date: "", start_time: "", end_time: "" });
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [editingInquiryId, setEditingInquiryId] = useState<string | null>(null);
   const [inquiryEditDraft, setInquiryEditDraft] = useState("");
   const [oauthName, setOauthName] = useState("");
@@ -143,10 +145,13 @@ export default function Account() {
           setReservations([]);
           setInquiries([]);
         } else {
-          const [reservationResult, inquiryResult, attendanceResult, hourResult, exceptionResult] = await Promise.all([
+          const [reservationResult, inquiryResult, attendanceResult, couponResult, hourResult, exceptionResult] = await Promise.all([
             supabase.from("reservations").select("*").eq("profile_id", user.id).order("date", { ascending: false }).order("created_at", { ascending: false }),
             supabase.from("reservation_inquiries").select("*").eq("profile_id", user.id).order("created_at", { ascending: true }),
             supabase.from("attendance").select("*").eq("profile_id", user.id).order("check_in_at", { ascending: false }),
+            // select("*") — migration 0048 전에는 할인 컬럼이 없다. 컬럼명을 적으면
+            // 그 사이에 내정보 화면이 통째로 깨진다.
+            supabase.from("coupons").select("*").eq("profile_id", user.id).order("issued_at", { ascending: false }),
             supabase.from("business_hours").select("*").order("weekday"),
             supabase.from("business_date_exceptions").select("*").order("date"),
           ]);
@@ -160,6 +165,7 @@ export default function Account() {
           });
           setInquiries((inquiryResult.data ?? []) as ReservationInquiry[]);
           setAttendance((attendanceResult.data ?? []) as Attendance[]);
+          setCoupons(couponResult.error ? [] : ((couponResult.data ?? []) as Coupon[]));
           setBusinessHours((hourResult.data ?? []) as BusinessHour[]);
           setDateExceptions((exceptionResult.data ?? []) as BusinessDateException[]);
         }
@@ -366,6 +372,29 @@ export default function Account() {
         `운영자에게 알려주시면 금액을 바로잡아 드립니다. ${SITE.phone}`,
     );
     return true;
+  }
+
+  // 쿠폰을 예약에 붙이거나 뗀다. 금액은 서버 트리거가 다시 계산하므로
+  // 여기서는 coupon_id만 보내고, 돌려받은 예약으로 화면을 갱신한다.
+  async function setReservationCoupon(reservation: Reservation, couponId: string | null) {
+    if (!supabase) return;
+    setActionBusy(`coupon-${reservation.id}`);
+    setError("");
+    const { data, error: updateError } = await supabase
+      .from("reservations")
+      .update({ coupon_id: couponId })
+      .eq("id", reservation.id)
+      .select("*")
+      .single();
+    setActionBusy(null);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    const next = data as Reservation;
+    setReservations((current) => current.map((item) => (item.id === next.id ? next : item)));
+    setSuccess(couponId ? "쿠폰을 적용했어요." : "쿠폰 적용을 취소했어요.");
   }
 
   async function payNow(reservation: Reservation) {
@@ -598,6 +627,65 @@ export default function Account() {
                             method={reservation.payment_method}
                             receipts={receiptsByReservation.get(reservation.id) ?? []}
                           />
+
+                          {/* 쿠폰 — 결제 전에만, 쓸 수 있는 예약에만 보인다. */}
+                          {(() => {
+                            if (reservation.payment_status === "paid" || reservation.payment_status === "service") return null;
+                            if (reservation.status !== "pending" && reservation.status !== "confirmed") return null;
+
+                            const passName = reservation.pass_name_snapshot || reservation.pass_type;
+                            const applied = coupons.find((item) => item.id === reservation.coupon_id);
+                            const available = usableCoupons(coupons, passName);
+                            const busy = actionBusy === `coupon-${reservation.id}`;
+
+                            if (applied) {
+                              return (
+                                <div className={`${tintCard("yellow")} mt-3 flex flex-wrap items-center justify-between gap-2 p-3`}>
+                                  <p className="text-sm font-bold">
+                                    쿠폰 적용됨 · {applied.discount_percent}% 할인
+                                    <span className="mt-0.5 block text-xs font-medium text-workroom-muted">
+                                      {applied.label} · 결제가 완료되면 사용 처리됩니다.
+                                    </span>
+                                  </p>
+                                  <button
+                                    className={buttonClass("secondary", "sm")}
+                                    disabled={busy}
+                                    onClick={() => void setReservationCoupon(reservation, null)}
+                                    type="button"
+                                  >
+                                    {busy ? "처리 중…" : "빼기"}
+                                  </button>
+                                </div>
+                              );
+                            }
+
+                            const best = available[0];
+                            if (!best) return null;
+
+                            const unit = passPrices.get(passName) ?? 0;
+                            const quote = couponQuote(unit, reservation.people ?? 1, reservation.discount_percent_at_booking ?? 0, best.discount_percent ?? 0);
+                            // 이미 걸린 이용권 할인이 더 크면 쿠폰을 써도 이득이 없다. 아끼게 둔다.
+                            if (quote.saved <= 0) return null;
+
+                            return (
+                              <div className={`${tintCard("yellow")} mt-3 flex flex-wrap items-center justify-between gap-2 p-3`}>
+                                <p className="text-sm font-bold">
+                                  쿠폰 {available.length}장 사용 가능
+                                  <span className="mt-0.5 block text-xs font-medium text-workroom-muted">
+                                    {best.discount_percent}% 할인 · {formatPrice(quote.saved)} 저렴해집니다
+                                  </span>
+                                </p>
+                                <button
+                                  className={buttonClass("primary", "sm")}
+                                  disabled={busy}
+                                  onClick={() => void setReservationCoupon(reservation, best.id)}
+                                  type="button"
+                                >
+                                  {busy ? "적용 중…" : "쿠폰 쓰기"}
+                                </button>
+                              </div>
+                            );
+                          })()}
 
                           {(reservation.status === "pending" || reservation.status === "confirmed") && reservation.payment_status !== "service" && (reservation.price_at_booking ?? 0) > 0 ? (
                             <div className="mt-3">

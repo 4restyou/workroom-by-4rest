@@ -13,8 +13,10 @@ export type PricedReservation = {
   people: number | null;
   pass_type: string;
   pass_name_snapshot: string | null;
-  /** 예약 시점에 적용된 할인율(migration 0047). 없으면 할인 없음으로 본다. */
+  /** 예약 시점에 적용된 이용권 할인율(migration 0047). 없으면 할인 없음으로 본다. */
   discount_percent_at_booking?: number | null;
+  /** 쿠폰으로 적용된 할인율(migration 0048). */
+  coupon_percent_at_booking?: number | null;
 };
 
 export type PriceCheck = {
@@ -41,10 +43,11 @@ export function checkReservationPrice(
   if (!Number.isFinite(unit) || unit <= 0) return null;
 
   const people = Math.max(1, Number(reservation.people ?? 1));
-  // 할인가로 잡힌 예약은 그 금액이 맞다. 정가와만 비교하면 할인 예약이 전부
-  // '금액 오류'로 막힌다.
-  const discount = Math.max(0, Number(reservation.discount_percent_at_booking ?? 0));
-  const expected = discountedPrice(unit, discount) * people;
+  // 할인가·쿠폰가로 잡힌 예약은 그 금액이 맞다. 정가와만 비교하면 할인 예약이
+  // 전부 '금액 오류'로 막힌다. 둘이 겹치면 서버와 같이 더 유리한 쪽 하나만 본다.
+  const passDiscount = Math.max(0, Number(reservation.discount_percent_at_booking ?? 0));
+  const couponDiscount = Math.max(0, Number(reservation.coupon_percent_at_booking ?? 0));
+  const expected = discountedPrice(unit, Math.max(passDiscount, couponDiscount)) * people;
   const actual = Number(reservation.price_at_booking ?? 0);
   return { expected, actual, mismatched: actual !== expected };
 }

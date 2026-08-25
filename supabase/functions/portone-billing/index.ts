@@ -77,6 +77,8 @@ type ReservationRow = {
   status: string;
   payment_status: string | null;
   price_at_booking: number | null;
+  /** 쿠폰을 빼기 전 금액. 정기결제는 이 금액으로 등록한다(migration 0048). */
+  price_before_coupon: number | null;
   pass_id: string | null;
   pass_type: string;
   pass_name_snapshot: string | null;
@@ -85,7 +87,7 @@ type ReservationRow = {
 
 async function getReservation(id: string): Promise<ReservationRow | null> {
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/reservations?id=eq.${id}&select=id,profile_id,name,phone,email,status,payment_status,price_at_booking,pass_id,pass_type,pass_name_snapshot,access_end_date`,
+    `${SUPABASE_URL}/rest/v1/reservations?id=eq.${id}&select=id,profile_id,name,phone,email,status,payment_status,price_at_booking,price_before_coupon,pass_id,pass_type,pass_name_snapshot,access_end_date`,
     { headers: serviceHeaders },
   );
   const rows = (await resp.json()) as ReservationRow[];
@@ -179,8 +181,11 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
   if (reservation.profile_id !== user.id) return json({ ok: false, message: "본인 예약만 결제할 수 있습니다." }, 403, headers);
   const passName = reservation.pass_name_snapshot || reservation.pass_type;
   if (!passName.includes("월권")) return json({ ok: false, message: "정기결제는 월권만 가능합니다." }, 400, headers);
+  // 첫 회차는 쿠폰까지 뺀 금액으로 청구하고, 구독에는 쿠폰을 빼기 전 금액을 남긴다.
+  // 쿠폰 한 장은 한 번이다. 구독 금액에 넣으면 해지할 때까지 계속 할인된다.
   const amount = Number(reservation.price_at_booking ?? 0);
-  if (amount <= 0) return json({ ok: false, message: "결제 금액이 올바르지 않습니다." }, 400, headers);
+  const recurringAmount = Number(reservation.price_before_coupon ?? reservation.price_at_booking ?? 0);
+  if (amount <= 0 || recurringAmount <= 0) return json({ ok: false, message: "결제 금액이 올바르지 않습니다." }, 400, headers);
   if (reservation.payment_status === "paid") return json({ ok: false, message: "이미 결제된 예약입니다." }, 400, headers);
 
   const paymentId = `wr-sub-${reservationId.slice(0, 8)}-${Date.now()}`;
@@ -219,11 +224,25 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
     headers: { ...serviceHeaders, Prefer: "return=minimal" },
     body: JSON.stringify({
       profile_id: user.id, reservation_id: reservationId, billing_key: billingKey,
-      pass_id: reservation.pass_id, pass_name: passName, amount, cycle_days: cycleDays,
+      pass_id: reservation.pass_id, pass_name: passName, amount: recurringAmount, cycle_days: cycleDays,
       status: "active", next_charge_at: addDays(periodEnd, 1), last_paid_at: new Date().toISOString(),
     }),
   });
-  await recordPaymentLog({ reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "succeeded", amount, message: "정기결제 등록 및 첫 결제 완료" });
+  // 승인이 끝났으니 쿠폰을 쓴다.
+  if (amount !== recurringAmount) {
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/consume_reservation_coupon`, {
+      method: "POST",
+      headers: { ...serviceHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_reservation_id: reservationId }),
+    }).catch((error) => console.error("[portone-billing] consume coupon failed", { message: String(error) }));
+  }
+
+  await recordPaymentLog({
+    reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "succeeded", amount,
+    message: amount === recurringAmount
+      ? "정기결제 등록 및 첫 결제 완료"
+      : `정기결제 등록 및 첫 결제 완료 · 쿠폰 적용(다음 회차부터 ${recurringAmount.toLocaleString("ko-KR")}원)`,
+  });
   return json({ ok: true, message: "정기결제가 등록되고 첫 결제가 완료되었습니다." }, 200, headers);
 }
 

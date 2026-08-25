@@ -61,6 +61,8 @@ export type BookedDiscount = {
   price_at_booking: number | null;
   list_price_at_booking?: number | null;
   discount_percent_at_booking?: number | null;
+  /** 쿠폰으로 적용된 할인율(migration 0048). */
+  coupon_percent_at_booking?: number | null;
 };
 
 /**
@@ -68,7 +70,11 @@ export type BookedDiscount = {
  * 할인 없이 잡힌 예약이면 null — 아무 표시도 하지 않는다.
  */
 export function bookingDiscountNote(reservation: BookedDiscount): string | null {
-  const percent = Math.round(Number(reservation.discount_percent_at_booking ?? 0));
+  // 이용권 할인과 쿠폰이 겹치면 서버가 더 유리한 쪽 하나만 적용한다. 표시도 같게.
+  const percent = Math.max(
+    Math.round(Number(reservation.discount_percent_at_booking ?? 0)),
+    Math.round(Number(reservation.coupon_percent_at_booking ?? 0)),
+  );
   const list = Number(reservation.list_price_at_booking ?? 0);
   const paid = Number(reservation.price_at_booking ?? 0);
   if (percent <= 0 || list <= paid) return null;

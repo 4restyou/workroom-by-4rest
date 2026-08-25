@@ -268,6 +268,23 @@ async function applyUpgrade(
   });
 }
 
+/** 쿠폰 소진·복구. 승인이 끝난 뒤에만 부른다(붙였다고 사라지면 안 된다). */
+async function callCouponRpc(fn: "consume_reservation_coupon" | "restore_reservation_coupon", reservationId: string): Promise<void> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: "POST",
+      headers: { ...serviceHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_reservation_id: reservationId }),
+    });
+    if (!response.ok) {
+      console.error(`[portone-payment] ${fn} failed`, { status: response.status });
+    }
+  } catch (error) {
+    // 쿠폰 처리가 실패해도 결제 자체는 이미 끝났다. 돈 흐름을 막지 않는다.
+    console.error(`[portone-payment] ${fn} error`, { message: errorMessage(error) });
+  }
+}
+
 /** 오늘 마감 시각(특정일 예외 우선). 종일권 종료 시간으로 쓴다. */
 async function todayCloseTime(): Promise<string> {
   const today = kstToday();
@@ -501,6 +518,9 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
     return { ok: false, status: 500, message: "결제는 완료되었지만 반영에 실패했습니다. 운영자에게 문의해 주세요." };
   }
 
+  // 승인이 확인된 지금 쿠폰을 쓴다.
+  await callCouponRpc("consume_reservation_coupon", reservationId);
+
   await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "succeeded", amount: paidAmount, message: canAutoConfirm ? "포트원 결제 확인 및 예약 자동확정 완료" : `결제 확인 완료 · 예약 상태 ${reservation.status}` });
   return {
     ok: true,
@@ -654,7 +674,11 @@ Deno.serve(async (request) => {
       }
 
       // 부분 환불은 결제가 남아 있으므로 paid를 유지한다(전액일 때만 refunded).
-      if (!isPartial) await updateReservation(reservationId, { payment_status: "refunded" });
+      // 전액 환불이면 쓴 쿠폰도 돌려준다 — 손님은 할인을 쓰지 않은 셈이 된다.
+      if (!isPartial) {
+        await updateReservation(reservationId, { payment_status: "refunded" });
+        await callCouponRpc("restore_reservation_coupon", reservationId);
+      }
       await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, actor_id: user.id, action: "refund", status: "succeeded", amount: refundAmount, message: isPartial ? `부분 환불 ${refundAmount}원 · ${reason}` : reason });
       return json({ ok: true, message: isPartial ? `${refundAmount.toLocaleString("ko-KR")}원을 환불했습니다.` : "환불이 완료되었습니다." }, 200, headers);
     }

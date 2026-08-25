@@ -134,8 +134,14 @@ export type Reservation = {
   price_at_booking: number | null;
   /** 할인 전 금액(정가 x 인원). migration 0047 전 예약은 없다. */
   list_price_at_booking?: number | null;
-  /** 예약 시점에 적용된 할인율(%). */
+  /** 예약 시점에 적용된 이용권 할인율(%). */
   discount_percent_at_booking?: number | null;
+  /** 이 예약에 적용한 쿠폰(migration 0048). */
+  coupon_id?: string | null;
+  /** 쿠폰으로 적용된 할인율(%). */
+  coupon_percent_at_booking?: number | null;
+  /** 쿠폰을 빼기 전 금액. 정기결제는 이 금액으로 이어진다. */
+  price_before_coupon?: number | null;
   seat_type_id: string | null;
   payment_method: string | null;
   payment_status: PaymentStatus | null;
@@ -205,6 +211,10 @@ export type Coupon = {
   code: string;
   label: string;
   status: "issued" | "used";
+  /** 할인율(%). 0이면 결제에 못 쓰는 현물 쿠폰(migration 0048). */
+  discount_percent?: number | null;
+  /** month_pass = 월권 결제에만. */
+  applies_to?: string | null;
   issued_at: string;
   used_at: string | null;
 };

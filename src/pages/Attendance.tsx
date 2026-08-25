@@ -189,7 +189,12 @@ export default function Attendance() {
                     <div className={`${tintCard(coupon.status === "used" ? "lilac" : "yellow")} flex items-center justify-between gap-3 p-3`} key={coupon.id}>
                       <div>
                         <p className="text-sm font-black">{coupon.label}</p>
-                        <p className="mt-0.5 text-xs font-bold text-workroom-muted">코드 {coupon.code}</p>
+                        <p className="mt-0.5 text-xs font-bold text-workroom-muted">
+                          코드 {coupon.code}
+                          {(coupon.discount_percent ?? 0) > 0 && coupon.status === "issued"
+                            ? ` · 월권 결제 시 ${coupon.discount_percent}% 할인`
+                            : ""}
+                        </p>
                       </div>
                       <span className={badge(coupon.status === "used" ? "lilac" : "mint")}>
                         {coupon.status === "used" ? "사용완료" : "사용 가능"}

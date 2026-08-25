@@ -262,6 +262,15 @@ Deno.serve(async (request) => {
       headers: { ...serviceHeaders, Prefer: "return=minimal" },
       body: JSON.stringify(patch),
     });
+    // 환불했으면 그때 쓴 쿠폰도 돌려준다. 할인을 쓰지 않은 셈이 되어야 한다.
+    if (wasPaid) {
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/restore_reservation_coupon`, {
+        method: "POST",
+        headers: { ...serviceHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_reservation_id: reservationId }),
+      }).catch((error) => console.error("[refund-reservation] restore coupon failed", { message: String(error) }));
+    }
+
     if (!update.ok) {
       await recordPaymentLog({
         reservation_id: reservationId,
