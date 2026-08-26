@@ -33,10 +33,13 @@ $$;
 comment on function public.pass_matches_coupon_scope(text, text) is
   '이용권 이름이 쿠폰 적용 범위에 해당하는지. 프론트엔드(src/lib/coupon.ts)도 같은 규칙을 쓴다.';
 
+-- 제약을 먼저 뗀다. 옛 제약(month_pass/any만 허용)이 걸린 채로 값을 바꾸면
+-- UPDATE 자체가 그 제약에 걸려 막힌다.
+alter table public.coupons drop constraint if exists coupons_applies_to_check;
+
 -- 예전 값을 새 이름으로 옮긴다.
 update public.coupons set applies_to = 'month' where applies_to = 'month_pass';
 
-alter table public.coupons drop constraint if exists coupons_applies_to_check;
 alter table public.coupons
   add constraint coupons_applies_to_check check (applies_to in ('any', 'time', 'day', 'week', 'month'));
 
