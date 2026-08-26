@@ -7,7 +7,7 @@ const coupon = (overrides: Partial<RedeemableCoupon> = {}): RedeemableCoupon => 
   label: "월권 10% 할인",
   status: "issued",
   discount_percent: 10,
-  applies_to: "month_pass",
+  applies_to: "month",
   ...overrides,
 });
 
@@ -35,6 +35,27 @@ describe("couponAppliesToPass", () => {
 
   it("lets an any-pass coupon work anywhere", () => {
     expect(couponAppliesToPass(coupon({ applies_to: "any" }), "3시간권")).toBe(true);
+    expect(couponAppliesToPass(coupon({ applies_to: "any" }), "단체 및 모임 이용권")).toBe(true);
+  });
+
+  it("matches each pass kind", () => {
+    expect(couponAppliesToPass(coupon({ applies_to: "time" }), "3시간권")).toBe(true);
+    expect(couponAppliesToPass(coupon({ applies_to: "time" }), "추가 1시간")).toBe(true);
+    expect(couponAppliesToPass(coupon({ applies_to: "time" }), "종일권")).toBe(false);
+    expect(couponAppliesToPass(coupon({ applies_to: "day" }), "종일권")).toBe(true);
+    expect(couponAppliesToPass(coupon({ applies_to: "week" }), "주간권")).toBe(true);
+    expect(couponAppliesToPass(coupon({ applies_to: "month" }), "월권 지정석")).toBe(true);
+  });
+
+  it("still honours the value coupons were issued with before", () => {
+    // 0048에서 발급된 쿠폰은 month_pass 로 저장돼 있다.
+    expect(couponAppliesToPass(coupon({ applies_to: "month_pass" }), "월권 자유석")).toBe(true);
+    expect(couponAppliesToPass(coupon({ applies_to: "month_pass" }), "3시간권")).toBe(false);
+  });
+
+  it("leaves the group booking to an all-pass coupon only", () => {
+    // 단체·모임은 종류를 따로 두지 않았다. '전 이용권' 쿠폰으로만 걸린다.
+    expect(couponAppliesToPass(coupon({ applies_to: "month" }), "단체 및 모임 이용권")).toBe(false);
   });
 });
 

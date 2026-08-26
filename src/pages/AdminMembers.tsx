@@ -177,7 +177,7 @@ export default function AdminMembers() {
       confirmLabel: "발급",
       fields: [
         { name: "percent", label: "할인율 (%)", defaultValue: "10", numeric: true, hint: "0을 넣으면 결제 할인 없는 현물 쿠폰이 됩니다." },
-        { name: "scope", label: "쓸 수 있는 곳", defaultValue: "month_pass", options: couponScopeOptions },
+        { name: "scope", label: "쓸 수 있는 곳", defaultValue: "month", options: couponScopeOptions },
         { name: "label", label: "쿠폰 이름 (비워두면 자동)", defaultValue: "" },
       ],
     });

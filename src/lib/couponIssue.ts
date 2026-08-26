@@ -3,14 +3,10 @@
 // 할인율은 서버(0049)가 다시 검증한다. 여기서는 화면에서 들어온 값을 다듬고,
 // 마이그레이션이 아직 안 돌았을 때 무슨 일인지 알 수 있는 문구를 만든다.
 
+import { couponScopeLabels, type CouponScope } from "./coupon";
 import { supabase } from "./supabase";
 
-export type CouponScope = "month_pass" | "any";
-
-export const couponScopeOptions: Array<{ value: CouponScope; label: string }> = [
-  { value: "month_pass", label: "월권 결제에만" },
-  { value: "any", label: "모든 이용권" },
-];
+export { couponScopeOf, couponScopeOptions, type CouponScope } from "./coupon";
 
 /** 화면에서 들어온 할인율을 0~90 사이 정수로 다듬는다. */
 export function normalizeCouponPercent(value: unknown): number {
@@ -19,14 +15,10 @@ export function normalizeCouponPercent(value: unknown): number {
   return Math.min(90, Math.max(0, percent));
 }
 
-export function couponScopeOf(value: unknown): CouponScope {
-  return value === "any" ? "any" : "month_pass";
-}
-
 /** 발급 전 확인 문구. 얼마짜리를 어디에 쓸 수 있는지 그대로 읽힌다. */
 export function describeCoupon(percent: number, scope: CouponScope): string {
   if (percent <= 0) return "결제 할인이 없는 현물 쿠폰";
-  return `${scope === "any" ? "모든 이용권" : "월권"} ${percent}% 할인`;
+  return `${couponScopeLabels[scope]} ${percent}% 할인`;
 }
 
 export type IssueCouponResult = { ok: boolean; message: string; label?: string; code?: string };

@@ -75,7 +75,7 @@ export default function AdminAttendance() {
   const [couponTarget, setCouponTarget] = useState<MemberOption | null>(null);
   const [couponLabel, setCouponLabel] = useState("");
   const [couponPercent, setCouponPercent] = useState("10");
-  const [couponScope, setCouponScope] = useState<CouponScope>("month_pass");
+  const [couponScope, setCouponScope] = useState<CouponScope>("month");
 
   async function load(silent = false) {
     if (!supabase) return;
@@ -154,7 +154,7 @@ export default function AdminAttendance() {
       return;
     }
     setSuccess(`${name}님에게 '${result.label ?? couponLabel.trim()}' 쿠폰을 발급했어요 🎫`);
-    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel(""); setCouponPercent("10"); setCouponScope("month_pass");
+    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel(""); setCouponPercent("10"); setCouponScope("month");
     await load(true);
   }
 

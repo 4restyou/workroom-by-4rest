@@ -27,16 +27,23 @@ describe("normalizeCouponPercent", () => {
 describe("couponScopeOf", () => {
   it("defaults to the monthly pass", () => {
     // 범위를 잘못 넓히면 3시간권까지 깎인다. 모르면 좁은 쪽.
-    expect(couponScopeOf(undefined)).toBe("month_pass");
-    expect(couponScopeOf("아무거나")).toBe("month_pass");
+    expect(couponScopeOf(undefined)).toBe("month");
+    expect(couponScopeOf("아무거나")).toBe("month");
+  });
+
+  it("reads the value the coupon stores", () => {
+    expect(couponScopeOf("time")).toBe("time");
     expect(couponScopeOf("any")).toBe("any");
+    // 0048에서 쓰던 예전 값도 그대로 읽힌다.
+    expect(couponScopeOf("month_pass")).toBe("month");
   });
 });
 
 describe("describeCoupon", () => {
   it("says what the member gets", () => {
-    expect(describeCoupon(10, "month_pass")).toBe("월권 10% 할인");
-    expect(describeCoupon(20, "any")).toBe("모든 이용권 20% 할인");
+    expect(describeCoupon(10, "month")).toBe("월권 10% 할인");
+    expect(describeCoupon(20, "time")).toBe("시간권 20% 할인");
+    expect(describeCoupon(15, "any")).toBe("전 이용권 15% 할인");
     expect(describeCoupon(0, "any")).toBe("결제 할인이 없는 현물 쿠폰");
   });
 });
