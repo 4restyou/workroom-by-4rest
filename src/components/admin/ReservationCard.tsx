@@ -446,8 +446,14 @@ export default function ReservationCard({
           </div>
           <fieldset className="mt-3">
             <legend className="text-xs font-bold text-workroom-muted">이용 가능 요일</legend>
+            {/* 정기 휴무 요일은 고르는 칸에 넣지 않는다. 일요일에 체크가 들어가면
+                문 닫는 날을 이용일로 세어 종료일이 당겨진다. 다만 예전에 저장된
+                값에 들어 있으면 뺄 수 있어야 하므로 그때만 보여 준다. */}
             <div className="mt-2 flex flex-wrap gap-2">
-              {["일", "월", "화", "수", "목", "금", "토"].map((label, day) => (
+              {["일", "월", "화", "수", "목", "금", "토"]
+                .map((label, day) => ({ label, day }))
+                .filter(({ day }) => openWeekdays.includes(day) || accessDraft.weekdays.includes(day))
+                .map(({ label, day }) => (
                 <label className={`flex cursor-pointer items-center gap-1 rounded-[5px] border px-2.5 py-2 text-xs font-bold ${accessDraft.weekdays.includes(day) ? "border-workroom-ink bg-workroom-yellow" : "border-workroom-line bg-workroom-surface"}`} key={label}>
                   <input
                     checked={accessDraft.weekdays.includes(day)}
@@ -463,6 +469,7 @@ export default function ReservationCard({
                     type="checkbox"
                   />
                   {label}
+                  {!openWeekdays.includes(day) ? <span className="text-[10px] font-medium text-workroom-muted">휴무</span> : null}
                 </label>
               ))}
             </div>

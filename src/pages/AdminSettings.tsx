@@ -3,7 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import MoneyInput from "../components/MoneyInput";
+import { openWeekdaysFromRows } from "../lib/businessHours";
 import { activeDiscount, discountDeadlineLabel } from "../lib/discount";
+import { pendingPeriodExtensions } from "../lib/reservations";
 import { formatPrice, todayValue } from "../lib/format";
 import { buttonClass, card, cardFlat, tintCard } from "../lib/ui";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
@@ -348,6 +350,61 @@ export default function AdminSettings() {
     }
     setSuccess(`${newException.date} 예외 일정을 저장했습니다.`);
     await loadSettings();
+    if (newException.is_closed) await offerPeriodExtension();
+  }
+
+  /**
+   * 휴무를 새로 넣으면 그날을 이용일로 세고 있던 주간권·월권이 하루씩 손해를 본다.
+   * (월권은 '이용 24일 기준'으로 파는 상품이다.)
+   *
+   * 자동으로 바꾸지 않고 물어본다 — 회원에게 이미 안내된 기간이라 운영자가
+   * 알고 있어야 한다. 늘리기만 하고 줄이지는 않는다.
+   */
+  async function offerPeriodExtension() {
+    if (!supabase) return;
+
+    const [reservationResult, hourResult, exceptionResult] = await Promise.all([
+      supabase
+        .from("reservations")
+        .select("id,name,status,payment_status,pass_type,pass_name_snapshot,access_start_date,access_end_date")
+        .is("deleted_at", null)
+        .eq("status", "confirmed")
+        .not("access_end_date", "is", null)
+        .gte("access_end_date", today)
+        .limit(500),
+      supabase.from("business_hours").select("weekday,is_closed"),
+      supabase.from("business_date_exceptions").select("date,is_closed").eq("is_closed", true).limit(200),
+    ]);
+    if (reservationResult.error || hourResult.error || exceptionResult.error) return;
+
+    const openDays = openWeekdaysFromRows(hourResult.data ?? []);
+    const closed = (exceptionResult.data ?? []).map((row) => row.date);
+    const pending = pendingPeriodExtensions(reservationResult.data ?? [], openDays, closed, today);
+    if (!pending.length) return;
+
+    const preview = pending.slice(0, 5).map((item) => `${item.name} · ${item.passName} — ${item.from} → ${item.to}`);
+    const ok = await confirmDialog({
+      title: `이용권 ${pending.length}건의 종료일을 늘릴까요?`,
+      description: [
+        "휴무로 못 쓰게 된 날만큼 종료일을 뒤로 미룹니다.",
+        "",
+        ...preview,
+        pending.length > preview.length ? `외 ${pending.length - preview.length}건` : "",
+      ].filter(Boolean).join("\n"),
+      confirmLabel: "종료일 연장",
+    });
+    if (!ok) return;
+
+    let failed = 0;
+    for (const item of pending) {
+      const { error: updateError } = await supabase
+        .from("reservations")
+        .update({ access_end_date: item.to })
+        .eq("id", item.id);
+      if (updateError) failed += 1;
+    }
+    if (failed) setError(`${failed}건은 종료일을 바꾸지 못했습니다. 예약 화면에서 직접 확인해 주세요.`);
+    else setSuccess(`이용권 ${pending.length}건의 종료일을 늘렸습니다.`);
   }
 
   async function deleteDateException(date: string) {

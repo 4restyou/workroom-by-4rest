@@ -54,25 +54,91 @@ export function passUsableDays(name: string, openWeekdayCount: number): number {
   return passPeriodWeeks(name) * perWeek;
 }
 
-/** 시작일부터 이용 가능일을 usableDays만큼 채운 마지막 날짜. */
-export function accessEndDate(startDate: string, passName: string, openWeekdays: number[]): string {
+/**
+ * 시작일부터 이용 가능일을 usableDays만큼 채운 마지막 날짜.
+ *
+ * closedDates(특정일 휴무)는 세지 않고 건너뛴다. 월권은 '이용 24일 기준'으로
+ * 파는 상품이라, 기간 안에 휴무가 생기면 그만큼 종료일이 뒤로 밀려야 24일을
+ * 채운다. 이걸 빼먹으면 24일치를 산 회원이 21일만 쓰게 된다.
+ */
+export function accessEndDate(
+  startDate: string,
+  passName: string,
+  openWeekdays: number[],
+  closedDates: Iterable<string> = [],
+): string {
   if (!startDate) return startDate;
   const open = openWeekdays.length ? openWeekdays : [0, 1, 2, 3, 4, 5, 6];
   const target = passUsableDays(passName, open.length);
   const openSet = new Set(open);
+  const closedSet = new Set(closedDates);
 
   const cursor = new Date(`${startDate}T00:00:00`);
   let counted = 0;
   let lastOpen = startDate;
-  // 무한 루프 방지: 필요한 날의 3배까지만 탐색한다.
-  for (let step = 0; step < target * 3 + 7 && counted < target; step += 1) {
-    if (openSet.has(cursor.getDay())) {
+  // 무한 루프 방지: 필요한 날의 3배까지만 탐색한다. 휴무가 많아도 멈춘다.
+  for (let step = 0; step < target * 4 + 14 && counted < target; step += 1) {
+    const value = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    if (openSet.has(cursor.getDay()) && !closedSet.has(value)) {
       counted += 1;
-      lastOpen = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+      lastOpen = value;
     }
     cursor.setDate(cursor.getDate() + 1);
   }
   return lastOpen;
+}
+
+export type PeriodExtension = {
+  id: string;
+  name: string;
+  passName: string;
+  from: string;
+  to: string;
+};
+
+type ExtendableReservation = {
+  id: string;
+  name: string;
+  status: string | null;
+  pass_type: string;
+  pass_name_snapshot: string | null;
+  access_start_date: string | null;
+  access_end_date: string | null;
+  payment_status?: string | null;
+};
+
+/**
+ * 휴무가 새로 생겨 종료일을 늘려 줘야 하는 이용권을 찾는다.
+ *
+ * 늘리기만 한다. 휴무를 취소했다고 이미 안내한 종료일을 앞당기면, 회원은
+ * 쓸 수 있다고 들은 날에 문 앞에서 막힌다.
+ */
+export function pendingPeriodExtensions(
+  reservations: ExtendableReservation[],
+  openWeekdays: number[],
+  closedDates: Iterable<string>,
+  today: string,
+): PeriodExtension[] {
+  const closed = [...closedDates];
+  if (!closed.length) return [];
+
+  const extensions: PeriodExtension[] = [];
+  for (const reservation of reservations) {
+    if (reservation.status !== "confirmed") continue;
+    if ((reservation.payment_status ?? "unpaid") === "refunded") continue;
+    const start = reservation.access_start_date;
+    const end = reservation.access_end_date;
+    if (!start || !end) continue;
+    // 이미 끝난 이용권은 건드리지 않는다.
+    if (end < today) continue;
+
+    const passName = reservation.pass_name_snapshot || reservation.pass_type;
+    const next = accessEndDate(start, passName, openWeekdays, closed);
+    if (next > end) {
+      extensions.push({ id: reservation.id, name: reservation.name, passName, from: end, to: next });
+    }
+  }
+  return extensions;
 }
 
 export function passPeriodWeeks(name: string): number {

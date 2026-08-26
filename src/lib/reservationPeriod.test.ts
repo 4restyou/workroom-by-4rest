@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessEndDate, passUsableDays } from "./reservations";
+import { pendingPeriodExtensions, accessEndDate, passUsableDays } from "./reservations";
 
 // 일요일(0) 휴무, 월~토(1~6) 영업
 const OPEN = [1, 2, 3, 4, 5, 6];
@@ -36,5 +36,70 @@ describe("accessEndDate", () => {
 
   it("휴무가 없으면 주간권은 7일 뒤(시작일 포함)", () => {
     expect(accessEndDate("2026-08-03", "주간권", [0, 1, 2, 3, 4, 5, 6])).toBe("2026-08-09");
+  });
+});
+
+describe("accessEndDate — 특정일 휴무", () => {
+  // 월-토 영업(일요일 정기휴무).
+  const OPEN_DAYS = [1, 2, 3, 4, 5, 6];
+
+  it("pushes the end date out by each closed day", () => {
+    // 8월 3일(월) 시작 주간권은 원래 8월 8일(토)까지. 8월 5일을 쉬면 하루 밀린다.
+    expect(accessEndDate("2026-08-03", "주간권", OPEN_DAYS, ["2026-08-05"])).toBe("2026-08-10");
+  });
+
+  it("pushes it out three days for three closures", () => {
+    const end = accessEndDate("2026-08-03", "주간권", OPEN_DAYS, ["2026-08-04", "2026-08-05", "2026-08-06"]);
+    expect(end).toBe("2026-08-12");
+  });
+
+  it("ignores closures outside the period", () => {
+    expect(accessEndDate("2026-08-03", "주간권", OPEN_DAYS, ["2026-09-01"])).toBe("2026-08-08");
+  });
+
+  it("ignores a closure that falls on a day already closed", () => {
+    // 일요일은 원래 안 여는 날이라 세지 않았다. 다시 빼도 종료일은 그대로.
+    expect(accessEndDate("2026-08-03", "주간권", OPEN_DAYS, ["2026-08-09"])).toBe("2026-08-08");
+  });
+});
+
+describe("pendingPeriodExtensions", () => {
+  const OPEN_DAYS = [1, 2, 3, 4, 5, 6];
+  const pass = (overrides: Record<string, unknown> = {}) => ({
+    id: "r1",
+    name: "김지현",
+    status: "confirmed",
+    pass_type: "주간권",
+    pass_name_snapshot: "주간권",
+    access_start_date: "2026-08-03",
+    access_end_date: "2026-08-08",
+    payment_status: "paid",
+    ...overrides,
+  });
+
+  it("finds the pass that lost a day", () => {
+    expect(pendingPeriodExtensions([pass()], OPEN_DAYS, ["2026-08-05"], "2026-08-04")).toEqual([
+      { id: "r1", name: "김지현", passName: "주간권", from: "2026-08-08", to: "2026-08-10" },
+    ]);
+  });
+
+  it("leaves a finished pass alone", () => {
+    // 이미 끝난 이용권의 종료일을 늘리면 안 쓴 날이 되살아난다.
+    expect(pendingPeriodExtensions([pass()], OPEN_DAYS, ["2026-08-05"], "2026-09-01")).toEqual([]);
+  });
+
+  it("skips anything not confirmed or already refunded", () => {
+    expect(pendingPeriodExtensions([pass({ status: "canceled" })], OPEN_DAYS, ["2026-08-05"], "2026-08-04")).toEqual([]);
+    expect(pendingPeriodExtensions([pass({ payment_status: "refunded" })], OPEN_DAYS, ["2026-08-05"], "2026-08-04")).toEqual([]);
+  });
+
+  it("never shortens a period", () => {
+    // 휴무를 취소해도 이미 안내한 종료일은 그대로 둔다.
+    const already = pass({ access_end_date: "2026-08-20" });
+    expect(pendingPeriodExtensions([already], OPEN_DAYS, ["2026-08-05"], "2026-08-04")).toEqual([]);
+  });
+
+  it("says nothing when there are no closures", () => {
+    expect(pendingPeriodExtensions([pass()], OPEN_DAYS, [], "2026-08-04")).toEqual([]);
   });
 });

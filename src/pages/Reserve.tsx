@@ -182,6 +182,12 @@ export default function Reserve() {
     [dateExceptions, form.date, hoursByWeekday],
   );
   const selectedDateException = form.date ? dateExceptions[form.date] : undefined;
+  // 특정일 휴무는 이용일로 세지 않는다. 월권은 '이용 24일 기준'이라 휴무가
+  // 끼면 종료일이 그만큼 뒤로 밀려야 판 만큼을 채운다.
+  const closedDates = useMemo(
+    () => Object.values(dateExceptions).filter((item) => item.is_closed).map((item) => item.date),
+    [dateExceptions],
+  );
 
   const openHHMM = selectedHours?.open_time.slice(0, 5);
   const closeHHMM = selectedHours?.close_time.slice(0, 5);
@@ -541,7 +547,7 @@ export default function Reserve() {
         ? {
             access_start_date: form.date,
             // 영업일 기준으로 채운다 — 종료일이 휴무일이 되지 않도록.
-            access_end_date: accessEndDate(form.date, form.pass_type, openWeekdays),
+            access_end_date: accessEndDate(form.date, form.pass_type, openWeekdays, closedDates),
             access_weekdays: openWeekdays,
           }
         : {}),
@@ -1034,7 +1040,7 @@ export default function Reserve() {
                   <>
                     <dt className="font-bold text-workroom-muted">이용 기간</dt>
                     <dd className="font-bold">
-                      {form.date ? `${formatDate(form.date)} ~ ${formatDate(accessEndDate(form.date, form.pass_type, openWeekdays))}` : "-"}
+                      {form.date ? `${formatDate(form.date)} ~ ${formatDate(accessEndDate(form.date, form.pass_type, openWeekdays, closedDates))}` : "-"}
                       <span className="ml-1 font-medium text-workroom-muted">(이용 {passUsableDays(form.pass_type, openWeekdays.length)}일)</span>
                     </dd>
                   </>
@@ -1166,7 +1172,7 @@ export default function Reserve() {
                     <>
                       <dt className="font-bold text-workroom-muted">이용 기간</dt>
                       <dd className="font-bold">
-                        {formatDate(submittedReservation.date)} ~ {formatDate(accessEndDate(submittedReservation.date, submittedReservation.passName, openWeekdays))}
+                        {formatDate(submittedReservation.date)} ~ {formatDate(accessEndDate(submittedReservation.date, submittedReservation.passName, openWeekdays, closedDates))}
                         <span className="ml-1 font-medium text-workroom-muted">(이용 {passUsableDays(submittedReservation.passName, openWeekdays.length)}일)</span>
                       </dd>
                     </>
