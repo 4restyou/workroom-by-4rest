@@ -4,6 +4,7 @@ import AdminPage, { AdminEmpty } from "./AdminPage";
 import TodayTimeline from "./admin/TodayTimeline";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminders";
+import { dismissalMap, visibleActions } from "../lib/dismissals";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
@@ -34,6 +35,8 @@ type ActionItem = {
   detail: string;
   to: string;
   urgent?: boolean;
+  /** 주면 '확인함'으로 이 일수만큼 접어 둘 수 있다. 급한 항목에는 주지 않는다. */
+  snoozeDays?: number;
 };
 
 // 오늘의 운영 시간. 특정일 예외가 있으면 그쪽이 이긴다(요일 설정보다 우선).
@@ -110,11 +113,13 @@ function visitState(reservation: Reservation, attendance?: AttendanceRow, nowMin
 export default function AdminDashboard() {
   const [data, setData] = useState<AdminDashData | null>(null);
   const [loadError, setLoadError] = useState("");
+  // 확인해서 접어 둔 항목. 테이블이 아직 없으면(migration 0051 전) 빈 값으로 둔다.
+  const [dismissals, setDismissals] = useState<Map<string, string>>(new Map());
 
   async function load() {
     if (!supabase) return;
     const today = todayValue();
-    const [reservationResult, attendanceResult, inquiryResult, smsResult, seatResult, hourResult, exceptionResult, couponResult, memberResult, visitResult] = await Promise.all([
+    const [reservationResult, attendanceResult, inquiryResult, smsResult, seatResult, hourResult, exceptionResult, couponResult, memberResult, visitResult, dismissalResult] = await Promise.all([
       supabase
         .from("reservations")
         .select("*")
@@ -134,6 +139,7 @@ export default function AdminDashboard() {
       // 휴면 판정을 위해 회원과 최근 출석을 가져온다.
       supabase.from("profiles").select("id,full_name").eq("role", "user").limit(500),
       supabase.from("attendance").select("profile_id,check_in_at").order("check_in_at", { ascending: false }).limit(2000),
+      supabase.from("admin_dismissals").select("key,dismissed_at").limit(500),
     ]);
 
     if (reservationResult.error || attendanceResult.error) {
@@ -142,6 +148,7 @@ export default function AdminDashboard() {
     }
 
     setLoadError("");
+    setDismissals(dismissalResult.error ? new Map() : dismissalMap(dismissalResult.data ?? []));
     setData({
       reservations: (reservationResult.data ?? []) as Reservation[],
       attendance: (attendanceResult.data ?? []) as AttendanceRow[],
@@ -204,7 +211,7 @@ export default function AdminDashboard() {
         actions.push({ key: `over-${reservation.id}`, title: `${reservation.name} · 퇴실 확인 필요`, detail: `${formatTimeRange(reservation.start_time, reservation.end_time)} 이용`, to: "/admin/attendance", urgent: true });
       }
     });
-    (data?.failedSms ?? []).slice(0, 4).forEach((item) => actions.push({ key: `sms-${item.id}`, title: "문자 발송 실패", detail: "예약 상세에서 발송 상태를 확인해 주세요.", to: `/admin/reservations?reservation=${item.reservation_id}`, urgent: true }));
+    (data?.failedSms ?? []).slice(0, 4).forEach((item) => actions.push({ key: `sms-${item.id}`, title: "문자 발송 실패", detail: "예약 상세에서 발송 상태를 확인해 주세요.", to: `/admin/reservations?reservation=${item.reservation_id}`, urgent: true, snoozeDays: 7 }));
     (data?.inquiries ?? []).slice(0, 4).forEach((item) => actions.push({ key: `inquiry-${item.id}`, title: "답변하지 않은 문의", detail: "회원 문의 내용을 확인해 주세요.", to: item.reservation_id ? `/admin/reservations?reservation=${item.reservation_id}` : "/admin/reservations" }));
 
     const upcoming = reservations
@@ -262,6 +269,8 @@ export default function AdminDashboard() {
         title: `${reminder.name} · 사용하지 않은 쿠폰 ${reminder.count}장`,
         detail: reminder.label ? `오늘 방문 · ${reminder.label}` : "오늘 방문 · 안내해 주세요.",
         to: `/admin/customer/${reminder.profileId}`,
+        // 오늘 안내했으면 됐다. 다음에 또 오면 다시 알린다.
+        snoozeDays: 1,
       });
     });
 
@@ -272,14 +281,41 @@ export default function AdminDashboard() {
         title: `${member.name} · ${member.days}일째 방문 없음`,
         detail: "마지막 방문 이후 연락이 없었습니다.",
         to: `/admin/customer/${member.id}`,
+        // 연락하고 일주일 기다려 본다. 그래도 안 오면 다시 뜬다.
+        snoozeDays: 7,
       });
     });
 
     // 급한 항목이 조용한 대기 항목에 묻히지 않도록 정렬한다.
     actions.sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)));
 
-    return { actions, activePeople, attendanceByReservation, longTerm, minute, next, todaySchedule, upcoming, unpaidToday, unpaidTodayAmount };
-  }, [data]);
+    // 확인해서 접어 둔 항목은 기간이 지날 때까지 감춘다.
+    const openActions = visibleActions(actions, dismissals, Date.now());
+
+    return { actions: openActions, activePeople, attendanceByReservation, longTerm, minute, next, todaySchedule, upcoming, unpaidToday, unpaidTodayAmount };
+  }, [data, dismissals]);
+
+  /** 확인 처리 — 항목 종류가 정한 기간만큼 접어 둔다. */
+  async function dismissAction(key: string) {
+    // 화면에서 먼저 지운다. 목록을 정리하는 동작은 즉시 반응해야 한다.
+    setDismissals((current) => new Map(current).set(key, new Date().toISOString()));
+    if (!supabase) return;
+    const { error } = await supabase
+      .from("admin_dismissals")
+      .upsert({ key, dismissed_at: new Date().toISOString() }, { onConflict: "key" });
+    if (error) {
+      setDismissals((current) => {
+        const next = new Map(current);
+        next.delete(key);
+        return next;
+      });
+      setLoadError(
+        error.message.includes("admin_dismissals")
+          ? "확인 처리는 마이그레이션 0051을 적용해야 저장됩니다."
+          : error.message,
+      );
+    }
+  }
 
   return (
     <AdminPage
@@ -310,13 +346,28 @@ export default function AdminDashboard() {
           {data && summary.actions.length ? (
             <div className="border-y border-workroom-line bg-white">
               {summary.actions.slice(0, 12).map((item) => (
-                <Link className={`admin-row flex items-center justify-between gap-4 px-4 py-3.5 hover:bg-workroom-background ${item.urgent ? "border-l-[3px] border-l-red-500" : "border-l-[3px] border-l-workroom-yellow"}`} key={item.key} to={item.to}>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{item.title}</p>
-                    <p className="mt-0.5 truncate text-xs font-medium text-workroom-muted">{item.detail}</p>
-                  </div>
-                  <span className="shrink-0 text-sm font-semibold">확인</span>
-                </Link>
+                <div className={`admin-row flex items-center gap-2 pr-2 ${item.urgent ? "border-l-[3px] border-l-red-500" : "border-l-[3px] border-l-workroom-yellow"}`} key={item.key}>
+                  <Link className="flex min-w-0 flex-1 items-center justify-between gap-4 px-4 py-3.5 hover:bg-workroom-background" to={item.to}>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{item.title}</p>
+                      <p className="mt-0.5 truncate text-xs font-medium text-workroom-muted">{item.detail}</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold">확인</span>
+                  </Link>
+                  {/* 눌러도 사라지지 않는 항목은 결국 목록 전체를 안 읽게 만든다.
+                      급한 항목(결제·입퇴실)에는 snoozeDays를 주지 않아 여기 안 뜬다. */}
+                  {item.snoozeDays ? (
+                    <button
+                      aria-label={`${item.title} 확인함`}
+                      className={buttonClass("secondary", "sm", "shrink-0")}
+                      onClick={() => void dismissAction(item.key)}
+                      title={`${item.snoozeDays}일 동안 접어 둡니다`}
+                      type="button"
+                    >
+                      확인함
+                    </button>
+                  ) : null}
+                </div>
               ))}
               {/* 잘라낸 항목이 있으면 숨겼다는 사실을 알린다(개수만 맞고 목록은 짧던 문제). */}
               {summary.actions.length > 12 ? (
