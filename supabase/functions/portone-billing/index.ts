@@ -17,6 +17,8 @@
 //         수동: supabase functions deploy portone-billing --no-verify-jwt
 
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
+import { accessEndDate } from "../_shared/accessPeriod.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -119,6 +121,20 @@ async function recordPaymentLog(log: {
     });
   } catch (error) {
     console.error("[portone-billing] log error", { message: errorMessage(error) });
+  }
+}
+
+/** 특정일 휴무 날짜. 이용일로 세지 않는다. */
+async function closedDates(): Promise<string[]> {
+  try {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/business_date_exceptions?is_closed=eq.true&select=date&limit=500`,
+      { headers: serviceHeaders },
+    );
+    const rows = (await resp.json()) as Array<{ date: string }>;
+    return rows.map((row) => row.date);
+  } catch {
+    return [];
   }
 }
 
@@ -260,6 +276,10 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
   const subs = (await resp.json()) as SubscriptionRow[];
   let charged = 0;
   let failed = 0;
+  // 구독마다 다시 읽지 않는다 — 한 번에 여러 건을 처리하는 크론이다.
+  const openDays = await openWeekdays();
+  const closedDays = await closedDates();
+
   for (const sub of Array.isArray(subs) ? subs : []) {
     const reservation = sub.reservation_id ? await getReservation(sub.reservation_id) : null;
     // 결제 식별자를 주기(청구일)에 고정한다. 크론이 겹쳐 실행되거나 재시도돼도
@@ -273,18 +293,25 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
     const charge = await chargeBillingKey(paymentId, sub.billing_key, `WORKROOM ${sub.pass_name} (정기결제)`, sub.amount, customer);
     if (charge.ok) {
       charged += 1;
-      const base = sub.next_charge_at && sub.next_charge_at > today ? sub.next_charge_at : today;
+      // 이번 회차도 첫 회차와 같은 규칙으로 센다 — 4주치 영업일(월권 24일),
+      // 휴무는 제외. 예전에는 +28일을 그냥 더해서, 휴무가 낀 달마다 회원이
+      // 하루씩 손해를 봤다.
+      let nextEnd: string | null = null;
       if (reservation) {
         const currentEnd = reservation.access_end_date && reservation.access_end_date >= today ? reservation.access_end_date : today;
+        nextEnd = accessEndDate(addDays(currentEnd, 1), sub.pass_name, openDays, closedDays);
         await updateReservation(reservation.id, {
-          access_end_date: addDays(currentEnd, sub.cycle_days),
+          access_end_date: nextEnd,
           payment_key: paymentId,
         });
       }
+      // 다음 청구는 이용 기간이 끝난 다음 날. 기간이 밀리면 청구도 같이 밀린다.
+      const base = sub.next_charge_at && sub.next_charge_at > today ? sub.next_charge_at : today;
+      const nextCharge = nextEnd ? addDays(nextEnd, 1) : addDays(base, sub.cycle_days);
       await fetch(`${SUPABASE_URL}/rest/v1/subscriptions?id=eq.${sub.id}`, {
         method: "PATCH",
         headers: { ...serviceHeaders, Prefer: "return=minimal" },
-        body: JSON.stringify({ next_charge_at: addDays(base, sub.cycle_days), last_paid_at: new Date().toISOString(), fail_count: 0 }),
+        body: JSON.stringify({ next_charge_at: nextCharge, last_paid_at: new Date().toISOString(), fail_count: 0 }),
       });
       if (sub.reservation_id) await recordPaymentLog({ reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "succeeded", amount: sub.amount, message: "정기결제 자동청구 완료" });
     } else {
