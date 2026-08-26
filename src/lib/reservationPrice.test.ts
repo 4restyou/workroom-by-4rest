@@ -7,6 +7,8 @@ function reservation(overrides: Partial<PricedReservation> = {}): PricedReservat
     people: 1,
     pass_type: "3시간권",
     pass_name_snapshot: "3시간권",
+    discount_percent_at_booking: 0,
+    coupon_percent_at_booking: 0,
     ...overrides,
   };
 }
@@ -59,8 +61,18 @@ describe("checkReservationPrice", () => {
   });
 
   it("treats a booking made before discounts existed as full price", () => {
-    // migration 0047 이전 예약에는 할인 기록 자체가 없다.
+    // migration 0047 이전 예약은 값이 0으로 채워져 있다.
     expect(checkReservationPrice(reservation({ price_at_booking: 14000 }), 14000)?.mismatched).toBe(false);
+  });
+
+  it("says nothing when the screen did not load the discount columns", () => {
+    // 관리자 목록이 할인 컬럼을 빼고 조회하던 시절, 15% 할인된 월권이
+    // 전부 '금액 오류'로 표시됐다. 모르면 판단하지 않는다.
+    const check = checkReservationPrice(
+      { price_at_booking: 211650, people: 1, pass_type: "월권 자유석", pass_name_snapshot: "월권 자유석" },
+      249000,
+    );
+    expect(check).toBeNull();
   });
 
   it("flags a booking with no stored amount", () => {

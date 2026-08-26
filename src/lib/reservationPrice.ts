@@ -42,6 +42,13 @@ export function checkReservationPrice(
   const unit = Number(unitPrice);
   if (!Number.isFinite(unit) || unit <= 0) return null;
 
+  // 할인 컬럼을 아예 안 받아 온 화면이면(select 목록에서 빠진 경우) 판단하지
+  // 않는다. 할인율을 0으로 넘겨짚으면 정상적으로 할인된 예약을 전부 오류라고
+  // 알리게 된다 — 돈 문제는 틀린 경고가 침묵보다 나쁘다.
+  if (reservation.discount_percent_at_booking === undefined && reservation.coupon_percent_at_booking === undefined) {
+    return null;
+  }
+
   const people = Math.max(1, Number(reservation.people ?? 1));
   // 할인가·쿠폰가로 잡힌 예약은 그 금액이 맞다. 정가와만 비교하면 할인 예약이
   // 전부 '금액 오류'로 막힌다. 둘이 겹치면 서버와 같이 더 유리한 쪽 하나만 본다.

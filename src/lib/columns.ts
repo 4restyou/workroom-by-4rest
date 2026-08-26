@@ -10,8 +10,10 @@
 // 깨져 결과가 GenericStringError[]가 된다.
 
 /** 목록·집계용 예약 컬럼. 관리자 메모·요청사항 같은 큰 텍스트는 제외한다. */
+// 할인·쿠폰 컬럼이 빠지면 결제 금액 대조가 할인율을 0으로 보고, 정상적으로
+// 할인된 예약을 '금액 오류'로 표시한다(migration 0047·0048).
 export const RESERVATION_LIST_COLUMNS =
-  "id,profile_id,name,phone,date,start_time,end_time,people,status,payment_status,payment_preference,price_at_booking,pass_type,pass_name_snapshot,seat_type_id,access_start_date,access_end_date,access_weekdays,access_paused_from,access_paused_until,deleted_at,created_at";
+  "id,profile_id,name,phone,date,start_time,end_time,people,status,payment_status,payment_preference,price_at_booking,list_price_at_booking,discount_percent_at_booking,coupon_id,coupon_percent_at_booking,price_before_coupon,pass_type,pass_name_snapshot,seat_type_id,access_start_date,access_end_date,access_weekdays,access_paused_from,access_paused_until,deleted_at,created_at";
 
 /** 잔여 좌석 계산에 필요한 최소 컬럼. */
 export const RESERVATION_AVAILABILITY_COLUMNS = "date,start_time,end_time,people,status";
