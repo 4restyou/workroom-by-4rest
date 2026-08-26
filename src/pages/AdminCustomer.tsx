@@ -10,6 +10,7 @@ import { kstDate as kstDateShared, kstDateTime, kstTime, kstToday } from "../lib
 import { formatDate, formatPrice, formatTimeRange } from "../lib/format";
 import { isLongTermReservation } from "../lib/reservations";
 import type { RevenueLog } from "../lib/revenue";
+import { couponScopeOf, couponScopeOptions, issueCoupon as issueCouponRpc, normalizeCouponPercent } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, cardFlat, tintCard } from "../lib/ui";
@@ -121,19 +122,27 @@ export default function AdminCustomer() {
     const name = profile.full_name || "회원";
     const entered = await promptDialog({
       title: `${name}님에게 쿠폰을 발급할까요?`,
-      description: "쿠폰 이름을 비워 두면 설정에 저장된 기본 보상명으로 발급됩니다.",
+      description: "할인율을 정하면 회원이 결제할 때 그만큼 자동으로 빠집니다.",
       confirmLabel: "발급",
-      fields: [{ name: "label", label: "쿠폰 이름", defaultValue: "" }],
+      fields: [
+        { name: "percent", label: "할인율 (%)", defaultValue: "10", numeric: true, hint: "0을 넣으면 결제 할인 없는 현물 쿠폰이 됩니다." },
+        { name: "scope", label: "쓸 수 있는 곳", defaultValue: "month_pass", options: couponScopeOptions },
+        { name: "label", label: "쿠폰 이름 (비워두면 자동)", defaultValue: "" },
+      ],
     });
     if (!entered) return;
     const label = (entered.label ?? "").trim();
     setBusy("coupon");
-    const { data, error: rpcError } = await supabase.rpc("admin_issue_coupon", { p_profile_id: profile.id, p_label: label || null });
-    const result = data as { ok?: boolean; message?: string; label?: string } | null;
+    const result = await issueCouponRpc({
+      profileId: profile.id,
+      label,
+      percent: normalizeCouponPercent(entered.percent),
+      scope: couponScopeOf(entered.scope),
+    });
     setBusy(null);
-    if (rpcError || !result?.ok) { setError(result?.message ?? rpcError?.message ?? "쿠폰 발급에 실패했습니다."); return; }
+    if (!result.ok) { setError(result.message); return; }
     setError("");
-    setSuccess(`'${result.label ?? (label || "보상")}' 쿠폰을 발급했어요 🎫`);
+    setSuccess(`'${result.label ?? label}' 쿠폰을 발급했어요 🎫`);
     await load();
   }
 

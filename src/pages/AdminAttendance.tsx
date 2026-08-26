@@ -7,6 +7,7 @@ import WalkInForm, { type WalkInDraft } from "../components/admin/WalkInForm";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, readableReservationError, reservationCoversDate } from "../lib/reservations";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
+import { couponScopeOf, couponScopeOptions, describeCoupon, issueCoupon as issueCouponRpc, normalizeCouponPercent, type CouponScope } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, type TintColor } from "../lib/ui";
@@ -29,6 +30,8 @@ type CouponRow = {
   code: string;
   label: string;
   status: "issued" | "used";
+  discount_percent?: number | null;
+  applies_to?: string | null;
   issued_at: string;
   used_at: string | null;
   profile: { full_name: string | null } | null;
@@ -71,6 +74,8 @@ export default function AdminAttendance() {
   const [couponResults, setCouponResults] = useState<MemberOption[]>([]);
   const [couponTarget, setCouponTarget] = useState<MemberOption | null>(null);
   const [couponLabel, setCouponLabel] = useState("");
+  const [couponPercent, setCouponPercent] = useState("10");
+  const [couponScope, setCouponScope] = useState<CouponScope>("month_pass");
 
   async function load(silent = false) {
     if (!supabase) return;
@@ -133,19 +138,23 @@ export default function AdminAttendance() {
   async function issueCoupon() {
     if (!supabase || !couponTarget) return;
     const name = couponTarget.full_name || "회원";
-    const label = couponLabel.trim() || "보상";
-    const ok = await confirmDialog({ title: `${name}님에게 '${label}' 쿠폰을 발급할까요?`, confirmLabel: "발급" });
+    const percent = normalizeCouponPercent(couponPercent);
+    // 확인 창에 할인율을 그대로 읽어 준다 — 잘못 친 숫자가 그대로 나가지 않게.
+    const ok = await confirmDialog({
+      title: `${name}님에게 쿠폰을 발급할까요?`,
+      description: describeCoupon(percent, couponScope),
+      confirmLabel: "발급",
+    });
     if (!ok) return;
     setBusy("coupon");
-    const { data, error: rpcError } = await supabase.rpc("admin_issue_coupon", { p_profile_id: couponTarget.id, p_label: couponLabel.trim() || null });
-    const result = data as { ok?: boolean; message?: string; label?: string } | null;
+    const result = await issueCouponRpc({ profileId: couponTarget.id, label: couponLabel, percent, scope: couponScope });
     setBusy(null);
-    if (rpcError || !result?.ok) {
-      setError(rpcError?.message?.includes("function") ? "쿠폰 발급 기능이 아직 준비되지 않았습니다. 마이그레이션(0031) 적용을 확인해 주세요." : result?.message ?? rpcError?.message ?? "쿠폰 발급에 실패했습니다.");
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
-    setSuccess(`${name}님에게 '${result.label ?? label}' 쿠폰을 발급했어요 🎫`);
-    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel("");
+    setSuccess(`${name}님에게 '${result.label ?? couponLabel.trim()}' 쿠폰을 발급했어요 🎫`);
+    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel(""); setCouponPercent("10"); setCouponScope("month_pass");
     await load(true);
   }
 
@@ -481,7 +490,22 @@ export default function AdminAttendance() {
                     ))}
                   </>
                 )}
-                <input placeholder="쿠폰 이름 (비워두면 기본 보상명)" value={couponLabel} onChange={(event) => setCouponLabel(event.target.value)} />
+                <div className="grid gap-2 sm:grid-cols-[110px_1fr]">
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    할인율(%)
+                    <input inputMode="numeric" max={90} min={0} type="number" value={couponPercent} onChange={(event) => setCouponPercent(event.target.value)} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold text-workroom-muted">
+                    쓸 수 있는 곳
+                    <select value={couponScope} onChange={(event) => setCouponScope(couponScopeOf(event.target.value))}>
+                      {couponScopeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <input placeholder="쿠폰 이름 (비워두면 할인율로 자동)" value={couponLabel} onChange={(event) => setCouponLabel(event.target.value)} />
+                <p className="text-xs font-medium text-workroom-muted">{describeCoupon(normalizeCouponPercent(couponPercent), couponScope)} · 회원이 결제할 때 자동으로 빠집니다.</p>
                 <button className={buttonClass("primary", "md")} disabled={!couponTarget || busy === "coupon"} onClick={() => void issueCoupon()} type="button">{busy === "coupon" ? "발급 중…" : "쿠폰 발급"}</button>
               </div>
             </section>
@@ -511,7 +535,7 @@ function AttendanceCard({ busy, onDelete, onSave, row }: { busy: boolean; onDele
 
 function CouponRow({ busy, coupon, onClick }: { busy: boolean; coupon: CouponRow; onClick: () => void }) {
   const isUsed = coupon.status === "used";
-  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button></div>;
+  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button></div>;
 }
 
 function toKstInput(value: string) {

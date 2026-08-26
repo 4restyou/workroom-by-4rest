@@ -22,6 +22,8 @@ export type PromptField = {
   defaultValue?: string;
   /** 숫자 전용 키패드를 띄운다. 값 자체는 문자열로 돌려준다. */
   numeric?: boolean;
+  /** 주면 입력칸 대신 고르는 칸이 된다. */
+  options?: Array<{ value: string; label: string }>;
   required?: boolean;
 };
 

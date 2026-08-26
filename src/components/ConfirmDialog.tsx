@@ -143,15 +143,29 @@ export default function ConfirmDialog() {
                 <label className="text-xs font-black" htmlFor={`confirm-field-${request.id}-${field.name}`}>
                   {field.label}
                 </label>
-                <input
-                  autoComplete="off"
-                  className="w-full rounded-[6px] border border-workroom-ink bg-workroom-background px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
-                  data-prompt-field
-                  id={`confirm-field-${request.id}-${field.name}`}
-                  inputMode={field.numeric ? "numeric" : undefined}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-                  value={values[field.name] ?? ""}
-                />
+                {field.options ? (
+                  <select
+                    className="w-full rounded-[6px] border border-workroom-ink bg-workroom-background px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
+                    data-prompt-field
+                    id={`confirm-field-${request.id}-${field.name}`}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                    value={values[field.name] ?? ""}
+                  >
+                    {field.options.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    autoComplete="off"
+                    className="w-full rounded-[6px] border border-workroom-ink bg-workroom-background px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-workroom-yellow"
+                    data-prompt-field
+                    id={`confirm-field-${request.id}-${field.name}`}
+                    inputMode={field.numeric ? "numeric" : undefined}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                    value={values[field.name] ?? ""}
+                  />
+                )}
                 {field.hint ? <p className="text-[11px] font-medium leading-4 text-workroom-muted">{field.hint}</p> : null}
               </div>
             ))}
