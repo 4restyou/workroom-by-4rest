@@ -18,6 +18,7 @@
 
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
 import { accessEndDate } from "../_shared/accessPeriod.ts";
+import { recurringChargeAmount } from "../_shared/pricing.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -81,6 +82,9 @@ type ReservationRow = {
   price_at_booking: number | null;
   /** 쿠폰을 빼기 전 금액. 정기결제는 이 금액으로 등록한다(migration 0048). */
   price_before_coupon: number | null;
+  /** 할인 전 정가(정가 x 인원). 정기결제 기준액이 된다. */
+  list_price_at_booking: number | null;
+  people: number | null;
   pass_id: string | null;
   pass_type: string;
   pass_name_snapshot: string | null;
@@ -89,7 +93,7 @@ type ReservationRow = {
 
 async function getReservation(id: string): Promise<ReservationRow | null> {
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/reservations?id=eq.${id}&select=id,profile_id,name,phone,email,status,payment_status,price_at_booking,price_before_coupon,pass_id,pass_type,pass_name_snapshot,access_end_date`,
+    `${SUPABASE_URL}/rest/v1/reservations?id=eq.${id}&select=id,profile_id,name,phone,email,status,payment_status,price_at_booking,price_before_coupon,list_price_at_booking,people,pass_id,pass_type,pass_name_snapshot,access_end_date`,
     { headers: serviceHeaders },
   );
   const rows = (await resp.json()) as ReservationRow[];
@@ -121,6 +125,24 @@ async function recordPaymentLog(log: {
     });
   } catch (error) {
     console.error("[portone-billing] log error", { message: errorMessage(error) });
+  }
+}
+
+type PassRow = { id: string; price: number; discount_percent: number | null; discount_until: string | null };
+
+/** 이용권의 현재 정가와 걸려 있는 할인. 없으면 null(기준액 그대로 청구). */
+async function getPass(passId: string | null): Promise<PassRow | null> {
+  if (!passId) return null;
+  try {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/passes?id=eq.${passId}&select=id,price,discount_percent,discount_until`,
+      { headers: serviceHeaders },
+    );
+    if (!resp.ok) return null;
+    const rows = (await resp.json()) as PassRow[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -197,10 +219,13 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
   if (reservation.profile_id !== user.id) return json({ ok: false, message: "본인 예약만 결제할 수 있습니다." }, 403, headers);
   const passName = reservation.pass_name_snapshot || reservation.pass_type;
   if (!passName.includes("월권")) return json({ ok: false, message: "정기결제는 월권만 가능합니다." }, 400, headers);
-  // 첫 회차는 쿠폰까지 뺀 금액으로 청구하고, 구독에는 쿠폰을 빼기 전 금액을 남긴다.
-  // 쿠폰 한 장은 한 번이다. 구독 금액에 넣으면 해지할 때까지 계속 할인된다.
+  // 첫 회차는 지금 화면에 뜬 금액(할인·쿠폰 반영)으로 청구한다.
   const amount = Number(reservation.price_at_booking ?? 0);
-  const recurringAmount = Number(reservation.price_before_coupon ?? reservation.price_at_booking ?? 0);
+  // 구독에는 '정가'를 남긴다. 다음 회차부터는 결제하는 날의 할인을 다시 보고
+  // 청구하되, 이 금액을 넘지는 않는다(정가를 올려도 기존 회원은 그대로).
+  const recurringAmount = Number(
+    reservation.list_price_at_booking ?? reservation.price_before_coupon ?? reservation.price_at_booking ?? 0,
+  );
   if (amount <= 0 || recurringAmount <= 0) return json({ ok: false, message: "결제 금액이 올바르지 않습니다." }, 400, headers);
   if (reservation.payment_status === "paid") return json({ ok: false, message: "이미 결제된 예약입니다." }, 400, headers);
 
@@ -244,33 +269,31 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
       status: "active", next_charge_at: addDays(periodEnd, 1), last_paid_at: new Date().toISOString(),
     }),
   });
-  // 승인이 끝났으니 쿠폰을 쓴다.
-  if (amount !== recurringAmount) {
-    await fetch(`${SUPABASE_URL}/rest/v1/rpc/consume_reservation_coupon`, {
-      method: "POST",
-      headers: { ...serviceHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_reservation_id: reservationId }),
-    }).catch((error) => console.error("[portone-billing] consume coupon failed", { message: String(error) }));
-  }
+  // 승인이 끝났으니 쿠폰을 쓴다(쿠폰이 없는 예약이면 아무 일도 하지 않는다).
+  await fetch(`${SUPABASE_URL}/rest/v1/rpc/consume_reservation_coupon`, {
+    method: "POST",
+    headers: { ...serviceHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_reservation_id: reservationId }),
+  }).catch((error) => console.error("[portone-billing] consume coupon failed", { message: String(error) }));
 
   await recordPaymentLog({
     reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "succeeded", amount,
     message: amount === recurringAmount
       ? "정기결제 등록 및 첫 결제 완료"
-      : `정기결제 등록 및 첫 결제 완료 · 쿠폰 적용(다음 회차부터 ${recurringAmount.toLocaleString("ko-KR")}원)`,
+      : `정기결제 등록 및 첫 결제 완료 · 정가 ${recurringAmount.toLocaleString("ko-KR")}원 기준(다음 회차는 결제일의 할인에 따라 청구)`,
   });
   return json({ ok: true, message: "정기결제가 등록되고 첫 결제가 완료되었습니다." }, 200, headers);
 }
 
 type SubscriptionRow = {
   id: string; profile_id: string; reservation_id: string | null; billing_key: string;
-  pass_name: string; amount: number; cycle_days: number; next_charge_at: string | null; fail_count: number;
+  pass_id: string | null; pass_name: string; amount: number; cycle_days: number; next_charge_at: string | null; fail_count: number;
 };
 
 async function handleCharge(headers: Record<string, string>): Promise<Response> {
   const today = kstToday();
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/subscriptions?status=eq.active&next_charge_at=lte.${today}&select=id,profile_id,reservation_id,billing_key,pass_name,amount,cycle_days,next_charge_at,fail_count`,
+    `${SUPABASE_URL}/rest/v1/subscriptions?status=eq.active&next_charge_at=lte.${today}&select=id,profile_id,reservation_id,billing_key,pass_id,pass_name,amount,cycle_days,next_charge_at,fail_count`,
     { headers: serviceHeaders },
   );
   const subs = (await resp.json()) as SubscriptionRow[];
@@ -290,7 +313,19 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
     const customer = reservation
       ? { fullName: reservation.name, phoneNumber: reservation.phone, ...(reservation.email ? { email: reservation.email } : {}) }
       : { fullName: "회원", phoneNumber: "" };
-    const charge = await chargeBillingKey(paymentId, sub.billing_key, `WORKROOM ${sub.pass_name} (정기결제)`, sub.amount, customer);
+    // 청구액은 '결제하는 날' 기준이다. 그날 할인이 걸려 있으면 할인가로,
+    // 없으면 정가로. 단, 등록할 때 동의한 금액보다 더 받지는 않는다.
+    const pass = await getPass(sub.pass_id);
+    const chargeAmount = recurringChargeAmount({
+      baseAmount: sub.amount,
+      unitPrice: pass?.price ?? null,
+      people: reservation?.people ?? 1,
+      discountPercent: pass?.discount_percent ?? 0,
+      discountUntil: pass?.discount_until ?? null,
+      onDate: today,
+    });
+
+    const charge = await chargeBillingKey(paymentId, sub.billing_key, `WORKROOM ${sub.pass_name} (정기결제)`, chargeAmount, customer);
     if (charge.ok) {
       charged += 1;
       // 이번 회차도 첫 회차와 같은 규칙으로 센다 — 4주치 영업일(월권 24일),
@@ -313,7 +348,12 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
         headers: { ...serviceHeaders, Prefer: "return=minimal" },
         body: JSON.stringify({ next_charge_at: nextCharge, last_paid_at: new Date().toISOString(), fail_count: 0 }),
       });
-      if (sub.reservation_id) await recordPaymentLog({ reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "succeeded", amount: sub.amount, message: "정기결제 자동청구 완료" });
+      if (sub.reservation_id) await recordPaymentLog({
+        reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "succeeded", amount: chargeAmount,
+        message: chargeAmount < sub.amount
+          ? `정기결제 자동청구 완료 · 할인 적용(정가 ${sub.amount.toLocaleString("ko-KR")}원)`
+          : "정기결제 자동청구 완료",
+      });
     } else {
       failed += 1;
       const nextFail = sub.fail_count + 1;
@@ -328,7 +368,7 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
             : { fail_count: nextFail, ...(nextFail >= 3 ? { status: "paused" } : {}) },
         ),
       });
-      if (sub.reservation_id) await recordPaymentLog({ reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "failed", amount: sub.amount, provider_code: charge.code, message: `${charge.message}${nextFail >= 3 ? " · 3회 실패로 일시정지" : ""}` });
+      if (sub.reservation_id) await recordPaymentLog({ reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "failed", amount: chargeAmount, provider_code: charge.code, message: `${charge.message}${nextFail >= 3 ? " · 3회 실패로 일시정지" : ""}` });
     }
   }
   return json({ ok: true, charged, failed, total: Array.isArray(subs) ? subs.length : 0 }, 200, headers);
