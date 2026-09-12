@@ -25,6 +25,7 @@ const settingKeys = [
   "relax_notice",
   "print_notice",
   "location_notice",
+  "door_code",
   "reservation_enabled",
 ] as const;
 const settingLabels: Record<(typeof settingKeys)[number], string> = {
@@ -37,6 +38,7 @@ const settingLabels: Record<(typeof settingKeys)[number], string> = {
   relax_notice: "릴렉스타임 안내 문구",
   print_notice: "프린트 안내 문구",
   location_notice: "위치 안내 문구",
+  door_code: "출입구 비밀번호",
   reservation_enabled: "예약 받기",
 };
 

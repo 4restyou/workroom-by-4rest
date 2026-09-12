@@ -52,6 +52,8 @@ export default function AdminReservations() {
   const [passes, setPasses] = useState<Pass[]>([]);
   // 영업 요일(휴무가 아닌 요일). 월권·주간권 기본 이용 요일에서 휴무일을 제외한다.
   const [openWeekdays, setOpenWeekdays] = useState<number[]>(ALL_WEEKDAYS);
+  // 이용 안내 문구에 들어갈 출입구 비밀번호(설정에서 관리).
+  const [doorCode, setDoorCode] = useState("");
   // 장기 이용 탭: 기본은 이번 달에 걸친 이용권만 본다("" = 전체 기간).
   const [longTermMonth, setLongTermMonth] = useState(() => todayValue().slice(0, 7));
   const [showCreate, setShowCreate] = useState(false);
@@ -102,13 +104,15 @@ export default function AdminReservations() {
     setIsLoading(true);
     setError("");
 
-    const [{ data, error: loadError }, { data: passRows }, { data: hourRows }] = await Promise.all([
+    const [{ data, error: loadError }, { data: passRows }, { data: hourRows }, { data: settingRows }] = await Promise.all([
       // 이 화면은 목록과 상세 편집이 같은 배열을 쓴다. 상세 카드가 관리자 메모·
       // 결제수단·요청사항까지 편집하므로 여기서는 전체 컬럼이 필요하다.
       // (목록만 쓰는 화면은 lib/columns의 좁은 목록을 사용한다.)
       supabase.from("reservations").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
       loadPassesFromDb({ activeOnly: true }),
       supabase.from("business_hours").select("weekday,is_closed"),
+      // 이용 안내 문구에 들어갈 출입구 비밀번호. 코드에 두지 않는다.
+      supabase.from("space_settings").select("key,value").eq("key", "door_code").limit(1),
     ]);
 
     setIsLoading(false);
@@ -123,6 +127,7 @@ export default function AdminReservations() {
     if (hourRows?.length) {
       setOpenWeekdays(openWeekdaysFromRows(hourRows as { weekday: number; is_closed: boolean }[]));
     }
+    setDoorCode((settingRows ?? [])[0]?.value ?? "");
   }
 
   async function createManualReservation(payload: ReservationInsert) {
@@ -563,6 +568,7 @@ export default function AdminReservations() {
       smsLogs={smsLogs}
       passes={passes}
       openWeekdays={openWeekdays}
+      doorCode={doorCode}
       isArchived={Boolean(selectedReservation.deleted_at)}
       key={selectedReservation.id}
       reservation={selectedReservation}

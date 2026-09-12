@@ -6,6 +6,7 @@ import {
   buildCanceledMessage,
   buildConfirmedMessage,
   buildPaymentRequestMessage,
+  buildUsageGuideMessage,
   describeAuditLog,
   describePaymentLog,
   formatAuditTime,
@@ -37,7 +38,7 @@ import type {
 } from "../../lib/types";
 
 // 안내 문구 종류. 결제 전 안내는 미결제 예약에서 가장 자주 쓴다.
-type MessageKind = "confirmed" | "payment" | "canceled";
+type MessageKind = "confirmed" | "payment" | "canceled" | "usage";
 
 export default function ReservationCard({
   conflictCount,
@@ -46,6 +47,7 @@ export default function ReservationCard({
   smsLogs,
   passes,
   openWeekdays,
+  doorCode,
   isArchived,
   reservation,
   inquiries,
@@ -62,6 +64,8 @@ export default function ReservationCard({
   smsLogs: ReservationSmsLog[];
   passes: Pass[];
   openWeekdays: number[];
+  /** 설정(space_settings.door_code)의 출입구 비밀번호. 이용 안내 문구에 들어간다. */
+  doorCode?: string | null;
   isArchived: boolean;
   reservation: Reservation;
   inquiries: ReservationInquiry[];
@@ -203,7 +207,9 @@ export default function ReservationCard({
         ? buildConfirmedMessage(reservation)
         : kind === "payment"
           ? buildPaymentRequestMessage(reservation)
-          : buildCanceledMessage(reservation);
+          : kind === "usage"
+            ? buildUsageGuideMessage(reservation, doorCode)
+            : buildCanceledMessage(reservation);
     await navigator.clipboard.writeText(message);
     setCopiedMessage(kind);
     window.setTimeout(() => setCopiedMessage(null), 1800);
@@ -246,6 +252,7 @@ export default function ReservationCard({
           <div className="absolute left-0 top-[calc(100%+6px)] z-10 grid w-44 gap-1 border border-workroom-ink bg-white p-2">
             <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("confirmed")} type="button">{copiedMessage === "confirmed" ? "복사됨" : "확정 문구 복사"}</button>
             <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("payment")} type="button">{copiedMessage === "payment" ? "복사됨" : "결제 안내 복사"}</button>
+            <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("usage")} type="button">{copiedMessage === "usage" ? "복사됨" : "이용안내 복사"}</button>
             <button className={buttonClass("secondary", "sm")} onClick={() => void copyMessage("canceled")} type="button">{copiedMessage === "canceled" ? "복사됨" : "취소 문구 복사"}</button>
           </div>
         </details>

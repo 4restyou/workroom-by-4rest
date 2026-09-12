@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDaysStr,
   buildPaymentRequestMessage,
+  buildUsageGuideMessage,
   formatCompactPeriod,
   getConflictCount,
   isReservationStatus,
@@ -174,5 +175,40 @@ describe("buildPaymentRequestMessage", () => {
   it("says the amount will be confirmed later when no price is set", () => {
     const text = buildPaymentRequestMessage(reservation({ pass_type: "단체 및 모임 이용권", price_at_booking: null }));
     expect(text).toContain("금액: 확인 후 안내드립니다");
+  });
+});
+
+describe("buildUsageGuideMessage", () => {
+  it("gives the time pass one cup and the day pass three", () => {
+    expect(buildUsageGuideMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }), "1234")).toContain("커피는 1잔 드립니다.");
+    expect(buildUsageGuideMessage(reservation({ pass_type: "추가 1시간", pass_name_snapshot: "추가 1시간" }), "1234")).toContain("커피는 1잔 드립니다.");
+    expect(buildUsageGuideMessage(reservation({ pass_type: "종일권", pass_name_snapshot: "종일권" }), "1234")).toContain("커피는 하루 3잔까지 드립니다.");
+    expect(buildUsageGuideMessage(reservation({ pass_type: "월권 자유석", pass_name_snapshot: "월권 자유석" }), "1234")).toContain("커피는 하루 3잔까지 드립니다.");
+  });
+
+  it("puts the door code in when there is one", () => {
+    expect(buildUsageGuideMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }), "8825*")).toContain("출입구 비밀번호 8825*");
+  });
+
+  it("promises to send the code separately when it is not set", () => {
+    // 설정에 비밀번호가 없는데 빈칸을 보내면 손님이 문 앞에서 못 들어온다.
+    const text = buildUsageGuideMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }), "");
+    expect(text).toContain("방문 전에 따로 안내드릴게요");
+    expect(text).not.toContain("출입구 비밀번호 ");
+  });
+
+  it("reads in the order a first visit happens", () => {
+    const text = buildUsageGuideMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }), "1234");
+    const order = ["■ 위치", "■ 실내화", "■ 자리", "■ 커피", "■ 컵", "■ 음악", "■ 에어컨", "■ 음식 · 소리", "■ 나가실 때"];
+    const positions = order.map((heading) => text.indexOf(heading));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+  });
+
+  it("gives the mobile number, not the landline", () => {
+    // 유선번호는 카드사 표시용이다. 손님이 걸 곳은 휴대폰.
+    const text = buildUsageGuideMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }), "1234");
+    expect(text).toContain("문의 010-4931-3298");
+    expect(text).not.toContain("070-8211-1734");
   });
 });
