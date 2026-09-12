@@ -36,6 +36,7 @@ const Privacy = lazyPage(() => import("./pages/Privacy"));
 const Reserve = lazyPage(() => import("./pages/Reserve"));
 const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
 const Terms = lazyPage(() => import("./pages/Terms"));
+const Visit = lazyPage(() => import("./pages/Visit"));
 
 initAnalytics();
 watchForAppUpdate();
@@ -60,6 +61,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="directory/edit" element={<DirectoryEdit />} />
           <Route path="board" element={<Board />} />
           <Route path="faq" element={<Faq />} />
+          <Route path="visit" element={<Visit />} />
           <Route path="terms" element={<Terms />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="payment/portone" element={<PaymentPortone />} />

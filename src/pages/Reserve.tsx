@@ -1238,6 +1238,11 @@ export default function Reserve() {
             >
               {submittedReservation?.reservation.payment_status === "paid" ? "확정된 예약 보기" : "예약현황에서 보기"}
             </Link>
+            {/* 처음 오는 손님이 제일 궁금한 것 — 문은 어떻게 열고 자리는 어디에 앉나.
+                이용일이 되면 이 화면에서 출입구 비밀번호까지 보여 준다. */}
+            <Link className={buttonClass("secondary", "lg", "mt-2 w-full")} to="/visit">
+              방문 안내 보기
+            </Link>
             <button className={buttonClass("secondary", "md", "mt-2 w-full")} onClick={() => setSuccess(false)} type="button">
               닫기
             </button>

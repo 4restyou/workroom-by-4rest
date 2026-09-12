@@ -110,6 +110,7 @@ const adminTabs: Tab[] = [
 
 // '더보기' 시트 메뉴 — 홈 하단까지 스크롤하지 않아도 명함첩·메모판에 닿도록.
 const memberMoreItems: MoreItem[] = [
+  { to: "/visit", label: "방문 안내", description: "출입구·자리·커피·퇴실", icon: infoIcon },
   { to: "/directory", label: "멤버 명함첩", description: "함께 쓰는 사람들의 명함", icon: <IdCardIcon className="h-5 w-5" /> },
   { to: "/board", label: "메모판", description: "공지와 회원들의 한마디", icon: <PinIcon className="h-5 w-5" /> },
   { to: "/faq", label: "이용안내", description: "예약·결제·환불 안내", icon: infoIcon },

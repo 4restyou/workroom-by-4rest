@@ -5,7 +5,7 @@
 // 테스트할 수 있다 (src/lib/adminReservations.test.ts).
 
 import { formatDate, formatPrice, formatTimeRange, statusLabel } from "./format";
-import { SITE } from "./site";
+import { guideCupsFor, visitGuideText } from "./visitGuide";
 import { isLongTermPassName } from "./reservations";
 import { tintCard } from "./ui";
 import type {
@@ -203,62 +203,12 @@ function paymentDeadlineLine(passName: string) {
 /**
  * 처음 오는 손님에게 보낼 이용 안내.
  *
- * 들어와서 나갈 때까지의 순서대로 적는다 — 손님이 실제로 겪는 순서라
- * 읽으면서 그대로 따라 하게 된다. 규칙(음식·소리·금연)은 한 덩어리로 묶는다.
- * 항목이 열 개를 넘기면 읽지 않는다.
- *
- * 출입구 비밀번호는 코드에 두지 않는다. 저장소가 공개되어 있고, 비밀번호를
- * 바꿀 때마다 배포해야 한다. 설정(space_settings.door_code)에서 받아 채운다.
+ * 내용은 lib/visitGuide 에 있다 — 회원이 앱에서 보는 방문 안내 화면과 같은
+ * 글이어야 한다. 여기서 따로 적으면 한쪽만 고쳐진 채로 나간다.
  */
 export function buildUsageGuideMessage(reservation: Reservation, doorCode?: string | null): string {
   const passName = reservation.pass_name_snapshot || reservation.pass_type || "";
-  // 하루 종일 머무는 상품만 3잔이고 나머지는 1잔이다. '3잔인 것'을 나열하는
-  // 쪽으로 적는다 — 새 이용권이 생겼을 때 모르는 채로 3잔이 나가지 않는다.
-  const allDay = ["종일", "주간", "월권"].some((kind) => passName.includes(kind));
-  const cups = allDay ? 3 : 1;
-  const code = (doorCode ?? "").trim();
-
-  return [
-    "[WORKROOM by 4REST] 이용 안내",
-    "",
-    "■ 위치",
-    SITE.address,
-    code ? `출입구 비밀번호 ${code}` : "출입구 비밀번호는 방문 전에 따로 안내드릴게요.",
-    `운영 ${SITE.hoursLabel}`,
-    "",
-    "■ 실내화",
-    "들어오시면 신발은 신발장에 넣으시고 실내화로 갈아 신어 주세요.",
-    "",
-    "■ 자리",
-    "지정석이 아니니 비어 있는 자리 중 편한 곳으로 앉으시면 됩니다.",
-    "",
-    "■ 커피 · 정수기 · 화장실",
-    "들어오셔서 왼편에 커피머신과 정수기가 있습니다. 화장실도 같은 쪽입니다.",
-    cups === 1 ? "커피는 1잔 드립니다." : "커피는 하루 3잔까지 드립니다.",
-    "",
-    "■ 컵",
-    "일회용품은 되도록 쓰지 말아 주세요. 비치된 컵을 쓰시고,",
-    "다 쓰신 뒤에는 설거지까지 부탁드립니다.",
-    "",
-    "■ 음악",
-    "앰프 전원을 켜신 뒤 패드에서 재생을 눌러 주세요.",
-    "패드 잠금 패턴은 'ㄱ' 자입니다.",
-    "",
-    "■ 에어컨",
-    "필요하시면 쓰셔도 됩니다. 리모컨은 신발장 위에 있습니다.",
-    "",
-    "■ 음식 · 소리",
-    "냄새가 강하지 않은 것은 괜찮습니다. (과자, 샌드위치 등)",
-    "통화나 대화는 편하게 하셔도 됩니다. 서로 방해되지 않을 정도면 충분합니다.",
-    "실내는 전면 금연입니다.",
-    "",
-    "■ 나가실 때",
-    "마지막으로 나가시는 거라면",
-    "에어컨과 오디오, 메인 조명을 꺼 주세요.",
-    "",
-    `주차 ${SITE.parking.name} (${SITE.parking.address})`,
-    `문의 ${SITE.phone}`,
-  ].join("\n");
+  return visitGuideText({ cups: guideCupsFor(passName), doorCode });
 }
 
 export function buildCanceledMessage(reservation: Reservation) {
