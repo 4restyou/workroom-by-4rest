@@ -212,8 +212,10 @@ function paymentDeadlineLine(passName: string) {
  */
 export function buildUsageGuideMessage(reservation: Reservation, doorCode?: string | null): string {
   const passName = reservation.pass_name_snapshot || reservation.pass_type || "";
-  // 시간권은 1잔, 종일권부터 하루 3잔.
-  const cups = passName.includes("시간") ? 1 : 3;
+  // 하루 종일 머무는 상품만 3잔이고 나머지는 1잔이다. '3잔인 것'을 나열하는
+  // 쪽으로 적는다 — 새 이용권이 생겼을 때 모르는 채로 3잔이 나가지 않는다.
+  const allDay = ["종일", "주간", "월권"].some((kind) => passName.includes(kind));
+  const cups = allDay ? 3 : 1;
   const code = (doorCode ?? "").trim();
 
   return [

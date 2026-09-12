@@ -179,6 +179,15 @@ describe("buildPaymentRequestMessage", () => {
 });
 
 describe("buildUsageGuideMessage", () => {
+  it("gives one cup to anything short of a full day", () => {
+    // 단체·모임은 3시간 대관이라 1잔이다.
+    expect(buildUsageGuideMessage(reservation({ pass_type: "단체 및 모임 이용권", pass_name_snapshot: "단체 및 모임 이용권" }), "1234")).toContain("커피는 1잔 드립니다.");
+  });
+
+  it("gives three cups only to the all-day passes", () => {
+    expect(buildUsageGuideMessage(reservation({ pass_type: "주간권", pass_name_snapshot: "주간권" }), "1234")).toContain("커피는 하루 3잔까지 드립니다.");
+  });
+
   it("gives the time pass one cup and the day pass three", () => {
     expect(buildUsageGuideMessage(reservation({ pass_type: "3시간권", pass_name_snapshot: "3시간권" }), "1234")).toContain("커피는 1잔 드립니다.");
     expect(buildUsageGuideMessage(reservation({ pass_type: "추가 1시간", pass_name_snapshot: "추가 1시간" }), "1234")).toContain("커피는 1잔 드립니다.");
