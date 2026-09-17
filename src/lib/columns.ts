@@ -27,7 +27,7 @@ export const ATTENDANCE_COLUMNS = "id,profile_id,reservation_id,check_in_at,chec
 /** 이용권 목록(가격표·예약 화면). */
 
 /** 회원 목록. */
-export const PROFILE_LIST_COLUMNS = "id,full_name,email,phone,address,admin_note,created_at,role";
+export const PROFILE_LIST_COLUMNS = "id,full_name,email,phone,address,admin_note,created_at,role,blocked_at,blocked_reason";
 
 /** 쿠폰 목록. */
 // discount_percent·applies_to 는 migration 0048에서 생겼다.

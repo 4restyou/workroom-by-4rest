@@ -14,6 +14,9 @@ export type Profile = {
   admin_note: string | null;
   consented_at: string | null;
   created_at: string;
+  /** 차단한 시각. 값이 있으면 새 예약을 만들 수 없다(migration 0054). */
+  blocked_at?: string | null;
+  blocked_reason?: string | null;
 };
 
 export type Pass = {

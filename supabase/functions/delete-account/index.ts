@@ -1,8 +1,11 @@
-// Supabase Edge Function: member self-service account deletion (회원 탈퇴).
+// Supabase Edge Function: 회원 탈퇴 — 본인이 하거나, 관리자가 대신 지운다.
 //
-// Anonymizes the member's past reservations (strips name/phone/email so business
-// records survive without personal data), then deletes the auth user — which
-// cascades the profile and inquiries. Irreversible.
+// 지난 예약은 익명화하고(이름·연락처를 지워 영업 기록만 남긴다) auth 사용자를
+// 삭제한다 — 프로필과 문의는 FK로 함께 사라진다. 되돌릴 수 없다.
+//
+// 관리자 경로는 광고 목적으로 가입한 계정을 치우기 위한 것이다. 다녀간 적이
+// 있는 회원은 지우지 말고 차단해야 한다(migration 0054) — 계정을 지우면 그
+// 사람의 결제·방문 기록이 주인을 잃는다.
 //
 // Required secrets:
 //   SUPABASE_URL                   - (auto-provided)
@@ -69,8 +72,21 @@ Deno.serve(async (request) => {
 
     const serviceHeaders = { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` };
 
+    // 1-b) 관리자가 다른 회원을 지우는 경우. 역할은 토큰이 아니라 DB에서 확인한다.
+    const body = (await request.json().catch(() => ({}))) as { profileId?: unknown };
+    let targetId = user.id;
+    if (typeof body.profileId === "string" && body.profileId && body.profileId !== user.id) {
+      const roleResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`,
+        { headers: serviceHeaders },
+      );
+      const rows = (await roleResp.json().catch(() => [])) as Array<{ role?: string }>;
+      if (rows[0]?.role !== "admin") return json({ ok: false, message: "관리자만 다른 회원을 삭제할 수 있습니다." }, 403, headers);
+      targetId = body.profileId;
+    }
+
     // 2) Anonymize the member's reservations (keep the rows, drop personal data).
-    await fetch(`${SUPABASE_URL}/rest/v1/reservations?profile_id=eq.${user.id}`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/reservations?profile_id=eq.${targetId}`, {
       method: "PATCH",
       headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ name: "탈퇴한 회원", phone: "-", email: null }),
@@ -78,7 +94,7 @@ Deno.serve(async (request) => {
 
     // 3) Delete the auth user. Cascades the profile (and inquiries) via FKs;
     //    reservation.profile_id is set null by the cascade.
-    const del = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
+    const del = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${targetId}`, {
       method: "DELETE",
       headers: serviceHeaders,
     });

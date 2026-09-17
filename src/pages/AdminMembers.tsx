@@ -13,10 +13,10 @@ import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
 import { badge, buttonClass } from "../lib/ui";
 import type { Attendance, Coupon, Profile, Reservation } from "../lib/types";
-import { promptDialog } from "../lib/confirm";
+import { confirmDialog, promptDialog } from "../lib/confirm";
 import { useSession } from "../lib/sessionContext";
 
-type MemberView = "all" | "active" | "noted";
+type MemberView = "all" | "active" | "noted" | "blocked";
 
 export default function AdminMembers() {
   const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
@@ -83,6 +83,90 @@ export default function AdminMembers() {
     setError(""); setSuccess("회원 메모를 저장했습니다.");
   }
 
+  /**
+   * 예약 제한(차단). 삭제가 아니라 차단인 이유 — 다녀간 사람의 계정을 지우면
+   * 그 사람의 결제·방문 기록이 주인을 잃는다.
+   */
+  async function setBlocked(member: Profile, blocked: boolean) {
+    if (!supabase) return;
+    const name = member.full_name || "이 회원";
+    let reason = "";
+
+    if (blocked) {
+      const entered = await promptDialog({
+        title: `${name}님의 예약을 제한할까요?`,
+        description: "새 예약을 만들 수 없게 됩니다. 지난 기록과 결제 내역은 그대로 남습니다.",
+        confirmLabel: "제한",
+        tone: "danger",
+        fields: [{ name: "reason", label: "사유 (관리자만 봅니다)", defaultValue: "" }],
+      });
+      if (!entered) return;
+      reason = (entered.reason ?? "").trim();
+    } else if (!(await confirmDialog({ title: `${name}님의 제한을 해제할까요?`, confirmLabel: "해제" }))) {
+      return;
+    }
+
+    setBusy(`block-${member.id}`);
+    const { data, error: rpcError } = await supabase.rpc("admin_set_member_blocked", {
+      p_profile_id: member.id,
+      p_blocked: blocked,
+      p_reason: reason || null,
+    });
+    const result = data as { ok?: boolean; message?: string } | null;
+    setBusy(null);
+    if (rpcError || !result?.ok) {
+      setError(
+        rpcError?.message?.includes("function")
+          ? "예약 제한은 마이그레이션 0054를 적용해야 동작합니다."
+          : result?.message ?? rpcError?.message ?? "변경하지 못했습니다.",
+      );
+      return;
+    }
+    setError("");
+    setSuccess(result.message ?? "변경했습니다.");
+    await loadMembers();
+  }
+
+  /**
+   * 계정 삭제. 광고 목적으로 가입한 계정을 치우기 위한 것이다.
+   * 되돌릴 수 없고 지난 예약은 '탈퇴한 회원'으로 익명화되므로, 이용한 적이
+   * 있는 회원에게는 차단을 권한다.
+   */
+  async function deleteMember(member: Profile) {
+    if (!supabase) return;
+    const name = member.full_name || member.email;
+    const visits = (byProfile.reservations.get(member.id) ?? []).length;
+
+    const ok = await confirmDialog({
+      title: `${name} 계정을 삭제할까요?`,
+      description: [
+        "되돌릴 수 없습니다.",
+        visits
+          ? `이 회원에게는 예약 기록이 ${visits}건 있습니다. 삭제하면 그 기록은 '탈퇴한 회원'으로 남아 누구인지 알 수 없게 됩니다. 이용한 적이 있는 회원이라면 삭제 대신 예약 제한을 권합니다.`
+          : "예약 기록이 없는 계정입니다.",
+      ].join("\n\n"),
+      confirmLabel: "삭제",
+      tone: "danger",
+      requireTyped: "삭제",
+    });
+    if (!ok) return;
+
+    setBusy(`delete-${member.id}`);
+    const { data, error: fnError } = await supabase.functions.invoke("delete-account", {
+      body: { profileId: member.id },
+    });
+    const result = data as { ok?: boolean; message?: string } | null;
+    setBusy(null);
+    if (fnError || !result?.ok) {
+      setError(result?.message ?? fnError?.message ?? "삭제하지 못했습니다.");
+      return;
+    }
+    setError("");
+    setSuccess(`${name} 계정을 삭제했습니다.`);
+    setSelectedId(null);
+    await loadMembers();
+  }
+
   const activeMemberIds = useMemo(() => {
     const today = todayValue();
     return new Set(reservations.filter((item) => item.status === "confirmed" && isLongTermReservation(item) && reservationCoversDate(item, today)).map((item) => item.profile_id).filter(Boolean));
@@ -94,6 +178,7 @@ export default function AdminMembers() {
     return members.filter((member) => {
       if (view === "active" && !activeMemberIds.has(member.id)) return false;
       if (view === "noted" && !member.admin_note) return false;
+      if (view === "blocked" && !member.blocked_at) return false;
       if (!q) return true;
       return `${member.full_name ?? ""} ${member.email}`.toLowerCase().includes(q) || (digits && (member.phone ?? "").replace(/\D/g, "").includes(digits));
     });
@@ -128,6 +213,7 @@ export default function AdminMembers() {
   // 렌더 중 반복 호출되던 오늘 날짜를 한 번만 구한다.
   const today = todayValue();
   const notedCount = useMemo(() => members.filter((item) => item.admin_note).length, [members]);
+  const blockedCount = useMemo(() => members.filter((item) => item.blocked_at).length, [members]);
 
   const selectedMember = visibleMembers.find((member) => member.id === selectedId) ?? null;
   const selectedReservations = selectedMember ? byProfile.reservations.get(selectedMember.id) ?? [] : [];
@@ -200,14 +286,14 @@ export default function AdminMembers() {
     await loadMembers();
   }
 
-  const detail = selectedMember ? <MemberDetail attendance={selectedAttendance} coupons={selectedCoupons} issuingCoupon={busy === `coupon-${selectedMember.id}`} member={selectedMember} onIssueCoupon={() => void issueCoupon(selectedMember)} onSaveNote={(note) => void saveAdminNote(selectedMember.id, note)} reservations={selectedReservations} /> : null;
+  const detail = selectedMember ? <MemberDetail attendance={selectedAttendance} coupons={selectedCoupons} issuingCoupon={busy === `coupon-${selectedMember.id}`} member={selectedMember} onIssueCoupon={() => void issueCoupon(selectedMember)} onSaveNote={(note) => void saveAdminNote(selectedMember.id, note)} onSetBlocked={(blocked) => void setBlocked(selectedMember, blocked)} onDelete={() => void deleteMember(selectedMember)} busy={busy} reservations={selectedReservations} /> : null;
 
   return (
     <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadMembers()} type="button">새로고침</button><button className={buttonClass("secondary", "md")} disabled={!visibleMembers.length} onClick={exportMembers} type="button">CSV 저장</button></>} description="이용권, 다음 예약, 최근 방문을 기준으로 회원을 확인합니다." title="회원">
       <div className="admin-compact">
         <AdminFeedback error={error} success={success} />
         <div className="mb-5 border-y border-workroom-line bg-white px-3 pt-1">
-          <AdminTabs items={[{ value: "all", label: "전체 회원", count: members.length }, { value: "active", label: "이용권 사용 중", count: activeMemberIds.size }, { value: "noted", label: "메모 있음", count: notedCount }]} onChange={setView} value={view} />
+          <AdminTabs items={[{ value: "all", label: "전체 회원", count: members.length }, { value: "active", label: "이용권 사용 중", count: activeMemberIds.size }, { value: "noted", label: "메모 있음", count: notedCount }, { value: "blocked", label: "예약 제한", count: blockedCount }]} onChange={setView} value={view} />
           <div className="py-3"><input placeholder="이름, 이메일 또는 전화번호 검색" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
         </div>
         {isLoading ? <AdminEmpty>회원 정보를 불러오는 중입니다.</AdminEmpty> : null}
@@ -221,7 +307,7 @@ export default function AdminMembers() {
                 const activePass = memberReservations.find((item) => item.status === "confirmed" && isLongTermReservation(item) && reservationCoversDate(item, today));
                 // 목록에서도 장기 이용권은 '다음 예약'으로 중복 표시하지 않는다.
                 const next = memberReservations.filter((item) => item.status === "confirmed" && item.date >= today && !isLongTermReservation(item)).sort((a, b) => a.date.localeCompare(b.date))[0];
-                return <button className={`admin-row block w-full border-l-[4px] px-4 py-3 text-left ${member.id === selectedId ? "border-l-workroom-yellow bg-workroom-background" : "border-l-transparent bg-white hover:bg-workroom-background"}`} key={member.id} onClick={() => { setSelectedId(member.id); setMobileDetailOpen(true); }} type="button"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{member.full_name || "이름 미입력"}</p><p className="mt-0.5 truncate text-xs text-workroom-muted">{member.phone || member.email}</p></div>{activePass ? <span className={badge("yellow")}>이용권 사용 중</span> : null}</div><p className="mt-2 truncate text-xs font-medium text-workroom-muted">{activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · ${formatDate(activePass.access_end_date || activePass.date)}까지` : next ? `다음 예약 ${formatDate(next.date)}` : "예정된 예약 없음"}</p></button>;
+                return <button className={`admin-row block w-full border-l-[4px] px-4 py-3 text-left ${member.id === selectedId ? "border-l-workroom-yellow bg-workroom-background" : "border-l-transparent bg-white hover:bg-workroom-background"}`} key={member.id} onClick={() => { setSelectedId(member.id); setMobileDetailOpen(true); }} type="button"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{member.full_name || "이름 미입력"}</p><p className="mt-0.5 truncate text-xs text-workroom-muted">{member.phone || member.email}</p></div>{member.blocked_at ? <span className={badge("danger")}>제한</span> : activePass ? <span className={badge("yellow")}>이용권 사용 중</span> : null}</div><p className="mt-2 truncate text-xs font-medium text-workroom-muted">{activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · ${formatDate(activePass.access_end_date || activePass.date)}까지` : next ? `다음 예약 ${formatDate(next.date)}` : "예정된 예약 없음"}</p></button>;
               })}
               {!visibleMembers.length ? <AdminEmpty>조건에 맞는 회원이 없습니다.</AdminEmpty> : null}
             </div>
@@ -235,7 +321,7 @@ export default function AdminMembers() {
   );
 }
 
-function MemberDetail({ attendance, coupons, issuingCoupon, member, onIssueCoupon, onSaveNote, reservations }: { attendance: Attendance[]; coupons: Coupon[]; issuingCoupon: boolean; member: Profile; onIssueCoupon: () => void; onSaveNote: (note: string) => void; reservations: Reservation[] }) {
+function MemberDetail({ attendance, busy, coupons, issuingCoupon, member, onIssueCoupon, onSaveNote, onSetBlocked, onDelete, reservations }: { attendance: Attendance[]; busy: string | null; coupons: Coupon[]; issuingCoupon: boolean; member: Profile; onIssueCoupon: () => void; onSaveNote: (note: string) => void; onSetBlocked: (blocked: boolean) => void; onDelete: () => void; reservations: Reservation[] }) {
   const [note, setNote] = useState(member.admin_note ?? "");
   useEffect(() => setNote(member.admin_note ?? ""), [member]);
   const today = todayValue();
@@ -287,6 +373,14 @@ function MemberDetail({ attendance, coupons, issuingCoupon, member, onIssueCoupo
 
   return <article className="border border-workroom-line bg-white p-4 sm:p-5">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-workroom-line pb-4"><div><h2 className="text-2xl font-bold">{member.full_name || "이름 미입력"}</h2><div className="mt-2 flex flex-wrap gap-2">{member.phone ? <a className={buttonClass("secondary", "sm")} href={`tel:${member.phone}`}>전화</a> : null}<a className={buttonClass("secondary", "sm")} href={`mailto:${member.email}`}>이메일</a><Link className={buttonClass("accent", "sm")} to={`/admin/customer/${member.id}`}>고객 카드 열기</Link></div></div><p className="text-xs font-medium text-workroom-muted">가입 {formatDate(member.created_at.slice(0, 10))}</p></header>
+
+    {/* 제한된 회원은 상세를 열자마자 보여야 한다. 아래 버튼까지 내려가서야
+        알게 되면 이미 응대를 시작한 뒤다. */}
+    {member.blocked_at ? (
+      <p className={`${badge("danger")} mt-4 block w-fit`}>
+        예약 제한됨{member.blocked_reason ? ` · ${member.blocked_reason}` : ""}
+      </p>
+    ) : null}
     <div className="grid border-b border-workroom-line sm:grid-cols-2"><InfoCell
         label="현재 이용권"
         value={activePass ? `${activePass.pass_name_snapshot || activePass.pass_type} · 남은 ${passDaysLeft}일` : "사용 중인 이용권 없음"}
@@ -299,6 +393,31 @@ function MemberDetail({ attendance, coupons, issuingCoupon, member, onIssueCoupo
     <div className="grid grid-cols-2 border-b border-workroom-line sm:grid-cols-3 lg:grid-cols-5"><SmallStat label="예약" value={`${reservations.length}건`} /><SmallStat label="방문" value={`${attendance.length}회`} /><SmallStat label="총 이용시간" value={formatDuration(visitStats.totalMinutes)} /><SmallStat label="결제" value={`${paidAmount.toLocaleString("ko-KR")}원`} /><SmallStat label="쿠폰" value={`${activeCoupons.length}장`} /></div>
     {member.address ? <p className="border-b border-workroom-line py-3 text-sm font-medium text-workroom-muted">{member.address}</p> : null}
     <label className="mt-4 grid gap-1.5 text-sm font-semibold">관리자 메모<textarea placeholder="응대에 필요한 내용만 기록하세요." rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></label><button className={`${buttonClass("primary", "sm")} mt-2`} disabled={note === (member.admin_note ?? "")} onClick={() => onSaveNote(note)} type="button">메모 저장</button>
+
+    <div className="mt-6 border-t border-workroom-line pt-4">
+      <p className="text-sm font-bold">계정 관리</p>
+      <p className="mt-1 text-xs font-medium leading-5 text-workroom-muted">
+        이용한 적이 있는 회원은 <b>예약 제한</b>을 쓰세요. 삭제하면 지난 예약이 ‘탈퇴한 회원’으로 남아 누구였는지 알 수 없게 됩니다.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          className={buttonClass("secondary", "sm")}
+          disabled={busy === `block-${member.id}`}
+          onClick={() => onSetBlocked(!member.blocked_at)}
+          type="button"
+        >
+          {busy === `block-${member.id}` ? "처리 중…" : member.blocked_at ? "제한 해제" : "예약 제한"}
+        </button>
+        <button
+          className={buttonClass("secondary", "sm", "!border-red-500 !text-red-700")}
+          disabled={busy === `delete-${member.id}`}
+          onClick={onDelete}
+          type="button"
+        >
+          {busy === `delete-${member.id}` ? "삭제 중…" : "계정 삭제"}
+        </button>
+      </div>
+    </div>
     <details className="mt-5 border-t border-workroom-line pt-3" open><summary className="cursor-pointer text-sm font-semibold">예약 이력 {reservations.length}건</summary><div className="mt-2 border-y border-workroom-line">{reservations.slice(0, 12).map((reservation) => <Link className="admin-row flex items-center justify-between gap-3 px-3 py-3 hover:bg-workroom-background" key={reservation.id} to={`/admin/reservations?reservation=${reservation.id}`}><div><p className="text-sm font-semibold">{formatDate(reservation.date)} · {formatTimeRange(reservation.start_time, reservation.end_time)}</p><p className="mt-0.5 text-xs text-workroom-muted">{reservation.pass_name_snapshot || reservation.pass_type}</p></div><StatusBadge status={reservation.status} /></Link>)}{!reservations.length ? <AdminEmpty>예약 이력이 없습니다.</AdminEmpty> : null}</div></details>
     <details className="mt-4 border-t border-workroom-line pt-3" open>
       <summary className="cursor-pointer text-sm font-semibold">이용내역 {attendance.length}회</summary>
