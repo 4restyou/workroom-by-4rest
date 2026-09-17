@@ -17,6 +17,8 @@ export type Profile = {
   /** 차단한 시각. 값이 있으면 새 예약을 만들 수 없다(migration 0054). */
   blocked_at?: string | null;
   blocked_reason?: string | null;
+  /** 광고 수신에 동의한 시각(migration 0055). 없으면 동의하지 않은 것. */
+  marketing_consent_at?: string | null;
 };
 
 export type Pass = {

@@ -61,7 +61,7 @@ jobs:
           NO_JWT="portone-payment portone-billing reservation-sms admin-reservation-sms reservation-end-reminder pass-expiry-reminder"
 
           # 호출자의 액세스 토큰으로 본인을 식별하는 함수 — 게이트를 켜 둔다.
-          WITH_JWT="delete-account refund-reservation"
+          WITH_JWT="broadcast-sms delete-account refund-reservation"
 
           # 새 함수를 만들고 위 목록에 넣는 걸 잊으면 영영 배포되지 않는다.
           # 디렉터리와 목록이 어긋나면 배포 전에 멈춘다.

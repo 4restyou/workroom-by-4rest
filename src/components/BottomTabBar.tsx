@@ -123,6 +123,7 @@ const guestMoreItems: MoreItem[] = [
 
 const adminMoreItems: MoreItem[] = [
   { to: "/admin/stats", label: "매출", description: "예약·매출 통계", icon: statsIcon },
+  { to: "/admin/broadcast", label: "문자 보내기", description: "공지·광고 단체 발송", icon: infoIcon },
   { to: "/admin/settings", label: "설정", description: "운영시간·이용권·QR", icon: settingsIcon },
   { to: "/?site=1", label: "사이트 홈", description: "공개 화면 보기", icon: homeIcon },
   { to: "/directory", label: "멤버 명함첩", icon: <IdCardIcon className="h-5 w-5" /> },

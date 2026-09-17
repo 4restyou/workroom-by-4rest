@@ -63,6 +63,9 @@ export const SITE = {
     registrationNumber: "412-04-60970",
     mailOrderNumber: "2023-광주북구-0416호",
   },
+  // 광고 문자에 반드시 들어가야 하는 무료 수신거부 방법(정보통신망법 제50조 제4항).
+  // 080 수신거부 번호를 개설하면 그 번호로 바꾸는 것이 가장 확실하다.
+  smsOptOutNotice: "무료수신거부 work-room.kr > 내정보 > 광고 수신 끄기",
   instagramUrl: "https://instagram.com/workroom_by4rest",
   threadsUrl: "https://www.threads.net/@workroom_by4rest",
   naverMapUrl: "https://map.naver.com/p/search/%EC%A0%84%EB%82%A8%EA%B4%91%EC%A3%BC%ED%86%B5%ED%95%A9%ED%8A%B9%EB%B3%84%EC%8B%9C%20%EB%8F%99%EA%B5%AC%20%EC%B6%A9%EC%9E%A5%EB%A1%9C5%EA%B0%80%2096-23",

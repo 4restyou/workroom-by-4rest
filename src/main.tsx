@@ -17,6 +17,7 @@ import "./styles/globals.css";
 // don't download the admin/booking pages up front.
 const Account = lazyPage(() => import("./pages/Account"));
 const AdminAttendance = lazyPage(() => import("./pages/AdminAttendance"));
+const AdminBroadcast = lazyPage(() => import("./pages/AdminBroadcast"));
 const AdminCustomer = lazyPage(() => import("./pages/AdminCustomer"));
 const AdminHome = lazyPage(() => import("./pages/AdminHome"));
 const AdminLogin = lazyPage(() => import("./pages/AdminLogin"));
@@ -69,6 +70,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route element={<RequireAdmin />}>
             <Route path="admin/dashboard" element={<AdminHome />} />
             <Route path="admin/attendance" element={<AdminAttendance />} />
+            <Route path="admin/broadcast" element={<AdminBroadcast />} />
             <Route path="admin/members" element={<AdminMembers />} />
             <Route path="admin/customer/:profileId" element={<AdminCustomer />} />
             <Route path="admin/reservations" element={<AdminReservations />} />

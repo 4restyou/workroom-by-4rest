@@ -34,6 +34,25 @@ export default function AccountProfileForm({
   });
   const [detailAddress, setDetailAddress] = useState("");
   const [consent, setConsent] = useState(Boolean(profile.consented_at));
+  // 광고 수신은 선택이고 필수 동의와 따로 저장한다 — 끄는 순간 바로 반영돼야
+  // 한다. '저장' 버튼을 눌러야 꺼지는 수신거부는 수신거부가 아니다.
+  const [marketing, setMarketing] = useState(Boolean(profile.marketing_consent_at));
+  const [marketingNote, setMarketingNote] = useState("");
+
+  async function toggleMarketing(next: boolean) {
+    if (!supabase) return;
+    setMarketing(next);
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ marketing_consent_at: next ? new Date().toISOString() : null })
+      .eq("id", profile.id);
+    if (updateError) {
+      setMarketing(!next);
+      setMarketingNote("변경하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    setMarketingNote(next ? "할인·이벤트 문자를 받습니다." : "광고 문자를 받지 않습니다.");
+  }
   const [isSaving, setIsSaving] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [error, setError] = useState("");
@@ -231,6 +250,20 @@ export default function AccountProfileForm({
             개인정보처리방침
           </Link>
           을 따릅니다.
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3 text-sm">
+        <input
+          className="mt-0.5 h-5 w-5 shrink-0"
+          type="checkbox"
+          checked={marketing}
+          onChange={(event) => void toggleMarketing(event.target.checked)}
+        />
+        <span className="font-medium leading-6">
+          <span className="font-bold">[선택]</span> 할인·이벤트 안내 문자를 받겠습니다. 동의하지 않아도 예약과 이용에는 아무 영향이 없고,
+          언제든 이 칸을 해제하면 바로 중단됩니다.
+          {marketingNote ? <span className="mt-1 block text-xs font-bold text-workroom-muted">{marketingNote}</span> : null}
         </span>
       </label>
 
