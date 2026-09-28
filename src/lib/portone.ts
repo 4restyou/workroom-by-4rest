@@ -32,7 +32,15 @@ export function canPayOnline(reservation: Reservation): boolean {
   return canPayOnlineRule(reservation, availability());
 }
 
-export type PayResult = { ok: boolean; message: string };
+export type PayResult = {
+  ok: boolean;
+  message: string;
+  /**
+   * 승인이 아직 반영되지 않았을 뿐 실패한 게 아니다. 카드사 앱을 거친 결제는
+   * 몇 초 늦게 반영되는데, 이걸 실패로 보여 주면 손님이 다시 결제하려 든다.
+   */
+  pending?: boolean;
+};
 
 // 결제창을 열고, 완료되면 서버(portone-payment 함수)에서 금액·상태를 재검증해
 // 예약을 결제완료·확정으로 반영한다. 모바일 리디렉션 흐름은 /payment/portone 페이지가 처리.
@@ -88,6 +96,15 @@ export async function confirmPayment(paymentId: string, attempt = 0): Promise<Pa
   if (result?.pending && attempt < 2) {
     await new Promise((resolve) => setTimeout(resolve, 2500));
     return confirmPayment(paymentId, attempt + 1);
+  }
+
+  // 기다려 봤는데도 대기면, 실패가 아니라 '아직'이다.
+  if (result?.pending) {
+    return {
+      ok: false,
+      pending: true,
+      message: result.message ?? "결제 승인이 확인되는 중입니다.",
+    };
   }
 
   if (!result?.ok) return { ok: false, message: result?.message ?? "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요." };

@@ -482,7 +482,10 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
 
   if (decision.kind === "noop") {
     await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "skipped", provider_code: decision.code, message: "이미 결제 완료된 예약입니다." });
-    return { ok: true, status: 200, message: "이미 결제 완료된 예약입니다." };
+    // 기록에는 '중복 확인'으로 남기되, 손님에게는 방금 낸 결제가 끝났다고 말한다.
+    // 웹훅이 브라우저보다 먼저 도착하는 것이 정상 경로라, 결제한 사람 대부분이
+    // 이 응답을 받는다 — 여기서 '이미 결제된 예약'이라고 하면 중복 결제한 줄 안다.
+    return { ok: true, status: 200, message: "결제가 완료되었습니다. 예약이 확정되었어요." };
   }
 
   if (decision.kind === "reject") {
