@@ -46,4 +46,9 @@ describe("describeCoupon", () => {
     expect(describeCoupon(15, "any")).toBe("전 이용권 15% 할인");
     expect(describeCoupon(0, "any")).toBe("결제 할인이 없는 현물 쿠폰");
   });
+
+  it("says when it stacks", () => {
+    // 겹쳐 쓰는 쿠폰은 발급 확인창에서 그렇다고 읽혀야 한다.
+    expect(describeCoupon(10, "time", true)).toBe("시간권 10% 할인 · 이용권 할인과 겹쳐 사용");
+  });
 });

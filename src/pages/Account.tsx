@@ -663,7 +663,7 @@ export default function Account() {
                             if (!best) return null;
 
                             const unit = passPrices.get(passName) ?? 0;
-                            const quote = couponQuote(unit, reservation.people ?? 1, reservation.discount_percent_at_booking ?? 0, best.discount_percent ?? 0);
+                            const quote = couponQuote(unit, reservation.people ?? 1, reservation.discount_percent_at_booking ?? 0, best.discount_percent ?? 0, Boolean(best.stackable));
                             // 이미 걸린 이용권 할인이 더 크면 쿠폰을 써도 이득이 없다. 아끼게 둔다.
                             if (quote.saved <= 0) return null;
 

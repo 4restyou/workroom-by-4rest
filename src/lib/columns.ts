@@ -31,4 +31,4 @@ export const PROFILE_LIST_COLUMNS = "id,full_name,email,phone,address,admin_note
 
 /** 쿠폰 목록. */
 // discount_percent·applies_to 는 migration 0048에서 생겼다.
-export const COUPON_COLUMNS = "id,profile_id,code,label,status,issued_at,used_at,discount_percent,applies_to";
+export const COUPON_COLUMNS = "id,profile_id,code,label,status,issued_at,used_at,discount_percent,applies_to,stackable";

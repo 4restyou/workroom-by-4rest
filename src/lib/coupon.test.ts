@@ -57,7 +57,6 @@ describe("couponAppliesToPass", () => {
     // 단체·모임은 종류를 따로 두지 않았다. '전 이용권' 쿠폰으로만 걸린다.
     expect(couponAppliesToPass(coupon({ applies_to: "month" }), "단체 및 모임 이용권")).toBe(false);
   });
-});
 
 describe("usableCoupons", () => {
   it("keeps only what can be used, biggest discount first", () => {
@@ -89,4 +88,23 @@ describe("couponQuote", () => {
   it("counts every person", () => {
     expect(couponQuote(249000, 2, 0, 10).after).toBe(448200);
   });
+
+  it("stacks on top of a running promotion when the coupon allows it", () => {
+    // 14,000 → 20% → 11,200 → 10% → 10,080.
+    const quote = couponQuote(14000, 1, 20, 10, true);
+    expect(quote.before).toBe(11200);
+    expect(quote.after).toBe(10080);
+    expect(quote.saved).toBe(1120);
+  });
+
+  it("never gives both by default", () => {
+    // 같은 조건이라도 중복 허용이 아니면 더 큰 쪽 하나만.
+    expect(couponQuote(14000, 1, 20, 10).after).toBe(11200);
+  });
+
+  it("stacks sequentially, not by adding the rates", () => {
+    // 더하면 60+50=110%로 공짜가 된다. 순차면 0.4 × 0.5 = 20%가 남는다.
+    expect(couponQuote(10000, 1, 60, 50, true).after).toBe(2000);
+  });
+});
 });

@@ -17,6 +17,8 @@ export type PricedReservation = {
   discount_percent_at_booking?: number | null;
   /** 쿠폰으로 적용된 할인율(migration 0048). */
   coupon_percent_at_booking?: number | null;
+  /** 쿠폰이 이용권 할인과 겹쳐 적용됐는가(migration 0057). */
+  coupon_stacked?: boolean | null;
 };
 
 export type PriceCheck = {
@@ -54,7 +56,10 @@ export function checkReservationPrice(
   // 전부 '금액 오류'로 막힌다. 둘이 겹치면 서버와 같이 더 유리한 쪽 하나만 본다.
   const passDiscount = Math.max(0, Number(reservation.discount_percent_at_booking ?? 0));
   const couponDiscount = Math.max(0, Number(reservation.coupon_percent_at_booking ?? 0));
-  const expected = discountedPrice(unit, Math.max(passDiscount, couponDiscount)) * people;
+  const expected =
+    (reservation.coupon_stacked && couponDiscount > 0
+      ? discountedPrice(discountedPrice(unit, passDiscount), couponDiscount)
+      : discountedPrice(unit, Math.max(passDiscount, couponDiscount))) * people;
   const actual = Number(reservation.price_at_booking ?? 0);
   return { expected, actual, mismatched: actual !== expected };
 }

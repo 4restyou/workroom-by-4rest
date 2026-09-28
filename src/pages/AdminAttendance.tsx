@@ -32,6 +32,7 @@ type CouponRow = {
   status: "issued" | "used";
   discount_percent?: number | null;
   applies_to?: string | null;
+  stackable?: boolean | null;
   issued_at: string;
   used_at: string | null;
   profile: { full_name: string | null } | null;
@@ -76,6 +77,7 @@ export default function AdminAttendance() {
   const [couponLabel, setCouponLabel] = useState("");
   const [couponPercent, setCouponPercent] = useState("10");
   const [couponScope, setCouponScope] = useState<CouponScope>("month");
+  const [couponStackable, setCouponStackable] = useState(false);
 
   async function load(silent = false) {
     if (!supabase) return;
@@ -84,7 +86,7 @@ export default function AdminAttendance() {
     const [attendanceResult, reservationResult, couponResult, passResult] = await Promise.all([
       supabase.from("attendance").select("id,profile_id,reservation_id,check_in_at,check_out_at,profile:profiles(full_name,phone)").order("check_in_at", { ascending: false }).limit(500),
       supabase.from("reservations").select("*").is("deleted_at", null).or(`date.eq.${today},access_end_date.gte.${today}`).order("start_time", { ascending: true }).limit(300),
-      supabase.from("coupons").select("id,code,label,status,issued_at,used_at,profile:profiles(full_name)").order("issued_at", { ascending: false }).limit(500),
+      supabase.from("coupons").select("id,code,label,status,issued_at,used_at,discount_percent,applies_to,stackable,profile:profiles(full_name)").order("issued_at", { ascending: false }).limit(500),
       // 워크인 접수에 쓸 판매 중인 이용권.
       loadPassesFromDb({ activeOnly: true }),
     ]);
@@ -142,19 +144,19 @@ export default function AdminAttendance() {
     // 확인 창에 할인율을 그대로 읽어 준다 — 잘못 친 숫자가 그대로 나가지 않게.
     const ok = await confirmDialog({
       title: `${name}님에게 쿠폰을 발급할까요?`,
-      description: describeCoupon(percent, couponScope),
+      description: describeCoupon(percent, couponScope, couponStackable),
       confirmLabel: "발급",
     });
     if (!ok) return;
     setBusy("coupon");
-    const result = await issueCouponRpc({ profileId: couponTarget.id, label: couponLabel, percent, scope: couponScope });
+    const result = await issueCouponRpc({ profileId: couponTarget.id, label: couponLabel, percent, scope: couponScope, stackable: couponStackable });
     setBusy(null);
     if (!result.ok) {
       setError(result.message);
       return;
     }
     setSuccess(`${name}님에게 '${result.label ?? couponLabel.trim()}' 쿠폰을 발급했어요 🎫`);
-    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel(""); setCouponPercent("10"); setCouponScope("month");
+    setCouponQuery(""); setCouponResults([]); setCouponTarget(null); setCouponLabel(""); setCouponPercent("10"); setCouponScope("month"); setCouponStackable(false);
     await load(true);
   }
 
@@ -505,7 +507,16 @@ export default function AdminAttendance() {
                   </label>
                 </div>
                 <input placeholder="쿠폰 이름 (비워두면 할인율로 자동)" value={couponLabel} onChange={(event) => setCouponLabel(event.target.value)} />
-                <p className="text-xs font-medium text-workroom-muted">{describeCoupon(normalizeCouponPercent(couponPercent), couponScope)} · 회원이 결제할 때 자동으로 빠집니다.</p>
+                <label className="flex items-start gap-2 text-xs font-bold">
+                  <input checked={couponStackable} className="mt-0.5 h-4 w-4" type="checkbox" onChange={(event) => setCouponStackable(event.target.checked)} />
+                  <span>
+                    이용권 할인과 겹쳐 쓸 수 있게
+                    <span className="mt-0.5 block font-medium text-workroom-muted">
+                      끄면 판촉 기간에는 더 유리한 할인 하나만 적용됩니다.
+                    </span>
+                  </span>
+                </label>
+                <p className="text-xs font-medium text-workroom-muted">{describeCoupon(normalizeCouponPercent(couponPercent), couponScope, couponStackable)} · 회원이 결제할 때 자동으로 빠집니다.</p>
                 <button className={buttonClass("primary", "md")} disabled={!couponTarget || busy === "coupon"} onClick={() => void issueCoupon()} type="button">{busy === "coupon" ? "발급 중…" : "쿠폰 발급"}</button>
               </div>
             </section>
@@ -535,7 +546,7 @@ function AttendanceCard({ busy, onDelete, onSave, row }: { busy: boolean; onDele
 
 function CouponRow({ busy, coupon, onClick }: { busy: boolean; coupon: CouponRow; onClick: () => void }) {
   const isUsed = coupon.status === "used";
-  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button></div>;
+  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to), Boolean(coupon.stackable))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button></div>;
 }
 
 function toKstInput(value: string) {

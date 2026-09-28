@@ -55,6 +55,8 @@ export type RedeemableCoupon = {
   discount_percent?: number | null;
   /** 적용 범위 — time · day · week · month · any. */
   applies_to?: string | null;
+  /** 이용권 할인과 겹쳐 쓸 수 있는가(migration 0057). 기본은 못 쓴다. */
+  stackable?: boolean | null;
 };
 
 /** 이 이용권에 이 쿠폰을 쓸 수 있는가. */
@@ -81,20 +83,27 @@ export type CouponQuote = {
 };
 
 /**
- * 이용권 할인과 쿠폰이 겹치면 **더 유리한 쪽 하나만** 적용한다.
- * 20% 판촉 위에 10%를 또 얹으면 운영자가 예상하지 못한 금액이 나온다.
+ * 이용권 할인과 쿠폰이 겹칠 때.
+ *
+ * 기본은 **더 유리한 쪽 하나만**이다 — 20% 판촉 위에 10%를 또 얹으면 운영자가
+ * 예상하지 못한 금액이 나온다. 쿠폰을 '중복 가능'으로 발급했을 때만 겹쳐 쓴다.
+ *
+ * 겹칠 때는 순차로 깎는다(정가 → 이용권 할인 → 쿠폰 할인). 두 할인율을 더하면
+ * 합이 100%를 넘어 공짜가 될 수 있다.
  */
 export function couponQuote(
   unitPrice: number,
   people: number,
   passPercent: number,
   couponPercent: number,
+  stackable = false,
 ): CouponQuote {
   const heads = Math.max(1, Math.round(people) || 1);
   const pass = Math.max(0, Math.round(passPercent) || 0);
   const coupon = Math.max(0, Math.round(couponPercent) || 0);
 
-  const before = discountedPrice(unitPrice, pass) * heads;
-  const after = discountedPrice(unitPrice, Math.max(pass, coupon)) * heads;
+  const afterPass = discountedPrice(unitPrice, pass);
+  const before = afterPass * heads;
+  const after = (stackable ? discountedPrice(afterPass, coupon) : discountedPrice(unitPrice, Math.max(pass, coupon))) * heads;
   return { before, after, saved: Math.max(0, before - after) };
 }

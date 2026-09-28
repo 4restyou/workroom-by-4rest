@@ -16,9 +16,9 @@ export function normalizeCouponPercent(value: unknown): number {
 }
 
 /** 발급 전 확인 문구. 얼마짜리를 어디에 쓸 수 있는지 그대로 읽힌다. */
-export function describeCoupon(percent: number, scope: CouponScope): string {
+export function describeCoupon(percent: number, scope: CouponScope, stackable = false): string {
   if (percent <= 0) return "결제 할인이 없는 현물 쿠폰";
-  return `${couponScopeLabels[scope]} ${percent}% 할인`;
+  return `${couponScopeLabels[scope]} ${percent}% 할인${stackable ? " · 이용권 할인과 겹쳐 사용" : ""}`;
 }
 
 export type IssueCouponResult = { ok: boolean; message: string; label?: string; code?: string };
@@ -28,6 +28,8 @@ export async function issueCoupon(input: {
   label?: string;
   percent: number;
   scope: CouponScope;
+  /** 이용권 할인과 겹쳐 쓸 수 있게 발급한다. */
+  stackable?: boolean;
 }): Promise<IssueCouponResult> {
   if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다." };
 
@@ -36,6 +38,7 @@ export async function issueCoupon(input: {
     p_label: input.label?.trim() || null,
     p_discount_percent: normalizeCouponPercent(input.percent),
     p_applies_to: input.scope,
+    p_stackable: input.stackable ?? false,
   });
 
   const result = data as { ok?: boolean; message?: string; label?: string; code?: string } | null;

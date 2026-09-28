@@ -264,6 +264,10 @@ export default function AdminMembers() {
       fields: [
         { name: "percent", label: "할인율 (%)", defaultValue: "10", numeric: true, hint: "0을 넣으면 결제 할인 없는 현물 쿠폰이 됩니다." },
         { name: "scope", label: "쓸 수 있는 곳", defaultValue: "month", options: couponScopeOptions },
+        { name: "stackable", label: "이용권 할인과 겹치기", defaultValue: "no", options: [
+          { value: "no", label: "겹치지 않음 — 더 유리한 하나만" },
+          { value: "yes", label: "겹쳐 쓰기 — 순차로 할인" },
+        ] },
         { name: "label", label: "쿠폰 이름 (비워두면 자동)", defaultValue: "" },
       ],
     });
@@ -275,6 +279,7 @@ export default function AdminMembers() {
       label,
       percent: normalizeCouponPercent(entered.percent),
       scope: couponScopeOf(entered.scope),
+      stackable: entered.stackable === "yes",
     });
     setBusy(null);
     if (!result.ok) {

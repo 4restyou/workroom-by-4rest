@@ -220,6 +220,8 @@ export type Coupon = {
   discount_percent?: number | null;
   /** month_pass = 월권 결제에만. */
   applies_to?: string | null;
+  /** 이용권 할인과 겹쳐 쓸 수 있는가(migration 0057). */
+  stackable?: boolean | null;
   issued_at: string;
   used_at: string | null;
 };
