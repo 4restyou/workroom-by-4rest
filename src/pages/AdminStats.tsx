@@ -85,7 +85,7 @@ export default function AdminStats() {
       supabase.from("passes").select("id,name,description,price,is_active,sort_order").order("sort_order", { ascending: true }),
       supabase.from("attendance").select("check_in_at,check_out_at").order("check_in_at", { ascending: false }).limit(6000),
       // 금액은 결제 원장에서 읽는다(부분 환불은 payment_status로 알 수 없다).
-      supabase.from("reservation_payment_logs").select("reservation_id,action,amount").eq("status", "succeeded").order("created_at", { ascending: false }).limit(6000),
+      supabase.from("reservation_payment_logs").select("reservation_id,action,amount,provider_payment_id").eq("status", "succeeded").order("created_at", { ascending: false }).limit(6000),
     ]);
     setIsLoading(false);
     if (reservationResult.error) { setError(reservationResult.error.message); return; }

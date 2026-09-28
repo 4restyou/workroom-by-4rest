@@ -17,6 +17,8 @@ export type RevenueLog = {
   reservation_id: string;
   action: PaymentLogAction;
   amount: number | null;
+  /** PG 결제번호(migration 0056). 같은 결제가 두 줄로 남은 경우를 가려낸다. */
+  provider_payment_id?: string | null;
 };
 
 export type RevenueReservation = {
@@ -54,11 +56,25 @@ export function reservationMoney(
 ): ReservationMoney {
   let charged = 0;
   let refunded = 0;
+  // 같은 결제번호의 입금 기록은 한 번만 센다. 웹훅과 브라우저가 동시에 같은
+  // 결제를 확인하면 성공 기록이 두 줄 남는데, 그대로 더하면 매출이 배가 된다
+  // (청구는 한 번이다). 환불은 같은 결제번호로 여러 번 일어나는 것이 정상이라
+  // 제외하지 않는다.
+  const countedCharges = new Set<string>();
   for (const log of logs ?? []) {
     const amount = Number(log.amount ?? 0);
     if (!Number.isFinite(amount) || amount <= 0) continue;
-    if (log.action === "refund") refunded += amount;
-    else charged += amount;
+    if (log.action === "refund") {
+      refunded += amount;
+      continue;
+    }
+    const paymentId = log.provider_payment_id ?? null;
+    if (paymentId) {
+      const key = `${log.action}:${paymentId}`;
+      if (countedCharges.has(key)) continue;
+      countedCharges.add(key);
+    }
+    charged += amount;
   }
 
   const status = reservation.payment_status ?? "unpaid";

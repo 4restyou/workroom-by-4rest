@@ -317,6 +317,8 @@ async function recordPaymentLog(log: {
   amount?: number | null;
   provider_code?: string | null;
   message?: string | null;
+  /** PG 결제번호. 같은 결제가 두 번 기록되지 않게 하는 기준(migration 0056). */
+  provider_payment_id?: string | null;
 }) {
   if (!isUuid(log.reservation_id)) return;
   try {
@@ -330,6 +332,7 @@ async function recordPaymentLog(log: {
         action: log.action,
         status: log.status,
         amount: log.amount ?? null,
+        provider_payment_id: log.provider_payment_id ?? null,
         provider: "portone",
         provider_code: log.provider_code ?? null,
         message: log.message ?? null,
@@ -524,7 +527,7 @@ async function confirmPayment(paymentId: string): Promise<{ ok: boolean; status:
   // 승인이 확인된 지금 쿠폰을 쓴다.
   await callCouponRpc("consume_reservation_coupon", reservationId);
 
-  await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "succeeded", amount: paidAmount, message: canAutoConfirm ? "포트원 결제 확인 및 예약 자동확정 완료" : `결제 확인 완료 · 예약 상태 ${reservation.status}` });
+  await recordPaymentLog({ reservation_id: reservationId, profile_id: reservation.profile_id, action: "confirm", status: "succeeded", amount: paidAmount, provider_payment_id: paymentId, message: canAutoConfirm ? "포트원 결제 확인 및 예약 자동확정 완료" : `결제 확인 완료 · 예약 상태 ${reservation.status}` });
   return {
     ok: true,
     status: 200,

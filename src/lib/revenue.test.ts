@@ -95,3 +95,52 @@ describe("sumRevenue", () => {
     expect(sumRevenue(reservations, new Map())).toEqual({ revenue: 0, charged: 0, refunded: 0 });
   });
 });
+
+describe("같은 결제가 두 줄로 남은 경우", () => {
+  const reservation = {
+    id: "r1",
+    payment_status: "paid",
+    price_at_booking: 11200,
+    pass_name_snapshot: "3시간권",
+    pass_type: "3시간권",
+  };
+
+  it("counts one charge, not two", () => {
+    // 웹훅과 브라우저가 동시에 같은 결제를 확인하면 성공 기록이 두 줄 남는다.
+    // 청구는 한 번이므로 매출도 한 번이어야 한다.
+    const money = reservationMoney(reservation, [
+      { reservation_id: "r1", action: "confirm", amount: 11200, provider_payment_id: "wr-abc-1" },
+      { reservation_id: "r1", action: "confirm", amount: 11200, provider_payment_id: "wr-abc-1" },
+    ]);
+    expect(money.charged).toBe(11200);
+    expect(money.net).toBe(11200);
+  });
+
+  it("still counts two separate payments", () => {
+    // 결제번호가 다르면 실제로 두 번 결제한 것이다.
+    const money = reservationMoney(reservation, [
+      { reservation_id: "r1", action: "confirm", amount: 11200, provider_payment_id: "wr-abc-1" },
+      { reservation_id: "r1", action: "confirm", amount: 11200, provider_payment_id: "wr-def-2" },
+    ]);
+    expect(money.charged).toBe(22400);
+  });
+
+  it("keeps counting every partial refund", () => {
+    // 부분 환불은 같은 결제번호로 여러 번 일어나는 것이 정상이다.
+    const money = reservationMoney(reservation, [
+      { reservation_id: "r1", action: "confirm", amount: 11200, provider_payment_id: "wr-abc-1" },
+      { reservation_id: "r1", action: "refund", amount: 3000, provider_payment_id: "wr-abc-1" },
+      { reservation_id: "r1", action: "refund", amount: 2000, provider_payment_id: "wr-abc-1" },
+    ]);
+    expect(money.refunded).toBe(5000);
+    expect(money.net).toBe(6200);
+  });
+
+  it("counts rows with no payment id as before", () => {
+    // migration 0056 이전 기록에는 결제번호가 없다. 예전처럼 그대로 더한다.
+    const money = reservationMoney(reservation, [
+      { reservation_id: "r1", action: "confirm", amount: 11200 },
+    ]);
+    expect(money.charged).toBe(11200);
+  });
+});

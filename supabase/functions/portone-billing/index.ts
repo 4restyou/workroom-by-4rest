@@ -115,6 +115,8 @@ async function recordPaymentLog(log: {
   amount?: number | null;
   provider_code?: string | null;
   message?: string | null;
+  /** PG 결제번호. 같은 결제가 두 번 기록되지 않게 하는 기준(migration 0056). */
+  provider_payment_id?: string | null;
 }) {
   if (!isUuid(log.reservation_id)) return;
   try {
@@ -277,7 +279,7 @@ async function handleIssue(request: Request, headers: Record<string, string>): P
   }).catch((error) => console.error("[portone-billing] consume coupon failed", { message: String(error) }));
 
   await recordPaymentLog({
-    reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "succeeded", amount,
+    reservation_id: reservationId, profile_id: user.id, action: "subscribe", status: "succeeded", amount, provider_payment_id: paymentId,
     message: amount === recurringAmount
       ? "정기결제 등록 및 첫 결제 완료"
       : `정기결제 등록 및 첫 결제 완료 · 정가 ${recurringAmount.toLocaleString("ko-KR")}원 기준(다음 회차는 결제일의 할인에 따라 청구)`,
@@ -349,7 +351,7 @@ async function handleCharge(headers: Record<string, string>): Promise<Response> 
         body: JSON.stringify({ next_charge_at: nextCharge, last_paid_at: new Date().toISOString(), fail_count: 0 }),
       });
       if (sub.reservation_id) await recordPaymentLog({
-        reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "succeeded", amount: chargeAmount,
+        reservation_id: sub.reservation_id, profile_id: sub.profile_id, action: "recurring", status: "succeeded", amount: chargeAmount, provider_payment_id: paymentId,
         message: chargeAmount < sub.amount
           ? `정기결제 자동청구 완료 · 할인 적용(정가 ${sub.amount.toLocaleString("ko-KR")}원)`
           : "정기결제 자동청구 완료",
