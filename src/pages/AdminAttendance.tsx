@@ -160,6 +160,38 @@ export default function AdminAttendance() {
     await load(true);
   }
 
+  /**
+   * 쿠폰 회수. 잘못 발급했거나 약속이 틀어졌을 때 되돌린다.
+   * 이미 쓴 쿠폰은 지난 거래의 근거라 서버가 거절한다.
+   */
+  async function revokeCoupon(coupon: CouponRow) {
+    if (!supabase) return;
+    const who = coupon.profile?.full_name || "회원";
+    const ok = await confirmDialog({
+      title: `${who}님의 쿠폰을 회수할까요?`,
+      description: `${coupon.label}\n\n아직 결제하지 않은 예약에 붙어 있으면 그 예약 금액도 원래대로 돌아갑니다.`,
+      confirmLabel: "회수",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setBusy(coupon.id);
+    const { data, error: rpcError } = await supabase.rpc("admin_revoke_coupon", { p_coupon_id: coupon.id });
+    const result = data as { ok?: boolean; message?: string } | null;
+    setBusy(null);
+    if (rpcError || !result?.ok) {
+      setError(
+        rpcError?.message?.includes("function")
+          ? "쿠폰 회수는 마이그레이션 0058을 적용해야 동작합니다."
+          : result?.message ?? rpcError?.message ?? "회수하지 못했습니다.",
+      );
+      return;
+    }
+    setError("");
+    setSuccess(result.message ?? "쿠폰을 회수했습니다.");
+    await load(true);
+  }
+
   // 예약 없이 온 손님을 한 번에 접수한다: 오늘 예약을 확정으로 만들고, 번호가 같은
   // 회원이 있으면 이어 붙인 뒤 곧바로 입실까지 기록한다. 화면을 옮겨 다닐 필요가
   // 없어야 카운터에서 실제로 쓰이고, 그래야 매출과 인원에도 잡힌다.
@@ -520,7 +552,7 @@ export default function AdminAttendance() {
                 <button className={buttonClass("primary", "md")} disabled={!couponTarget || busy === "coupon"} onClick={() => void issueCoupon()} type="button">{busy === "coupon" ? "발급 중…" : "쿠폰 발급"}</button>
               </div>
             </section>
-            <section><h2 className="mb-2 text-base font-bold">사용 가능 {pendingCoupons.length}장</h2><div className="border-y border-workroom-line bg-white">{pendingCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "used")} />)}{!pendingCoupons.length ? <AdminEmpty>사용 가능한 쿠폰이 없습니다.</AdminEmpty> : null}</div></section>
+            <section><h2 className="mb-2 text-base font-bold">사용 가능 {pendingCoupons.length}장</h2><div className="border-y border-workroom-line bg-white">{pendingCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "used")} onRevoke={() => void revokeCoupon(coupon)} />)}{!pendingCoupons.length ? <AdminEmpty>사용 가능한 쿠폰이 없습니다.</AdminEmpty> : null}</div></section>
             <details><summary className="cursor-pointer text-sm font-semibold text-workroom-muted">사용 완료 {usedCoupons.length}장</summary><div className="mt-2 border-y border-workroom-line bg-white">{usedCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "issued")} />)}</div></details>
           </div>
         ) : null}
@@ -544,9 +576,9 @@ function AttendanceCard({ busy, onDelete, onSave, row }: { busy: boolean; onDele
   );
 }
 
-function CouponRow({ busy, coupon, onClick }: { busy: boolean; coupon: CouponRow; onClick: () => void }) {
+function CouponRow({ busy, coupon, onClick, onRevoke }: { busy: boolean; coupon: CouponRow; onClick: () => void; onRevoke?: () => void }) {
   const isUsed = coupon.status === "used";
-  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to), Boolean(coupon.stackable))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button></div>;
+  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to), Boolean(coupon.stackable))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><div className="flex shrink-0 gap-2"><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button>{!isUsed && onRevoke ? <button className={buttonClass("secondary", "sm", "!border-red-500 !text-red-700")} disabled={busy} onClick={onRevoke} type="button">회수</button> : null}</div></div>;
 }
 
 function toKstInput(value: string) {

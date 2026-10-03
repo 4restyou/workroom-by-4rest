@@ -19,7 +19,9 @@ import { maxBookingDateValue,
 } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { canPayOnline, canSubscribe, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly, type UpgradeQuote } from "../lib/portone";
+import { confirmDialog } from "../lib/confirm";
 import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
+import { bookingLabel, checkSameDay, type ExistingBooking } from "../lib/sameDayBooking";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
 import { lockScroll } from "../lib/scrollLock";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
@@ -519,6 +521,46 @@ export default function Reserve() {
         setError(`선택한 시간대의 잔여 좌석이 부족합니다. 현재 잔여 ${capacity.remaining}석입니다. 다른 시간을 선택해 주세요.`);
         goToStep(2);
         return;
+      }
+    }
+
+    // 같은 날 이미 잡힌 예약과 부딪히는지 본다. 겹치는 예약은 서버도 막지만,
+    // 거기까지 가면 손님은 '오류'로 읽는다 — 어떤 예약과 겹치는지 여기서 말해 준다.
+    if (profile?.id && !isLongTermPassName(form.pass_type)) {
+      const { data: mine } = await supabase
+        .from("reservations")
+        .select("id,date,start_time,end_time,status,pass_type,pass_name_snapshot,access_start_date,access_end_date")
+        .eq("profile_id", profile.id)
+        .is("deleted_at", null)
+        .in("status", ["pending", "confirmed"])
+        .limit(200);
+
+      const clash = checkSameDay((mine ?? []) as ExistingBooking[], {
+        date: form.date,
+        start_time: form.start_time,
+        end_time: form.end_time,
+      });
+
+      if (clash.overlapping.length) {
+        setError(`이미 ${bookingLabel(clash.overlapping[0])} 예약이 있습니다. 시간이 겹치지 않게 선택해 주세요.`);
+        goToStep(2);
+        return;
+      }
+
+      if (clash.covering.length) {
+        const keepGoing = await confirmDialog({
+          title: "이미 이용권이 있는 날이에요",
+          description: `${bookingLabel(clash.covering[0])}으로 이날 이용하실 수 있어요. 따로 예약하지 않으셔도 됩니다.\n\n그래도 추가로 예약할까요?`,
+          confirmLabel: "추가로 예약",
+        });
+        if (!keepGoing) return;
+      } else if (clash.sameDay.length) {
+        const keepGoing = await confirmDialog({
+          title: "그날 예약이 이미 있어요",
+          description: `${clash.sameDay.map(bookingLabel).join("\n")}\n\n따로 한 건 더 예약하시는 게 맞을까요?`,
+          confirmLabel: "네, 추가로 예약",
+        });
+        if (!keepGoing) return;
       }
     }
 
