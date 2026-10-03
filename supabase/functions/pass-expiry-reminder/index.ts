@@ -115,6 +115,13 @@ Deno.serve(async (request) => {
   const presented = request.headers.get("x-cron-secret") ?? "";
   if (!CRON_SECRET || !timingSafeEqual(presented, CRON_SECRET)) {
     console.error("[pass-expiry-reminder] unauthorized call");
+    // 비밀값이 붙어 온 호출이 거절된 경우만 남긴다(아무나 두드린 요청은 무시).
+    // 그래야 "기록 없음"이 아니라 왜 멈췄는지가 대시보드에 보인다.
+    if (!CRON_SECRET) {
+      await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "pass-expiry-reminder", false, null, "Supabase 함수 시크릿에 CRON_SECRET이 없습니다.");
+    } else if (presented) {
+      await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "pass-expiry-reminder", false, null, "Netlify와 Supabase의 CRON_SECRET 값이 서로 다릅니다.");
+    }
     return new Response("unauthorized", { status: 401 });
   }
 
