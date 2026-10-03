@@ -5,6 +5,7 @@ import TodayTimeline from "./admin/TodayTimeline";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminders";
 import { dismissalMap, visibleActions } from "../lib/dismissals";
+import { readAdminMfaState } from "../lib/adminMfa";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
@@ -111,6 +112,11 @@ function visitState(reservation: Reservation, attendance?: AttendanceRow, nowMin
 }
 
 export default function AdminDashboard() {
+  // 인증 앱을 아직 등록하지 않았으면 맨 위에 한 줄로 권한다.
+  const [mfaOff, setMfaOff] = useState(false);
+  useEffect(() => {
+    void readAdminMfaState().then((state) => setMfaOff(state === "none"));
+  }, []);
   const [data, setData] = useState<AdminDashData | null>(null);
   const [loadError, setLoadError] = useState("");
   // 확인해서 접어 둔 항목. 테이블이 아직 없으면(migration 0051 전) 빈 값으로 둔다.
@@ -324,6 +330,12 @@ export default function AdminDashboard() {
       title="오늘 운영"
     >
       <div className="admin-compact">
+        {mfaOff ? (
+          <Link className="mb-4 flex items-center justify-between gap-3 border border-workroom-ink bg-workroom-yellow px-4 py-3 text-sm font-semibold" to="/admin/settings?tab=security">
+            <span>2단계 인증이 꺼져 있어요. 비밀번호만 알면 관리자 화면에 들어올 수 있습니다.</span>
+            <span className="shrink-0 font-bold underline">켜기</span>
+          </Link>
+        ) : null}
         {loadError ? <p className="mb-4 border border-red-400 bg-workroom-danger/30 px-4 py-3 text-sm font-semibold">{loadError}</p> : null}
 
         {/* 휴대폰에서는 1열이라 지표 5개가 화면 한 판을 다 차지했다. 2열로 접는다. */}

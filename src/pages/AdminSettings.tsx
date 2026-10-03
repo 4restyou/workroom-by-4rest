@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import AdminPage, { AdminFeedback, AdminTabs } from "../components/AdminPage";
 import MoneyInput from "../components/MoneyInput";
+import { AdminMfaSetup } from "../components/admin/AdminMfa";
 import { openWeekdaysFromRows } from "../lib/businessHours";
 import { activeDiscount, discountDeadlineLabel } from "../lib/discount";
 import { pendingPeriodExtensions } from "../lib/reservations";
@@ -43,7 +44,8 @@ const settingLabels: Record<(typeof settingKeys)[number], string> = {
 };
 
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
-type SettingsTab = "operation" | "products" | "discount" | "guidance" | "checkin";
+type SettingsTab = "operation" | "products" | "discount" | "guidance" | "checkin" | "security";
+const SETTINGS_TABS: SettingsTab[] = ["operation", "products", "discount", "guidance", "checkin", "security"];
 
 /** 화면에서 들어온 할인율을 저장 가능한 값으로 다듬는다. */
 function cleanPercent(value: unknown): number {
@@ -89,7 +91,11 @@ export default function AdminSettings() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   useFeedbackToast(success, error);
-  const [tab, setTab] = useState<SettingsTab>("operation");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<SettingsTab>(() => {
+    const requested = searchParams.get("tab") as SettingsTab | null;
+    return requested && SETTINGS_TABS.includes(requested) ? requested : "operation";
+  });
   const [savedSnapshot, setSavedSnapshot] = useState("");
 
   useEffect(() => {
@@ -455,7 +461,7 @@ export default function AdminSettings() {
         <AdminFeedback error={error} success={success} />
 
         <div className="mb-5 border-y border-workroom-line bg-white px-3 pt-1">
-          <AdminTabs items={[{ value: "operation", label: "운영시간·휴무" }, { value: "products", label: "좌석·이용권" }, { value: "discount", label: "할인" }, { value: "guidance", label: "예약·안내" }, { value: "checkin", label: "출석·QR" }]} onChange={setTab} value={tab} />
+          <AdminTabs items={[{ value: "operation", label: "운영시간·휴무" }, { value: "products", label: "좌석·이용권" }, { value: "discount", label: "할인" }, { value: "guidance", label: "예약·안내" }, { value: "checkin", label: "출석·QR" }, { value: "security", label: "보안" }]} onChange={setTab} value={tab} />
         </div>
 
         <div className="grid gap-5">
@@ -737,6 +743,8 @@ export default function AdminSettings() {
             </div>
           </section>
           ) : null}
+
+          {tab === "security" ? <AdminMfaSetup /> : null}
 
           {tab === "checkin" ? (
           <section className={`${card} p-5`}>

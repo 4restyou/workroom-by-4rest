@@ -24,6 +24,7 @@
 //    막지 않는다 — Origin 헤더는 인증 수단이 아니라 CORS 응답 계산에만 쓴다.)
 
 import { decideDayPassUpgrade, decidePaymentConfirmation, isPaymentId, isUuid, quoteDayPassUpgrade } from "../_shared/paymentRules.ts";
+import { callerIsAdmin } from "../_shared/adminAuth.ts";
 
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
 const PORTONE_WEBHOOK_SECRET = Deno.env.get("PORTONE_WEBHOOK_SECRET") ?? "";
@@ -628,9 +629,7 @@ Deno.serve(async (request) => {
       const user = (await userResp.json()) as { id?: string };
       if (!isUuid(user.id)) return json({ ok: false, message: "로그인이 필요합니다." }, 401, headers);
 
-      const profileResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: serviceHeaders });
-      const profiles = (await profileResp.json()) as Array<{ role?: string }>;
-      if (profiles?.[0]?.role !== "admin") return json({ ok: false, message: "관리자만 환불할 수 있습니다." }, 403, headers);
+      if (!(await callerIsAdmin(SUPABASE_URL, ANON, authHeader))) return json({ ok: false, message: "관리자만 환불할 수 있습니다." }, 403, headers);
 
       const reservationId = body.reservationId;
       if (!isUuid(reservationId)) return json({ ok: false, message: "잘못된 요청입니다." }, 400, headers);

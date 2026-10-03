@@ -10,6 +10,8 @@ type ReservationRow = {
   pass_name_snapshot: string | null;
 };
 
+import { callerIsAdmin } from "../_shared/adminAuth.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -67,19 +69,8 @@ async function logSms(row: ReservationRow, event: string, status: "succeeded" | 
 }
 
 async function isAdmin(request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  if (!authorization) return false;
-  const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: ANON_KEY, authorization },
-  });
-  if (!userResponse.ok) return false;
-  const user = await userResponse.json() as { id?: string };
-  if (!user.id) return false;
-  const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
-    headers: { apikey: SERVICE_ROLE, authorization: `Bearer ${SERVICE_ROLE}` },
-  });
-  const profiles = await profileResponse.json() as Array<{ role?: string }>;
-  return profiles[0]?.role === "admin";
+  // DB의 is_admin()을 호출자 토큰으로 불러 2단계 인증 규칙까지 같이 적용한다.
+  return callerIsAdmin(SUPABASE_URL, ANON_KEY, request.headers.get("authorization") ?? "");
 }
 
 Deno.serve(async (request) => {

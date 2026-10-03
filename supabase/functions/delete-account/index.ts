@@ -15,6 +15,8 @@
 //
 // Deploy with Verify JWT ON; the caller's access token identifies the member.
 
+import { callerIsAdmin } from "../_shared/adminAuth.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -72,16 +74,11 @@ Deno.serve(async (request) => {
 
     const serviceHeaders = { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` };
 
-    // 1-b) 관리자가 다른 회원을 지우는 경우. 역할은 토큰이 아니라 DB에서 확인한다.
+    // 1-b) 관리자가 다른 회원을 지우는 경우. 역할은 DB의 is_admin()으로 확인한다(2단계 인증 규칙 포함).
     const body = (await request.json().catch(() => ({}))) as { profileId?: unknown };
     let targetId = user.id;
     if (typeof body.profileId === "string" && body.profileId && body.profileId !== user.id) {
-      const roleResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`,
-        { headers: serviceHeaders },
-      );
-      const rows = (await roleResp.json().catch(() => [])) as Array<{ role?: string }>;
-      if (rows[0]?.role !== "admin") return json({ ok: false, message: "관리자만 다른 회원을 삭제할 수 있습니다." }, 403, headers);
+      if (!(await callerIsAdmin(SUPABASE_URL, ANON, authHeader))) return json({ ok: false, message: "관리자만 다른 회원을 삭제할 수 있습니다." }, 403, headers);
       targetId = body.profileId;
     }
 

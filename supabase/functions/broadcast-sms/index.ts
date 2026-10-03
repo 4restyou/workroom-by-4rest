@@ -13,6 +13,7 @@
 // Deploy with Verify JWT ON (호출자의 토큰으로 관리자 여부를 확인한다).
 
 import { checkBroadcast, composeBroadcast, type BroadcastAudience, type BroadcastKind } from "../_shared/broadcast.ts";
+import { callerIsAdmin } from "../_shared/adminAuth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -111,10 +112,8 @@ Deno.serve(async (request) => {
     const user = (await userResp.json()) as { id?: string };
     if (!userResp.ok || !user?.id) return json({ ok: false, message: "인증에 실패했습니다." }, 401, headers);
 
-    // 역할은 토큰이 아니라 DB에서 확인한다.
-    const roleResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: serviceHeaders });
-    const roleRows = (await roleResp.json().catch(() => [])) as Array<{ role?: string }>;
-    if (roleRows[0]?.role !== "admin") return json({ ok: false, message: "관리자만 보낼 수 있습니다." }, 403, headers);
+    // 역할은 DB의 is_admin()으로 확인한다(2단계 인증 규칙 포함).
+    if (!(await callerIsAdmin(SUPABASE_URL, ANON, authHeader))) return json({ ok: false, message: "관리자만 보낼 수 있습니다." }, 403, headers);
 
     const payload = (await request.json().catch(() => ({}))) as {
       kind?: BroadcastKind;
