@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
 import { configuredAdminEmails, hasSupabaseConfig, supabase } from "../lib/supabase";
 import { buttonClass, tintCard } from "../lib/ui";
+import { useCaptcha } from "../components/Turnstile";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const captcha = useCaptcha();
 
   useEffect(() => {
     async function redirectIfSignedIn() {
@@ -34,12 +36,19 @@ export default function AdminLogin() {
       return;
     }
 
+    if (!captcha.ready) {
+      setError("보안 확인이 끝나는 중이에요. 잠시 후 다시 눌러 주세요.");
+      return;
+    }
+
     setIsSubmitting(true);
     const { data, error: loginError } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: { captchaToken: captcha.captchaToken },
     });
     setIsSubmitting(false);
+    captcha.reset();
 
     if (loginError) {
       setError(loginError.message);
@@ -96,6 +105,7 @@ export default function AdminLogin() {
             비밀번호
             <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </label>
+          {captcha.widget}
           {error ? <p className={`${tintCard("danger")} p-3 text-sm font-bold`}>{error}</p> : null}
           <button className={buttonClass("primary", "lg")} disabled={isSubmitting} type="submit">
             {isSubmitting ? "확인 중…" : "로그인"}

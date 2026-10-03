@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
+import { useCaptcha } from "../components/Turnstile";
 import { oauthLeavesApp } from "../lib/pwa";
 import { authErrorMessage, passwordValidationMessage } from "../lib/auth";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
@@ -31,6 +32,7 @@ export default function Auth() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const captcha = useCaptcha();
 
   // 홈 화면 앱에서 구글 로그인을 누르면 iOS가 앱을 얼려 두고 다른 창을 띄운다.
   // 돌아오면 얼기 직전 상태가 복원되므로 버튼이 "구글로 이동 중…"에 영영 멈춰
@@ -94,13 +96,20 @@ export default function Auth() {
       setError("이메일을 입력해 주세요.");
       return;
     }
+    if (!captcha.ready) {
+      setError("보안 확인이 끝나는 중이에요. 잠시 후 다시 눌러 주세요.");
+      return;
+    }
+    const captchaToken = captcha.captchaToken;
 
     if (mode === "forgot") {
       setIsSubmitting(true);
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
+        captchaToken,
       });
       setIsSubmitting(false);
+      captcha.reset();
 
       if (resetError) {
         setError(authErrorMessage(resetError, "비밀번호 재설정 메일을 보내지 못했습니다."));
@@ -129,9 +138,11 @@ export default function Auth() {
         options: {
           data: { full_name: fullName.trim() },
           emailRedirectTo: `${window.location.origin}/account?tab=profile`,
+          captchaToken,
         },
       });
       setIsSubmitting(false);
+      captcha.reset();
 
       if (signupError) {
         setError(authErrorMessage(signupError, "회원가입을 완료하지 못했습니다."));
@@ -151,8 +162,10 @@ export default function Auth() {
     const { error: loginError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
+      options: { captchaToken },
     });
     setIsSubmitting(false);
+    captcha.reset();
 
     if (loginError) {
       setError(authErrorMessage(loginError, "로그인하지 못했습니다. 입력한 정보를 확인해 주세요."));
@@ -296,6 +309,7 @@ export default function Auth() {
             {error ? <p className={`${tintCard("danger")} p-3 text-sm font-bold leading-6`} role="alert">{error}</p> : null}
             {message ? <p className={`${tintCard("sky")} p-3 text-sm font-bold leading-6`} aria-live="polite">{message}</p> : null}
 
+            {captcha.widget}
             <button className={buttonClass("primary", "lg", "w-full")} disabled={isSubmitting || isGoogleSubmitting || !hasSupabaseConfig} type="submit">
               {isSubmitting ? "처리 중…" : mode === "login" ? "이메일로 로그인" : mode === "signup" ? "회원가입" : "재설정 메일 보내기"}
             </button>
