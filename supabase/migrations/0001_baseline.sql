@@ -57,6 +57,8 @@ create table if not exists reservations (
 alter table reservations add column if not exists profile_id uuid references profiles(id) on delete set null;
 alter table reservations add column if not exists payment_method text;
 alter table reservations add column if not exists payment_status text default 'unpaid';
+-- 운영 DB에는 예전 schema.sql로 이미 있던 컬럼. 빈 DB에서 처음부터 쌓을 때를 위해 둔다.
+alter table reservations add column if not exists deleted_at timestamp with time zone;
 alter table reservations alter column payment_status set default 'unpaid';
 update reservations set payment_status = 'unpaid' where payment_status is null;
 
