@@ -12,7 +12,16 @@
 //
 // Deploy with Verify JWT ON (호출자의 토큰으로 관리자 여부를 확인한다).
 
-import { checkBroadcast, composeBroadcast, type BroadcastAudience, type BroadcastKind } from "../_shared/broadcast.ts";
+import {
+  checkBroadcast,
+  checkDailyLimit,
+  composeBroadcast,
+  DAILY_RECIPIENT_LIMIT,
+  seoulDayStartIso,
+  type BroadcastAudience,
+  type BroadcastKind,
+  type SentToday,
+} from "../_shared/broadcast.ts";
 import { callerIsAdmin } from "../_shared/adminAuth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -21,6 +30,8 @@ const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
 const SOLAPI_API_SECRET = Deno.env.get("SOLAPI_API_SECRET") ?? "";
 const SMS_SENDER = Deno.env.get("SMS_SENDER") ?? "";
+// 필요하면 Supabase 함수 환경 변수로 하루 상한을 바꾼다.
+const DAILY_LIMIT = Number(Deno.env.get("BROADCAST_DAILY_LIMIT") ?? "") || DAILY_RECIPIENT_LIMIT;
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://work-room.kr",
   "https://www.work-room.kr",
@@ -140,6 +151,35 @@ Deno.serve(async (request) => {
 
     const message = composeBroadcast({ kind, body: text, optOut });
 
+    // 하루 상한·광고 1회·연속 발송을 서버에서 확인한다.
+    const now = new Date();
+    const todayResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/sms_campaigns?created_at=gte.${encodeURIComponent(seoulDayStartIso(now))}&select=kind,body,recipient_count,created_at`,
+      { headers: serviceHeaders },
+    );
+    if (!todayResp.ok) return json({ ok: false, message: "오늘 발송 이력을 확인하지 못했습니다." }, 500, headers);
+    const today = (await todayResp.json()) as SentToday[];
+    const limit = checkDailyLimit({ kind, message, recipients: recipients.length, today, now, limit: DAILY_LIMIT });
+    if (!limit.ok) return json({ ok: false, message: limit.problems.join(" ") }, 429, headers);
+
+    // 보내기 전에 먼저 기록한다. 버튼을 두 번 눌러 동시에 들어온 두 번째 요청이
+    // 위 확인에서 이 기록을 보고 멈추게 하려는 것이다. 결과 숫자는 끝나고 채운다.
+    const createResp = await fetch(`${SUPABASE_URL}/rest/v1/sms_campaigns`, {
+      method: "POST",
+      headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        kind,
+        audience,
+        body: message,
+        recipient_count: recipients.length,
+        sent_count: 0,
+        failed_count: 0,
+        created_by: user.id,
+      }),
+    });
+    if (!createResp.ok) return json({ ok: false, message: "발송 기록을 만들지 못해 보내지 않았습니다." }, 500, headers);
+    const campaignId = ((await createResp.json()) as Array<{ id: string }>)[0]?.id;
+
     let sent = 0;
     let failed = 0;
     for (const recipient of recipients) {
@@ -148,19 +188,13 @@ Deno.serve(async (request) => {
       else failed += 1;
     }
 
-    await fetch(`${SUPABASE_URL}/rest/v1/sms_campaigns`, {
-      method: "POST",
-      headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({
-        kind,
-        audience,
-        body: message,
-        recipient_count: recipients.length,
-        sent_count: sent,
-        failed_count: failed,
-        created_by: user.id,
-      }),
-    });
+    if (campaignId) {
+      await fetch(`${SUPABASE_URL}/rest/v1/sms_campaigns?id=eq.${campaignId}`, {
+        method: "PATCH",
+        headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ sent_count: sent, failed_count: failed }),
+      });
+    }
 
     return json({ ok: true, sent, failed, total: recipients.length }, 200, headers);
   } catch (error) {

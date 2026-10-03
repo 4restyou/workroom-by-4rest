@@ -95,3 +95,48 @@ export function checkBroadcast({ kind, audience, body, recipients, hour }: Check
 
   return { ok: problems.length === 0, problems };
 }
+
+// ── 하루 상한 ─────────────────────────────────────────────────────
+// 실수(버튼 두 번, 잘못 고른 대상)나 관리자 계정 탈취로 문자가 쏟아지는 걸 막는다.
+//   - 하루(서울 기준) 받는 사람 합계가 상한을 넘으면 거절
+//   - 광고는 하루 한 번
+//   - 같은 내용을 10분 안에 다시 보내면 거절(두 번 누름)
+export const DAILY_RECIPIENT_LIMIT = 300;
+export const REPEAT_WINDOW_MINUTES = 10;
+
+export type SentToday = { kind: BroadcastKind; body: string; recipient_count: number; created_at: string };
+
+export type DailyLimitInput = {
+  kind: BroadcastKind;
+  message: string;
+  recipients: number;
+  today: SentToday[];
+  now: Date;
+  limit?: number;
+};
+
+export function checkDailyLimit({ kind, message, recipients, today, now, limit = DAILY_RECIPIENT_LIMIT }: DailyLimitInput): BroadcastCheck {
+  const problems: string[] = [];
+  const used = today.reduce((sum, row) => sum + (row.recipient_count || 0), 0);
+
+  if (used + recipients > limit) {
+    const left = Math.max(0, limit - used);
+    problems.push(`오늘은 ${limit}명까지 보낼 수 있어요. 이미 ${used}명에게 보냈고, 남은 인원은 ${left}명입니다.`);
+  }
+  if (kind === "ad" && today.some((row) => row.kind === "ad")) {
+    problems.push("광고 문자는 하루에 한 번만 보낼 수 있어요.");
+  }
+  const repeatSince = now.getTime() - REPEAT_WINDOW_MINUTES * 60_000;
+  if (today.some((row) => row.body === message && new Date(row.created_at).getTime() >= repeatSince)) {
+    problems.push(`같은 내용을 ${REPEAT_WINDOW_MINUTES}분 안에 이미 보냈어요. 두 번 눌린 건 아닌지 확인해 주세요.`);
+  }
+
+  return { ok: problems.length === 0, problems };
+}
+
+/** 서울 기준 오늘 0시(UTC ISO). sms_campaigns 조회 시작점. */
+export function seoulDayStartIso(now: Date): string {
+  const seoul = new Date(now.getTime() + 9 * 3600_000);
+  const startUtc = Date.UTC(seoul.getUTCFullYear(), seoul.getUTCMonth(), seoul.getUTCDate()) - 9 * 3600_000;
+  return new Date(startUtc).toISOString();
+}

@@ -6,6 +6,9 @@ import {
   audienceLabels,
   canSendAdTo,
   checkBroadcast,
+  checkDailyLimit,
+  DAILY_RECIPIENT_LIMIT,
+  seoulDayStartIso,
   composeBroadcast,
   smsByteLength,
   smsType,
@@ -41,6 +44,7 @@ export default function AdminBroadcast() {
   const [body, setBody] = useState("");
   const [recipients, setRecipients] = useState<number | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [today, setToday] = useState<Campaign[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -61,6 +65,12 @@ export default function AdminBroadcast() {
       .order("created_at", { ascending: false })
       .limit(10);
     setCampaigns((data ?? []) as Campaign[]);
+    // 하루 상한은 서버가 최종 판단한다. 화면은 미리 알려 주기만 한다.
+    const { data: todayRows } = await supabase
+      .from("sms_campaigns")
+      .select("id,kind,audience,body,recipient_count,sent_count,failed_count,created_at")
+      .gte("created_at", seoulDayStartIso(new Date()));
+    setToday((todayRows ?? []) as Campaign[]);
   }
 
   // 대상 수는 서버가 세는 것과 같은 함수로 센다. 화면에서 따로 세면 미리 본
@@ -89,10 +99,13 @@ export default function AdminBroadcast() {
     () => composeBroadcast({ kind, body, optOut: SITE.smsOptOutNotice }),
     [body, kind],
   );
-  const check = useMemo(
-    () => checkBroadcast({ kind, audience, body, recipients: recipients ?? 0, hour: new Date().getHours() }),
-    [audience, body, kind, recipients],
-  );
+  const sentToday = today.reduce((sum, row) => sum + (row.recipient_count || 0), 0);
+  const check = useMemo(() => {
+    const base = checkBroadcast({ kind, audience, body, recipients: recipients ?? 0, hour: new Date().getHours() });
+    const daily = checkDailyLimit({ kind, message: preview, recipients: recipients ?? 0, today, now: new Date() });
+    const problems = [...base.problems, ...daily.problems];
+    return { ok: problems.length === 0, problems };
+  }, [audience, body, kind, recipients, preview, today]);
 
   async function send() {
     if (!supabase || !check.ok) return;
@@ -117,10 +130,16 @@ export default function AdminBroadcast() {
     const { data, error: fnError } = await supabase.functions.invoke("broadcast-sms", {
       body: { kind, audience, body, optOut: SITE.smsOptOutNotice },
     });
-    const result = data as { ok?: boolean; message?: string; sent?: number; failed?: number } | null;
+    let result = data as { ok?: boolean; message?: string; sent?: number; failed?: number } | null;
+    // 서버가 거절(4xx)하면 사유가 응답 본문에 있다.
+    if (fnError && !result) {
+      const context = (fnError as { context?: Response }).context;
+      result = context && typeof context.json === "function" ? await context.json().catch(() => null) : null;
+    }
     setBusy(false);
     if (fnError || !result?.ok) {
       setError(result?.message ?? fnError?.message ?? "발송하지 못했습니다.");
+      await loadCampaigns();
       return;
     }
     setSuccess(`${result.sent}건을 보냈습니다${result.failed ? ` · 실패 ${result.failed}건` : ""}.`);
@@ -180,6 +199,9 @@ export default function AdminBroadcast() {
             {smsType(preview)} · {smsByteLength(preview)}바이트 ·{" "}
             {recipients === null ? "대상 확인 중…" : `${recipients}명`}
             {recipients !== null && recipients > 0 ? ` · ${smsType(preview)} ${recipients}건` : ""}
+          </p>
+          <p className="mt-1 text-xs font-medium text-workroom-muted">
+            오늘 보낸 인원 {sentToday} / {DAILY_RECIPIENT_LIMIT}명 · 광고는 하루 1번
           </p>
         </div>
 

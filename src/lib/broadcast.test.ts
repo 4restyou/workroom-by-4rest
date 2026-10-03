@@ -84,3 +84,34 @@ describe("checkBroadcast", () => {
     expect(checkBroadcast({ ...base, recipients: 0 }).ok).toBe(false);
   });
 });
+
+import { checkDailyLimit, seoulDayStartIso } from "../../supabase/functions/_shared/broadcast";
+
+describe("checkDailyLimit", () => {
+  const now = new Date("2026-10-03T05:00:00Z"); // 서울 14시
+  it("오늘 합계가 상한 안이면 통과", () => {
+    expect(checkDailyLimit({ kind: "notice", message: "a", recipients: 100, today: [{ kind: "notice", body: "x", recipient_count: 150, created_at: "2026-10-03T01:00:00Z" }], now }).ok).toBe(true);
+  });
+  it("상한을 넘으면 남은 인원을 알려 주고 거절", () => {
+    const check = checkDailyLimit({ kind: "notice", message: "a", recipients: 200, today: [{ kind: "notice", body: "x", recipient_count: 150, created_at: "2026-10-03T01:00:00Z" }], now });
+    expect(check.ok).toBe(false);
+    expect(check.problems[0]).toContain("남은 인원은 150명");
+  });
+  it("광고는 하루 한 번", () => {
+    expect(checkDailyLimit({ kind: "ad", message: "b", recipients: 1, today: [{ kind: "ad", body: "a", recipient_count: 1, created_at: "2026-10-03T01:00:00Z" }], now }).ok).toBe(false);
+    expect(checkDailyLimit({ kind: "notice", message: "b", recipients: 1, today: [{ kind: "ad", body: "a", recipient_count: 1, created_at: "2026-10-03T01:00:00Z" }], now }).ok).toBe(true);
+  });
+  it("같은 내용을 10분 안에 다시 보내면 거절, 지나면 허용", () => {
+    const recent = [{ kind: "notice" as const, body: "same", recipient_count: 1, created_at: "2026-10-03T04:55:00Z" }];
+    const old = [{ kind: "notice" as const, body: "same", recipient_count: 1, created_at: "2026-10-03T04:40:00Z" }];
+    expect(checkDailyLimit({ kind: "notice", message: "same", recipients: 1, today: recent, now }).ok).toBe(false);
+    expect(checkDailyLimit({ kind: "notice", message: "same", recipients: 1, today: old, now }).ok).toBe(true);
+  });
+});
+
+describe("seoulDayStartIso", () => {
+  it("서울 자정을 UTC로", () => {
+    expect(seoulDayStartIso(new Date("2026-10-03T05:00:00Z"))).toBe("2026-10-02T15:00:00.000Z");
+    expect(seoulDayStartIso(new Date("2026-10-02T16:00:00Z"))).toBe("2026-10-02T15:00:00.000Z");
+  });
+});
