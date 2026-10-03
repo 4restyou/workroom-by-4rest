@@ -10,6 +10,7 @@ import SessionProvider from "./components/SessionProvider";
 import Home from "./pages/Home";
 import { initAnalytics } from "./lib/analytics";
 import { watchForAppUpdate } from "./lib/appUpdate";
+import { installErrorReporting } from "./lib/errorReporting";
 import { lazyPage } from "./lib/lazyPage";
 import "./styles/globals.css";
 
@@ -40,6 +41,7 @@ const Terms = lazyPage(() => import("./pages/Terms"));
 const Visit = lazyPage(() => import("./pages/Visit"));
 
 initAnalytics();
+installErrorReporting();
 watchForAppUpdate();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

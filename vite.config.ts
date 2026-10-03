@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // 오류 기록에 "어느 배포에서 났는지"를 남기기 위한 빌드 시각(UTC, 분 단위).
+  define: { __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16)) },
   plugins: [
     react(),
     VitePWA({

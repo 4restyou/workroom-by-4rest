@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { isStaleModuleError, reloadOnceForUpdate } from "../lib/appUpdate";
+import { reportClientError } from "../lib/errorReporting";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean; detail: string; stale: boolean };
@@ -17,8 +18,9 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: unknown) {
-    // Last-resort logging; swap for a real reporter (e.g. Sentry) later.
     console.error("Unhandled UI error:", error);
+    // 운영자가 손님 제보 없이도 알 수 있게 기록한다(관리자 > 오늘 운영).
+    reportClientError("render", error);
     // 배포 직후 낡은 화면이라 깨진 경우에는 스스로 새 버전을 받아 온다.
     if (isStaleModuleError(error)) reloadOnceForUpdate();
   }

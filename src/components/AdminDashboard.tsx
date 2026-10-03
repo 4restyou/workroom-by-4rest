@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminPage, { AdminEmpty } from "./AdminPage";
 import TodayTimeline from "./admin/TodayTimeline";
+import ClientErrorsPanel from "./admin/ClientErrorsPanel";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminders";
 import { dismissalMap, visibleActions } from "../lib/dismissals";
@@ -450,6 +451,8 @@ export default function AdminDashboard() {
             </div>
           ) : <AdminEmpty>다가오는 확정 예약이 없습니다.</AdminEmpty>}
         </section>
+
+        <ClientErrorsPanel />
       </div>
     </AdminPage>
   );
