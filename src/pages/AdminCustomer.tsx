@@ -265,6 +265,9 @@ export default function AdminCustomer() {
           ) : (
             <AdminEmpty>발급된 쿠폰이 없습니다.</AdminEmpty>
           )}
+          <Link className="mt-2 inline-block text-xs font-semibold text-workroom-muted underline" to="/admin/attendance?view=coupons">
+            전체 쿠폰 관리 (중복 설정·사용 처리) →
+          </Link>
         </Section>
 
         <Section title={`예정된 예약 ${upcoming.length}건`}>

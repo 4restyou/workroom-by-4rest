@@ -123,6 +123,7 @@ const guestMoreItems: MoreItem[] = [
 
 const adminMoreItems: MoreItem[] = [
   { to: "/admin/stats", label: "매출", description: "예약·매출 통계", icon: statsIcon },
+  { to: "/admin/attendance?view=coupons", label: "쿠폰", description: "발급·회수·중복 설정", icon: <IdCardIcon className="h-5 w-5" /> },
   { to: "/admin/broadcast", label: "문자 보내기", description: "공지·광고 단체 발송", icon: infoIcon },
   { to: "/admin/settings", label: "설정", description: "운영시간·이용권·QR", icon: settingsIcon },
   { to: "/?site=1", label: "사이트 홈", description: "공개 화면 보기", icon: homeIcon },
@@ -147,7 +148,8 @@ export default function BottomTabBar() {
     status !== "ready" || !isSignedIn ? "guest" : isAdmin ? "admin" : "user";
   const tabs = role === "admin" ? adminTabs : role === "user" ? memberTabs : guestTabs;
   const moreItems = role === "admin" ? adminMoreItems : role === "user" ? memberMoreItems : guestMoreItems;
-  const moreActive = moreOpen || moreItems.some((item) => location.pathname.startsWith(item.to.split("?")[0]) && item.to !== "/?site=1");
+  // 쿼리가 붙은 항목(사이트 홈, 쿠폰)은 탭과 같은 경로라 '더보기 활성'으로 치지 않는다.
+  const moreActive = moreOpen || moreItems.some((item) => !item.to.includes("?") && location.pathname.startsWith(item.to));
 
   const tabClass = (active: boolean) =>
     `flex w-full select-none flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-workroom-ink ${

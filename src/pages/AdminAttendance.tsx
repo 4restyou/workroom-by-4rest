@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AdminPage, { AdminEmpty, AdminFeedback, AdminTabs } from "../components/AdminPage";
 import { formatTimeRange, todayValue } from "../lib/format";
 import { kstDate as kstDateShared, kstDateTime, kstTime } from "../lib/datetime";
@@ -7,7 +7,7 @@ import WalkInForm, { type WalkInDraft } from "../components/admin/WalkInForm";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, readableReservationError, reservationCoversDate } from "../lib/reservations";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
-import { couponScopeOf, couponScopeOptions, describeCoupon, issueCoupon as issueCouponRpc, normalizeCouponPercent, revokeCoupon as revokeCouponRpc, type CouponScope } from "../lib/couponIssue";
+import { couponScopeOf, couponScopeOptions, describeCoupon, issueCoupon as issueCouponRpc, normalizeCouponPercent, revokeCoupon as revokeCouponRpc, setCouponStackable as setCouponStackableRpc, type CouponScope } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, type TintColor } from "../lib/ui";
@@ -58,7 +58,14 @@ function startMinute(value?: string | null) {
 export default function AdminAttendance() {
   const { status: sessionStatus, isSignedIn, isAdmin } = useSession();
   const navigate = useNavigate();
-  const [view, setView] = useState<View>("today");
+  const [searchParams] = useSearchParams();
+  // 회원 화면·더보기 메뉴에서 바로 쿠폰 관리로 들어올 수 있게 한다.
+  const [view, setView] = useState<View>(() => (searchParams.get("view") === "coupons" ? "coupons" : searchParams.get("view") === "history" ? "history" : "today"));
+  const [couponFilter, setCouponFilter] = useState("");
+  const viewParam = searchParams.get("view");
+  useEffect(() => {
+    if (viewParam === "coupons" || viewParam === "history") setView(viewParam);
+  }, [viewParam]);
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
@@ -325,6 +332,24 @@ export default function AdminAttendance() {
     setRows((current) => current.filter((row) => row.id !== id)); setSuccess("출석 기록을 삭제했습니다.");
   }
 
+  async function toggleStackable(coupon: CouponRow) {
+    const next = !coupon.stackable;
+    const ok = await confirmDialog({
+      title: next ? "이용권 할인과 겹쳐 쓸 수 있게 할까요?" : "겹쳐 쓰기를 끌까요?",
+      description: next
+        ? "판촉 할인 뒤에 이 쿠폰이 한 번 더 깎입니다. 예: 14,000 → 20% → 11,200 → 10% → 10,080"
+        : "판촉 할인과 쿠폰 중 더 유리한 하나만 적용됩니다. 이미 쿠폰을 붙인 미결제 예약은 다시 붙여야 새 규칙이 적용돼요.",
+      confirmLabel: next ? "켜기" : "끄기",
+    });
+    if (!ok) return;
+    setBusy(coupon.id);
+    const result = await setCouponStackableRpc(coupon.id, next);
+    setBusy(null);
+    if (!result.ok) { setError(result.message); return; }
+    setCoupons((current) => current.map((item) => item.id === coupon.id ? { ...item, stackable: next } : item));
+    setSuccess(result.message);
+  }
+
   async function changeCoupon(coupon: CouponRow, nextStatus: "issued" | "used") {
     if (!supabase) return;
     const action = nextStatus === "used" ? "사용" : "사용 취소";
@@ -348,8 +373,13 @@ export default function AdminAttendance() {
   const activeCount = currentOccupancy(todays.filter((row) => !row.check_out_at), peopleByReservationId(reservations));
   // 예약과 연결되지 않은 오늘 입실(워크인·수기 도장).
   const walkIns = todays.filter((row) => !row.reservation_id);
-  const pendingCoupons = coupons.filter((coupon) => coupon.status === "issued");
-  const usedCoupons = coupons.filter((coupon) => coupon.status === "used");
+  const couponMatches = (coupon: CouponRow) => {
+    const q = couponFilter.trim().toLowerCase();
+    if (!q) return true;
+    return [coupon.profile?.full_name, coupon.label, coupon.code].some((value) => value?.toLowerCase().includes(q));
+  };
+  const pendingCoupons = coupons.filter((coupon) => coupon.status === "issued" && couponMatches(coupon));
+  const usedCoupons = coupons.filter((coupon) => coupon.status === "used" && couponMatches(coupon));
 
   return (
     <AdminPage
@@ -547,7 +577,8 @@ export default function AdminAttendance() {
                 <button className={buttonClass("primary", "md")} disabled={!couponTarget || busy === "coupon"} onClick={() => void issueCoupon()} type="button">{busy === "coupon" ? "발급 중…" : "쿠폰 발급"}</button>
               </div>
             </section>
-            <section><h2 className="mb-2 text-base font-bold">사용 가능 {pendingCoupons.length}장</h2><div className="border-y border-workroom-line bg-white">{pendingCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "used")} onRevoke={() => void revokeCoupon(coupon)} />)}{!pendingCoupons.length ? <AdminEmpty>사용 가능한 쿠폰이 없습니다.</AdminEmpty> : null}</div></section>
+            <input placeholder="이름·쿠폰 이름·코드로 찾기" value={couponFilter} onChange={(event) => setCouponFilter(event.target.value)} />
+            <section><h2 className="mb-2 text-base font-bold">사용 가능 {pendingCoupons.length}장</h2><div className="border-y border-workroom-line bg-white">{pendingCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "used")} onRevoke={() => void revokeCoupon(coupon)} onToggleStackable={() => void toggleStackable(coupon)} />)}{!pendingCoupons.length ? <AdminEmpty>사용 가능한 쿠폰이 없습니다.</AdminEmpty> : null}</div></section>
             <details><summary className="cursor-pointer text-sm font-semibold text-workroom-muted">사용 완료 {usedCoupons.length}장</summary><div className="mt-2 border-y border-workroom-line bg-white">{usedCoupons.map((coupon) => <CouponRow busy={busy === coupon.id} coupon={coupon} key={coupon.id} onClick={() => void changeCoupon(coupon, "issued")} />)}</div></details>
           </div>
         ) : null}
@@ -571,9 +602,9 @@ function AttendanceCard({ busy, onDelete, onSave, row }: { busy: boolean; onDele
   );
 }
 
-function CouponRow({ busy, coupon, onClick, onRevoke }: { busy: boolean; coupon: CouponRow; onClick: () => void; onRevoke?: () => void }) {
+function CouponRow({ busy, coupon, onClick, onRevoke, onToggleStackable }: { busy: boolean; coupon: CouponRow; onClick: () => void; onRevoke?: () => void; onToggleStackable?: () => void }) {
   const isUsed = coupon.status === "used";
-  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to), Boolean(coupon.stackable))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><div className="flex shrink-0 gap-2"><button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button>{!isUsed && onRevoke ? <button className={buttonClass("secondary", "sm", "!border-red-500 !text-red-700")} disabled={busy} onClick={onRevoke} type="button">회수</button> : null}</div></div>;
+  return <div className="admin-row flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-semibold">{coupon.profile?.full_name || "회원"} · {coupon.label}</p><p className="mt-0.5 text-xs text-workroom-muted">{coupon.code}{(coupon.discount_percent ?? 0) > 0 ? ` · ${describeCoupon(coupon.discount_percent ?? 0, couponScopeOf(coupon.applies_to), Boolean(coupon.stackable))}` : ""}{coupon.used_at ? ` · ${dateTime(coupon.used_at)}` : ""}</p></div><div className="flex shrink-0 flex-wrap justify-end gap-2">{!isUsed && onToggleStackable && (coupon.discount_percent ?? 0) > 0 ? <button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onToggleStackable} type="button">{coupon.stackable ? "중복 끄기" : "중복 켜기"}</button> : null}<button className={buttonClass("secondary", "sm")} disabled={busy} onClick={onClick} type="button">{isUsed ? "사용 취소" : "사용 처리"}</button>{!isUsed && onRevoke ? <button className={buttonClass("secondary", "sm", "!border-red-500 !text-red-700")} disabled={busy} onClick={onRevoke} type="button">회수</button> : null}</div></div>;
 }
 
 function toKstInput(value: string) {

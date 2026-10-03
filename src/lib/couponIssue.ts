@@ -76,3 +76,13 @@ export async function issueCoupon(input: {
   if (!result?.ok) return { ok: false, message: result?.message ?? "쿠폰 발급에 실패했습니다." };
   return { ok: true, message: result.message ?? "쿠폰을 발급했어요.", label: result.label, code: result.code };
 }
+
+/** 이미 발급한(미사용) 쿠폰의 '이용권 할인과 겹쳐 쓰기'를 켜고 끈다. */
+export async function setCouponStackable(couponId: string, stackable: boolean): Promise<IssueCouponResult> {
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다." };
+  const { data, error } = await supabase.rpc("admin_set_coupon_stackable", { p_coupon_id: couponId, p_stackable: stackable });
+  const result = data as { ok?: boolean; message?: string } | null;
+  if (error) return { ok: false, message: error.message || "바꾸지 못했습니다." };
+  if (!result?.ok) return { ok: false, message: result?.message ?? "바꾸지 못했습니다." };
+  return { ok: true, message: result.message ?? "바꿨습니다." };
+}
