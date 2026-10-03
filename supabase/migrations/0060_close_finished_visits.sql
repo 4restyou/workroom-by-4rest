@@ -24,9 +24,17 @@ declare
   v_closed_open integer := 0;
   v_completed integer := 0;
 begin
-  if not (public.is_admin() or auth.role() = 'service_role') then
+  -- auth.role()은 SQL 편집기에서 null이다. null을 그대로 쓰면 조건 전체가 null이
+  -- 되어 검사가 통과해 버리므로 빈 문자열로 받아 둔다.
+  if not coalesce(public.is_admin(), false) and coalesce(auth.role(), '') <> 'service_role' then
     raise exception '권한이 없습니다.';
   end if;
+
+  -- 예약을 수정하면 '본인 예약만 수정할 수 있습니다'(guard_reservation_member_update)에
+  -- 걸린다. 그 트리거는 auth.role()을 보는데, 크론이 아니라 SQL 편집기나 관리자
+  -- 화면에서 부르면 그 값이 없다. 호출 권한은 위에서 이미 확인했으므로, 이
+  -- 트랜잭션 동안만 service_role로 선언하고 진행한다.
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
   -- 1) 예약 시간이 정해진 입실: 그 예약의 종료 시각으로 닫는다.
   with finished as (
