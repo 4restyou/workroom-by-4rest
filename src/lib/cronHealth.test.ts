@@ -32,3 +32,16 @@ describe("cronProblems", () => {
     expect(problems[0].message).toContain("claim 500");
   });
 });
+
+describe("감시 시작 직후", () => {
+  it("한 주기가 지나기 전에는 기록이 없어도 경고하지 않는다", () => {
+    const fresh = (job: string, minutesAgo: number): CronRun => ({
+      job, last_run_at: null, last_ok_at: null, last_error_at: null, last_error: null,
+      watch_since: new Date(now.getTime() - minutesAgo * 60_000).toISOString(),
+    });
+    const problems = cronProblems([fresh("reservation-end-reminder", 10), fresh("pass-expiry-reminder", 60), fresh("portone-billing", 60)], now);
+    expect(problems).toEqual([]);
+    const late = cronProblems([fresh("reservation-end-reminder", 40), fresh("pass-expiry-reminder", 60), fresh("portone-billing", 60)], now);
+    expect(late.map((p) => p.job)).toEqual(["reservation-end-reminder"]);
+  });
+});

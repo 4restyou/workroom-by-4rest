@@ -6,6 +6,8 @@ export type CronRun = {
   last_ok_at: string | null;
   last_error_at: string | null;
   last_error: string | null;
+  /** 감시를 시작한 시각(0064). 없으면 오래전부터 감시한 것으로 본다. */
+  watch_since?: string | null;
 };
 
 export type CronJob = { job: string; label: string; staleAfterMinutes: number; what: string };
@@ -39,6 +41,8 @@ export function cronProblems(runs: CronRun[], now: Date, required: (job: string)
     if (!required(spec.job)) continue;
     const run = byJob.get(spec.job);
     if (!run?.last_ok_at) {
+      // 감시를 시작한 지 한 주기가 안 됐으면 아직 돌 차례가 오지 않은 것이다.
+      if (run?.watch_since && !run.last_error && minutesSince(run.watch_since, now) <= spec.staleAfterMinutes) continue;
       problems.push({
         job: spec.job,
         label: spec.label,

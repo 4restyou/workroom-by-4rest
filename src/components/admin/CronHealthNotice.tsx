@@ -10,7 +10,7 @@ export default function CronHealthNotice() {
     if (!supabase) return;
     void (async () => {
       const [runs, subs] = await Promise.all([
-        supabase!.from("cron_runs").select("job,last_run_at,last_ok_at,last_error_at,last_error"),
+        supabase!.from("cron_runs").select("*"),
         supabase!.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
       ]);
       // 표가 아직 없으면(0063 적용 전) 아무것도 띄우지 않는다.
