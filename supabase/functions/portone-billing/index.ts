@@ -19,6 +19,7 @@
 const PORTONE_API_SECRET = Deno.env.get("PORTONE_API_SECRET") ?? "";
 import { accessEndDate } from "../_shared/accessPeriod.ts";
 import { recurringChargeAmount } from "../_shared/pricing.ts";
+import { recordCronRun } from "../_shared/cronRun.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -292,6 +293,19 @@ type SubscriptionRow = {
   pass_id: string | null; pass_name: string; amount: number; cycle_days: number; next_charge_at: string | null; fail_count: number;
 };
 
+// 자동청구가 돌았는지 관리자 화면에서 보이게 cron_runs에 남긴다(0063).
+async function handleChargeRecorded(headers: Record<string, string>): Promise<Response> {
+  try {
+    const response = await handleCharge(headers);
+    const result = (await response.clone().json().catch(() => null)) as Record<string, unknown> | null;
+    await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "portone-billing", response.ok, result);
+    return response;
+  } catch (error) {
+    await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "portone-billing", false, null, errorMessage(error));
+    throw error;
+  }
+}
+
 async function handleCharge(headers: Record<string, string>): Promise<Response> {
   const today = kstToday();
   const resp = await fetch(
@@ -387,7 +401,7 @@ Deno.serve(async (request) => {
     const cronHeader = request.headers.get("x-cron-secret");
     if (cronHeader) {
       if (!CRON_SECRET || cronHeader !== CRON_SECRET) return json({ ok: false, message: "인증 실패" }, 403, headers);
-      return await handleCharge(headers);
+      return await handleChargeRecorded(headers);
     }
 
     const clone = request.clone();
@@ -401,7 +415,7 @@ Deno.serve(async (request) => {
     if (type === "charge") {
       // 본문 방식 크론(대체 경로): CRON_SECRET 필수.
       if (!CRON_SECRET || body.secret !== CRON_SECRET) return json({ ok: false, message: "인증 실패" }, 403, headers);
-      return await handleCharge(headers);
+      return await handleChargeRecorded(headers);
     }
     return json({ ok: false, message: "알 수 없는 요청입니다." }, 400, headers);
   } catch (error) {

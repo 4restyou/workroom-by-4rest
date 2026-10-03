@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AdminPage, { AdminEmpty } from "./AdminPage";
 import TodayTimeline from "./admin/TodayTimeline";
 import ClientErrorsPanel from "./admin/ClientErrorsPanel";
+import CronHealthNotice from "./admin/CronHealthNotice";
 import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/format";
 import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminders";
 import { dismissalMap, visibleActions } from "../lib/dismissals";
@@ -337,6 +338,7 @@ export default function AdminDashboard() {
             <span className="shrink-0 font-bold underline">켜기</span>
           </Link>
         ) : null}
+        <CronHealthNotice />
         {loadError ? <p className="mb-4 border border-red-400 bg-workroom-danger/30 px-4 py-3 text-sm font-semibold">{loadError}</p> : null}
 
         {/* 휴대폰에서는 1열이라 지표 5개가 화면 한 판을 다 차지했다. 2열로 접는다. */}

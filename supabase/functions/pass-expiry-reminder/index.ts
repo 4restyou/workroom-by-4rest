@@ -22,6 +22,8 @@ type ReminderRow = {
   pass_name: string;
 };
 
+import { recordCronRun } from "../_shared/cronRun.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SOLAPI_API_KEY = Deno.env.get("SOLAPI_API_KEY") ?? "";
@@ -125,6 +127,7 @@ Deno.serve(async (request) => {
     if (!claimResponse.ok) {
       const detail = await claimResponse.text();
       console.error("[pass-expiry-reminder] claim failed", { status: claimResponse.status, detail });
+      await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "pass-expiry-reminder", false, null, `claim ${claimResponse.status}: ${detail}`);
       return new Response("claim failed", { status: 500 });
     }
 
@@ -140,9 +143,11 @@ Deno.serve(async (request) => {
         });
       }
     }
+    await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "pass-expiry-reminder", true, { claimed: rows.length, sent });
     return Response.json({ ok: true, claimed: rows.length, sent });
   } catch (error) {
     console.error("[pass-expiry-reminder] error", { message: error instanceof Error ? error.message : "unknown error" });
+    await recordCronRun(SUPABASE_URL, SERVICE_ROLE, "pass-expiry-reminder", false, null, error instanceof Error ? error.message : "unknown error");
     return new Response("error", { status: 500 });
   }
 });
