@@ -742,19 +742,20 @@ export default function Reserve() {
 
   return (
     <main className="pb-28 sm:pb-12">
-      <Section eyebrow="Reserve" title="예약" accent="yellow">
-        <div className="mb-6 grid gap-3 border-y border-workroom-ink py-4 text-sm font-bold leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
-          <div>
-            <p>회원 전용 예약{SITE.booking.onlinePaymentLive ? " · 온라인 결제 완료 시 예약이 바로 확정됩니다." : " · 신청 후 운영자 확인을 거쳐 확정됩니다."}</p>
-            <p className="mt-1 font-medium text-workroom-muted">
-              {SITE.booking.onlinePaymentLive
-                ? "예약 신청 후 카드 결제 → 자동확정·확정 문자 발송 · 현장 결제와 예외 예약은 관리자 확인 · 예약은 오늘부터 2개월 이내"
-                : "예약 신청 후 관리자가 결제 링크를 보내드리거나 현장에서 결제(카드·현금) · 예약은 오늘부터 2개월 이내"}
-            </p>
-            {profile ? <span className="mt-2 block font-medium">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</span> : null}
-          </div>
-          <span className={badge("yellow")}>MEMBER ONLY</span>
-        </div>
+      <Section title="예약" accent="yellow">
+        {/* 첫 화면에서 이용권이 바로 보이도록 안내는 한 줄로 줄이고 나머지는 접어 둔다. */}
+        <details className="mb-4 border-y border-workroom-ink py-3 text-sm leading-6">
+          <summary className="cursor-pointer list-none font-bold">
+            회원 전용 예약{SITE.booking.onlinePaymentLive ? " · 결제하면 바로 확정" : " · 운영자 확인 후 확정"}
+            <span className="ml-1 text-xs font-semibold text-workroom-muted underline">안내 보기</span>
+          </summary>
+          <p className="mt-2 font-medium text-workroom-muted">
+            {SITE.booking.onlinePaymentLive
+              ? "예약 신청 후 카드 결제 → 자동확정·확정 문자 발송 · 현장 결제와 예외 예약은 관리자 확인 · 예약은 오늘부터 2개월 이내"
+              : "예약 신청 후 관리자가 결제 링크를 보내드리거나 현장에서 결제(카드·현금) · 예약은 오늘부터 2개월 이내"}
+          </p>
+          {profile ? <p className="mt-1 font-medium text-workroom-muted">로그인된 회원 정보로 예약자 정보를 미리 채웠습니다.</p> : null}
+        </details>
 
         {!reservationEnabled ? (
           <div className={`mb-6 ${tintCard("danger")} p-4 text-sm font-bold`}>

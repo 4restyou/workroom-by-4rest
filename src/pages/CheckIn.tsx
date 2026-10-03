@@ -123,7 +123,7 @@ export default function CheckIn() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Check-in" title={title} accent={success ? "mint" : "yellow"}>
+      <Section eyebrow="출근 체크" title={title} accent={success ? "mint" : "yellow"}>
         <div className={`${card} grid gap-4 p-6`}>
           {state === "loading" ? <p className="font-bold">준비하고 있어요…</p> : null}
 

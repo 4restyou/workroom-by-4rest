@@ -194,7 +194,7 @@ export default function Home() {
         <section className="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:px-6 sm:pb-16 sm:pt-16">
           <div className="grid gap-8 border-b border-workroom-ink pb-8 sm:grid-cols-12 sm:gap-10 sm:pb-12">
             <div className="animate-pop-in sm:col-span-6 sm:self-center">
-              <span className={badge("yellow")}>MEMBER RESERVATION · 회원 예약</span>
+              <span className={badge("yellow")}>회원 예약</span>
               <h1 className="mt-5 font-display text-[2.7rem] font-bold leading-[1.25] tracking-[-0.045em] sm:text-[4.25rem]">
                 필요한 시간만큼,
                 <br />
@@ -318,7 +318,7 @@ export default function Home() {
       )}
 
 {showMarketing ? (
-      <Section id="space" eyebrow="About" title="조용히 머물 수 있는 작업 공간" accent="mint">
+      <Section id="space" eyebrow="공간 소개" title="조용히 머물 수 있는 작업 공간" accent="mint">
         <div className="max-w-3xl border-l-2 border-workroom-ink pl-5 text-lg font-medium leading-9 text-workroom-muted sm:pl-7 sm:text-xl">
           <p>
             WORKROOM은 예약제로 운영하는 작은 작업 공간입니다. 노트북 작업, 공부, 글쓰기처럼 조용한 시간이 필요할 때 이용하기 좋습니다.
@@ -331,7 +331,7 @@ export default function Home() {
       ) : null}
 
 {showMarketing ? (
-      <Section eyebrow="Features" title="이용할 수 있는 것" accent="lilac">
+      <Section eyebrow="시설" title="이용할 수 있는 것" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map((feature) => (
             <FeatureCard key={feature.title} {...feature} />
@@ -343,7 +343,7 @@ export default function Home() {
 {/* 로그인한 회원의 홈은 대시보드다. 요금표·이용 안내는 예약 화면과 FAQ에
     같은 내용이 있어서, 여기서는 접어 두고 링크만 남긴다. */}
 {showMarketing ? (
-      <Section id="pricing" eyebrow="Plans / Pricing" title="이용권 안내" accent="yellow">
+      <Section id="pricing" eyebrow="요금" title="이용권 안내" accent="yellow">
         <div className="grid gap-3">
           {passes.map((pass) => (
             <PriceCard key={pass.id} pass={pass} />
@@ -354,11 +354,11 @@ export default function Home() {
         </p>
         <div className="mt-4 grid gap-px overflow-hidden rounded-card border border-workroom-ink bg-workroom-ink sm:grid-cols-2">
           <div className="bg-workroom-surface p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">Online payment</p>
+            <p className="text-xs font-bold text-workroom-muted">온라인 결제</p>
             <p className="mt-2 text-sm font-bold leading-6">{SITE.booking.onlinePayment}</p>
           </div>
           <div className="bg-workroom-surface p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-workroom-muted">On-site payment</p>
+            <p className="text-xs font-bold text-workroom-muted">현장 결제</p>
             <p className="mt-2 text-sm font-bold leading-6">{SITE.booking.onsitePayment}</p>
           </div>
         </div>
@@ -366,20 +366,33 @@ export default function Home() {
       ) : null}
 
 {showMarketing ? (
-      <Section eyebrow="Guide" title="이용 전 확인해 주세요" accent="sky">
-        <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
-          {GUIDE_ITEMS.map(([title, body]) => (
+      <Section eyebrow="확인 사항" title="이용 전 확인해 주세요" accent="sky">
+        {/* 휴대폰에서 9개 항목이 화면 한 판을 넘게 차지했다. 결정에 필요한 앞의 4개만
+            펼쳐 두고 나머지는 접는다(같은 내용이 이용안내에도 있다). */}
+        <dl className="grid gap-x-10 gap-y-5 sm:grid-cols-2">
+          {GUIDE_ITEMS.slice(0, 4).map(([title, body]) => (
             <div className="border-t-2 border-workroom-ink pt-3" key={title}>
               <dt className="text-base font-bold">{title}</dt>
               <dd className="mt-1.5 text-sm font-medium leading-6 text-workroom-muted">{body}</dd>
             </div>
           ))}
         </dl>
+        <details className="mt-5">
+          <summary className="cursor-pointer text-sm font-bold underline underline-offset-4">소리·음식·촬영 등 {GUIDE_ITEMS.length - 4}가지 더 보기</summary>
+          <dl className="mt-4 grid gap-x-10 gap-y-5 sm:grid-cols-2">
+            {GUIDE_ITEMS.slice(4).map(([title, body]) => (
+              <div className="border-t-2 border-workroom-ink pt-3" key={title}>
+                <dt className="text-base font-bold">{title}</dt>
+                <dd className="mt-1.5 text-sm font-medium leading-6 text-workroom-muted">{body}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </Section>
       ) : null}
 
 {showMarketing ? null : (
-      <Section eyebrow="Info" title="필요할 때 바로" accent="sky">
+      <Section eyebrow="바로가기" title="필요할 때 바로" accent="sky">
         <div className="grid gap-3 sm:grid-cols-3">
           <Link className={`${tintCard("yellow")} ${pressable} p-5`} to="/reserve">
             <p className="text-base font-bold">이용권·요금 보기</p>
@@ -398,7 +411,7 @@ export default function Home() {
 )}
 
 {showMarketing ? (
-      <Section eyebrow="Use cases" title="이런 경우에 이용하기 좋아요" accent="lilac">
+      <Section eyebrow="이용 사례" title="이런 경우에 이용하기 좋아요" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <article className={`${tintCard("mint")} p-5`}>
             <h3 className="text-xl font-bold">추천하는 이용</h3>
@@ -430,12 +443,17 @@ export default function Home() {
       ) : null}
 
 {showMarketing ? (
-      <Section eyebrow="How to use" title="예약 방법" accent="coral">
-        <ol className="grid gap-3 sm:grid-cols-4">
-          {["원하는 이용권을 선택합니다.", "날짜와 시간을 선택합니다.", "예약 신청을 남깁니다.", "전화 또는 문자 안내 후 확정됩니다."].map(
+      <Section eyebrow="이용 방법" title="예약 방법" accent="coral">
+        <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            "원하는 이용권을 선택합니다.",
+            "날짜와 시간을 선택합니다.",
+            "예약 신청을 남깁니다.",
+            SITE.booking.onlinePaymentLive ? "카드로 결제하면 바로 확정됩니다." : "문자 안내 후 확정됩니다.",
+          ].map(
             (item, index) => (
-              <li key={item} className={`${card} p-5 font-medium`}>
-                <span className="mb-4 grid h-9 w-9 place-items-center rounded-pill border border-workroom-line bg-workroom-yellow text-sm font-bold">
+              <li key={item} className={`${card} p-4 text-sm font-medium leading-6 sm:p-5 sm:text-base`}>
+                <span className="mb-3 grid h-8 w-8 place-items-center rounded-pill border border-workroom-line bg-workroom-yellow text-sm font-bold">
                   {index + 1}
                 </span>
                 {item}
@@ -449,7 +467,7 @@ export default function Home() {
       </Section>
       ) : null}
 
-      <Section eyebrow="Location" title="충장로5가, 금남로5가역 근처" accent="mint">
+      <Section eyebrow="오시는 길" title="충장로5가, 금남로5가역 근처" accent="mint">
         <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
           <div className={`${card} p-5`}>
             <p className="text-xl font-bold">WORKROOM by 4REST</p>
@@ -496,7 +514,7 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section eyebrow="Community" title="멤버 공간" accent="lilac">
+      <Section eyebrow="커뮤니티" title="멤버 공간" accent="lilac">
         <div className="grid gap-4 sm:grid-cols-2">
           <Link className={`${tintCard("mint")} ${pressable} group flex flex-col gap-2 p-6`} to="/directory">
             <IdCardIcon className="h-7 w-7" />

@@ -84,7 +84,7 @@ const articles: { title: string; body: string[] }[] = [
 export default function Terms() {
   return (
     <main className="pb-16">
-      <Section eyebrow="Legal" title="이용약관" accent="lilac">
+      <Section eyebrow="약관" title="이용약관" accent="lilac">
         <div className={`${card} grid gap-6 p-6`}>
           {articles.map((article) => (
             <section key={article.title}>

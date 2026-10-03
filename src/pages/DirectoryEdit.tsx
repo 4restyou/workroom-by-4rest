@@ -168,7 +168,7 @@ export default function DirectoryEdit() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="My Card" title={existing ? "내 명함 수정" : "내 명함 등록"} accent="yellow">
+      <Section eyebrow="내 명함" title={existing ? "내 명함 수정" : "내 명함 등록"} accent="yellow">
         {isLoading ? (
           <div className="grid gap-4" aria-busy="true">
             <Skeleton className="h-12" />

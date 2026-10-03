@@ -17,7 +17,7 @@ export default function Section({ id, eyebrow, title, accent = "yellow", action,
       <Reveal>
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-t border-workroom-ink pt-4 sm:mb-10">
           <div>
-            {eyebrow ? <span className={`${badge(accent)} mb-3 uppercase tracking-[0.14em]`}>{eyebrow}</span> : null}
+            {eyebrow ? <span className={`${badge(accent)} mb-3 tracking-[0.06em]`}>{eyebrow}</span> : null}
             <h2 className="max-w-3xl font-display text-2xl font-bold leading-[1.2] tracking-[-0.025em] sm:text-[2.5rem]">{title}</h2>
           </div>
           {action ? <div className="flex flex-wrap items-center gap-2">{action}</div> : null}

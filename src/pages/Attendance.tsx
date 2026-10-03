@@ -126,7 +126,7 @@ export default function Attendance() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Attendance" title="출근부" accent="yellow">
+      <Section title="출근부" accent="yellow">
         {error ? <p className={`mb-4 ${tintCard("danger")} p-4 text-sm font-bold`}>{error}</p> : null}
         {isLoading ? (
           <div className="grid gap-5" aria-busy="true">

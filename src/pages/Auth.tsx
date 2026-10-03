@@ -178,7 +178,7 @@ export default function Auth() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Member" title="로그인 · 회원가입" accent="lilac">
+      <Section eyebrow="회원" title="로그인 · 회원가입" accent="lilac">
         <div className={`mx-auto grid max-w-lg gap-5 ${card} p-5 sm:p-6`}>
           {!hasSupabaseConfig ? (
             <p className={`${tintCard("yellow")} p-4 text-sm font-bold`}>

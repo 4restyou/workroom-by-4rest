@@ -55,7 +55,7 @@ export default function PaymentPortone() {
   return (
     <main className="pb-16">
       <Section
-        eyebrow="Payment"
+        eyebrow="결제"
         title={state === "done" ? "결제 완료" : state === "failed" ? "결제 확인 실패" : "결제 확인 중"}
         accent="yellow"
       >

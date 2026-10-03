@@ -65,7 +65,7 @@ const sections: { title: string; body: string[] }[] = [
 export default function Privacy() {
   return (
     <main className="pb-16">
-      <Section eyebrow="Legal" title="개인정보처리방침" accent="sky">
+      <Section eyebrow="정책" title="개인정보처리방침" accent="sky">
         <div className={`${card} grid gap-6 p-6`}>
           {sections.map((section) => (
             <section key={section.title}>

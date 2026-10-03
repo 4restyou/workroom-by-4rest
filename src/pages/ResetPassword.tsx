@@ -72,7 +72,7 @@ export default function ResetPassword() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Member" title="비밀번호 설정" accent="lilac">
+      <Section eyebrow="회원" title="비밀번호 설정" accent="lilac">
         <div className={`mx-auto grid max-w-lg gap-5 ${card} p-5 sm:p-6`}>
           {!hasSupabaseConfig ? (
             <p className={`${tintCard("yellow")} p-4 text-sm font-bold`}>서비스 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.</p>

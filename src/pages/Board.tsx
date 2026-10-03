@@ -481,7 +481,7 @@ export default function Board() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Board" title="메모판" accent="yellow">
+      <Section title="메모판" accent="yellow">
         <p className="mb-5 max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
           운영자 공지와 회원 메모를 확인하는 공간입니다. 로그인 후 메모를 남길 수 있습니다.
         </p>

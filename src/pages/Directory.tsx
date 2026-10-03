@@ -313,7 +313,7 @@ export default function Directory() {
 
   return (
     <main className="pb-16">
-      <Section eyebrow="Directory" title="멤버 명함첩" accent="sky">
+      <Section title="멤버 명함첩" accent="sky">
         <p className="max-w-2xl text-sm font-medium leading-6 text-workroom-muted">
           워크룸을 함께 쓰는 사람들. 이름·업종·카테고리로 찾아보고, 내 명함도 올려보세요.
         </p>

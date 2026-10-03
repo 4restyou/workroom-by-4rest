@@ -127,7 +127,7 @@ const groups: Group[] = [
 export default function Faq() {
   return (
     <main className="pb-16">
-      <Section eyebrow="Guide" title="이용안내 · 자주 묻는 질문" accent="sky">
+      <Section eyebrow="이용안내" title="이용안내 · 자주 묻는 질문" accent="sky">
         <div className="grid gap-6">
           {groups.map((group) => (
             <div className={`${card} grid gap-5 p-6`} key={group.title}>
