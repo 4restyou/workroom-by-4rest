@@ -4,13 +4,13 @@ import AdminPage, { AdminEmpty, AdminFeedback } from "../components/AdminPage";
 import StatusBadge from "../components/StatusBadge";
 import { buildPaymentRequestMessage, smsEventLabel } from "../lib/adminReservations";
 import { ATTENDANCE_COLUMNS, COUPON_COLUMNS, RESERVATION_LIST_COLUMNS } from "../lib/columns";
-import { promptDialog } from "../lib/confirm";
+import { confirmDialog, promptDialog } from "../lib/confirm";
 import { summarizeCustomer } from "../lib/customer";
 import { kstDate as kstDateShared, kstDateTime, kstTime, kstToday } from "../lib/datetime";
 import { formatDate, formatPrice, formatTimeRange } from "../lib/format";
 import { isLongTermReservation } from "../lib/reservations";
 import type { RevenueLog } from "../lib/revenue";
-import { couponScopeOf, couponScopeOptions, issueCoupon as issueCouponRpc, normalizeCouponPercent } from "../lib/couponIssue";
+import { couponScopeOf, couponScopeOptions, issueCoupon as issueCouponRpc, normalizeCouponPercent, revokeCoupon as revokeCouponRpc } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, cardFlat, tintCard } from "../lib/ui";
@@ -106,6 +106,25 @@ export default function AdminCustomer() {
   const checkedInToday = attendance.some((item) => kstDateShared(item.check_in_at) === today && !item.check_out_at);
   const upcoming = reservations.filter((item) => !item.deleted_at && item.date >= today && (item.status === "pending" || item.status === "confirmed"));
   const past = reservations.filter((item) => !item.deleted_at && !upcoming.includes(item));
+
+  /** 쿠폰 회수. 쿠폰이 보이는 화면에서는 어디서든 되어야 한다. */
+  async function revokeCustomerCoupon(coupon: Coupon) {
+    const ok = await confirmDialog({
+      title: "쿠폰을 회수할까요?",
+      description: `${coupon.label}\n\n아직 결제하지 않은 예약에 붙어 있으면 그 예약 금액도 원래대로 돌아갑니다.`,
+      confirmLabel: "회수",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setBusy(`revoke-${coupon.id}`);
+    const result = await revokeCouponRpc(coupon.id);
+    setBusy(null);
+    if (!result.ok) { setError(result.message); return; }
+    setError("");
+    setSuccess(result.message);
+    await load();
+  }
 
   async function saveNote() {
     if (!supabase || !profile) return;
@@ -215,6 +234,38 @@ export default function AdminCustomer() {
           <span className={badge("sky")}>누적 결제 {formatPrice(summary.netPaid)}</span>
           {summary.totalRefunded > 0 ? <span className={badge("lilac")}>환불 {formatPrice(summary.totalRefunded)}</span> : null}
         </div>
+
+        <Section title={`쿠폰 ${activeCoupons.length}장`}>
+          {coupons.length ? (
+            <div className="border-y border-workroom-line bg-white">
+              {coupons.map((coupon) => (
+                <div className="admin-row flex flex-wrap items-center justify-between gap-2 px-4 py-3" key={coupon.id}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{coupon.label}</p>
+                    <p className="mt-0.5 text-xs font-medium text-workroom-muted">{coupon.code}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className={badge(coupon.status === "issued" ? "yellow" : "sky")}>
+                      {coupon.status === "issued" ? "사용 가능" : "사용 완료"}
+                    </span>
+                    {coupon.status === "issued" ? (
+                      <button
+                        className={buttonClass("secondary", "sm", "!border-red-500 !text-red-700")}
+                        disabled={busy === `revoke-${coupon.id}`}
+                        onClick={() => void revokeCustomerCoupon(coupon)}
+                        type="button"
+                      >
+                        {busy === `revoke-${coupon.id}` ? "회수 중…" : "회수"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <AdminEmpty>발급된 쿠폰이 없습니다.</AdminEmpty>
+          )}
+        </Section>
 
         <Section title={`예정된 예약 ${upcoming.length}건`}>
           {upcoming.length ? (

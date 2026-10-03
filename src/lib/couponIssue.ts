@@ -23,6 +23,26 @@ export function describeCoupon(percent: number, scope: CouponScope, stackable = 
 
 export type IssueCouponResult = { ok: boolean; message: string; label?: string; code?: string };
 
+/**
+ * 쿠폰 회수. 쿠폰이 보이는 화면이면 어디서든 같은 동작이어야 해서 한 곳에 둔다.
+ * 아직 결제하지 않은 예약에 붙어 있으면 서버가 먼저 떼어내고 금액을 되돌린다.
+ */
+export async function revokeCoupon(couponId: string): Promise<IssueCouponResult> {
+  if (!supabase) return { ok: false, message: "서비스 연결에 문제가 있습니다." };
+
+  const { data, error } = await supabase.rpc("admin_revoke_coupon", { p_coupon_id: couponId });
+  const result = data as { ok?: boolean; message?: string } | null;
+  if (error) {
+    const missing = error.message?.includes("function") || error.message?.includes("schema cache");
+    return {
+      ok: false,
+      message: missing ? "쿠폰 회수는 마이그레이션 0058을 적용해야 동작합니다." : error.message || "회수하지 못했습니다.",
+    };
+  }
+  if (!result?.ok) return { ok: false, message: result?.message ?? "회수하지 못했습니다." };
+  return { ok: true, message: result.message ?? "쿠폰을 회수했습니다." };
+}
+
 export async function issueCoupon(input: {
   profileId: string;
   label?: string;

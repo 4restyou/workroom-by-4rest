@@ -7,7 +7,7 @@ import { formatDate, formatTimeRange, todayValue } from "../lib/format";
 import { kstDateTime, kstTime } from "../lib/datetime";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { ATTENDANCE_COLUMNS, COUPON_COLUMNS, PROFILE_LIST_COLUMNS, RESERVATION_LIST_COLUMNS } from "../lib/columns";
-import { couponScopeOf, couponScopeOptions, issueCoupon as issueCouponRpc, normalizeCouponPercent } from "../lib/couponIssue";
+import { couponScopeOf, couponScopeOptions, issueCoupon as issueCouponRpc, normalizeCouponPercent, revokeCoupon as revokeCouponRpc } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { useOverlayBackClose } from "../lib/useOverlayBackClose";
@@ -167,6 +167,28 @@ export default function AdminMembers() {
     await loadMembers();
   }
 
+  /** 쿠폰 회수. 쿠폰이 보이는 화면에서는 어디서든 되어야 한다. */
+  async function revokeMemberCoupon(coupon: Coupon) {
+    const ok = await confirmDialog({
+      title: "쿠폰을 회수할까요?",
+      description: `${coupon.label}\n\n아직 결제하지 않은 예약에 붙어 있으면 그 예약 금액도 원래대로 돌아갑니다.`,
+      confirmLabel: "회수",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setBusy(`revoke-${coupon.id}`);
+    const result = await revokeCouponRpc(coupon.id);
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setError("");
+    setSuccess(result.message);
+    await loadMembers();
+  }
+
   const activeMemberIds = useMemo(() => {
     const today = todayValue();
     return new Set(reservations.filter((item) => item.status === "confirmed" && isLongTermReservation(item) && reservationCoversDate(item, today)).map((item) => item.profile_id).filter(Boolean));
@@ -291,7 +313,7 @@ export default function AdminMembers() {
     await loadMembers();
   }
 
-  const detail = selectedMember ? <MemberDetail attendance={selectedAttendance} coupons={selectedCoupons} issuingCoupon={busy === `coupon-${selectedMember.id}`} member={selectedMember} onIssueCoupon={() => void issueCoupon(selectedMember)} onSaveNote={(note) => void saveAdminNote(selectedMember.id, note)} onSetBlocked={(blocked) => void setBlocked(selectedMember, blocked)} onDelete={() => void deleteMember(selectedMember)} busy={busy} reservations={selectedReservations} /> : null;
+  const detail = selectedMember ? <MemberDetail attendance={selectedAttendance} coupons={selectedCoupons} issuingCoupon={busy === `coupon-${selectedMember.id}`} member={selectedMember} onIssueCoupon={() => void issueCoupon(selectedMember)} onSaveNote={(note) => void saveAdminNote(selectedMember.id, note)} onSetBlocked={(blocked) => void setBlocked(selectedMember, blocked)} onDelete={() => void deleteMember(selectedMember)} onRevokeCoupon={(coupon) => void revokeMemberCoupon(coupon)} busy={busy} reservations={selectedReservations} /> : null;
 
   return (
     <AdminPage actions={<><button className={buttonClass("secondary", "md")} onClick={() => void loadMembers()} type="button">새로고침</button><button className={buttonClass("secondary", "md")} disabled={!visibleMembers.length} onClick={exportMembers} type="button">CSV 저장</button></>} description="이용권, 다음 예약, 최근 방문을 기준으로 회원을 확인합니다." title="회원">
@@ -326,7 +348,7 @@ export default function AdminMembers() {
   );
 }
 
-function MemberDetail({ attendance, busy, coupons, issuingCoupon, member, onIssueCoupon, onSaveNote, onSetBlocked, onDelete, reservations }: { attendance: Attendance[]; busy: string | null; coupons: Coupon[]; issuingCoupon: boolean; member: Profile; onIssueCoupon: () => void; onSaveNote: (note: string) => void; onSetBlocked: (blocked: boolean) => void; onDelete: () => void; reservations: Reservation[] }) {
+function MemberDetail({ attendance, busy, coupons, issuingCoupon, member, onIssueCoupon, onSaveNote, onSetBlocked, onDelete, onRevokeCoupon, reservations }: { attendance: Attendance[]; busy: string | null; coupons: Coupon[]; issuingCoupon: boolean; member: Profile; onIssueCoupon: () => void; onSaveNote: (note: string) => void; onSetBlocked: (blocked: boolean) => void; onDelete: () => void; onRevokeCoupon: (coupon: Coupon) => void; reservations: Reservation[] }) {
   const [note, setNote] = useState(member.admin_note ?? "");
   useEffect(() => setNote(member.admin_note ?? ""), [member]);
   const today = todayValue();
@@ -477,9 +499,21 @@ function MemberDetail({ attendance, busy, coupons, issuingCoupon, member, onIssu
           {issuingCoupon ? "발급 중…" : "쿠폰 발급"}
         </button>
         {coupons.map((coupon) => (
-          <div className="admin-row flex items-center justify-between py-2 text-sm" key={coupon.id}>
-            <span>{coupon.label}</span>
-            <span className={badge(coupon.status === "issued" ? "yellow" : "sky")}>{coupon.status === "issued" ? "사용 가능" : "사용 완료"}</span>
+          <div className="admin-row flex items-center justify-between gap-2 py-2 text-sm" key={coupon.id}>
+            <span className="min-w-0 truncate">{coupon.label}</span>
+            <span className="flex shrink-0 items-center gap-2">
+              <span className={badge(coupon.status === "issued" ? "yellow" : "sky")}>{coupon.status === "issued" ? "사용 가능" : "사용 완료"}</span>
+              {coupon.status === "issued" ? (
+                <button
+                  className={buttonClass("secondary", "sm", "!border-red-500 !text-red-700")}
+                  disabled={busy === `revoke-${coupon.id}`}
+                  onClick={() => onRevokeCoupon(coupon)}
+                  type="button"
+                >
+                  {busy === `revoke-${coupon.id}` ? "회수 중…" : "회수"}
+                </button>
+              ) : null}
+            </span>
           </div>
         ))}
         {!coupons.length ? <AdminEmpty>발급된 쿠폰이 없습니다.</AdminEmpty> : null}

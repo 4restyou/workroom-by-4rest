@@ -7,7 +7,7 @@ import WalkInForm, { type WalkInDraft } from "../components/admin/WalkInForm";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, readableReservationError, reservationCoversDate } from "../lib/reservations";
 import { loadPasses as loadPassesFromDb } from "../lib/passes";
-import { couponScopeOf, couponScopeOptions, describeCoupon, issueCoupon as issueCouponRpc, normalizeCouponPercent, type CouponScope } from "../lib/couponIssue";
+import { couponScopeOf, couponScopeOptions, describeCoupon, issueCoupon as issueCouponRpc, normalizeCouponPercent, revokeCoupon as revokeCouponRpc, type CouponScope } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
 import { badge, buttonClass, type TintColor } from "../lib/ui";
@@ -176,19 +176,14 @@ export default function AdminAttendance() {
     if (!ok) return;
 
     setBusy(coupon.id);
-    const { data, error: rpcError } = await supabase.rpc("admin_revoke_coupon", { p_coupon_id: coupon.id });
-    const result = data as { ok?: boolean; message?: string } | null;
+    const result = await revokeCouponRpc(coupon.id);
     setBusy(null);
-    if (rpcError || !result?.ok) {
-      setError(
-        rpcError?.message?.includes("function")
-          ? "쿠폰 회수는 마이그레이션 0058을 적용해야 동작합니다."
-          : result?.message ?? rpcError?.message ?? "회수하지 못했습니다.",
-      );
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
     setError("");
-    setSuccess(result.message ?? "쿠폰을 회수했습니다.");
+    setSuccess(result.message);
     await load(true);
   }
 
