@@ -9,7 +9,7 @@ import { bookingDiscountNote } from "../lib/discount";
 import { formatDate, formatPrice, formatTimeRange, maxBookingDateValue, passDurationHours, todayValue } from "../lib/format";
 import { kstLongDateTime } from "../lib/datetime";
 import { canCancelReservation, isRefundPending } from "../lib/paymentPolicy";
-import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly } from "../lib/portone";
+import { canPayOnline, canSubscribe, cancelOwnReservation, cancelSubscription, fetchDayPassUpgradeQuote, payReservation, preloadPortOne, subscribeMonthly } from "../lib/portone";
 import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
 import { isLongTermReservation, passPeriodWeeks, readableReservationError } from "../lib/reservations";
 import { checkReservationPrice } from "../lib/reservationPrice";
@@ -198,6 +198,11 @@ export default function Account() {
       setError(result.message);
     }
   }
+
+  // 결제할 예약이 있으면 결제 SDK를 미리 받아 둔다(버튼을 누르면 바로 창이 뜨게).
+  useEffect(() => {
+    if (reservations.some((reservation) => canPayOnline(reservation) || canSubscribe(reservation))) preloadPortOne();
+  }, [reservations]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);

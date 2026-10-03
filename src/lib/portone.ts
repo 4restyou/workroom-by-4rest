@@ -1,4 +1,5 @@
-import * as PortOne from "@portone/browser-sdk/v2";
+import type * as PortOne from "@portone/browser-sdk/v2";
+import { trackEvent } from "./analytics";
 import {
   canPayOnline as canPayOnlineRule,
   canSubscribe as canSubscribeRule,
@@ -17,6 +18,29 @@ const CHANNEL_KEY = import.meta.env.VITE_PORTONE_CHANNEL_KEY as string | undefin
 const BILLING_CHANNEL_KEY = import.meta.env.VITE_PORTONE_BILLING_CHANNEL_KEY as string | undefined;
 
 export const hasPortoneConfig = Boolean(STORE_ID && CHANNEL_KEY);
+
+// 결제 SDK는 결제 버튼을 누를 때만 필요하다. 예전에는 첫 화면 번들에 같이 실려
+// 홈만 보고 나가는 방문자도 받았다. 필요할 때 받고, 결제 직전 화면에서 미리 데운다.
+let sdkPromise: Promise<typeof PortOne> | null = null;
+function loadPortOne(): Promise<typeof PortOne> {
+  sdkPromise ??= import("@portone/browser-sdk/v2").catch((error) => {
+    sdkPromise = null;
+    throw error;
+  });
+  return sdkPromise;
+}
+
+/** 결제 버튼이 보이는 화면에서 부른다. 눌렀을 때 바로 창이 뜨게. */
+export function preloadPortOne() {
+  if (hasPortoneConfig || hasBillingConfig) void loadPortOne().catch(() => undefined);
+}
+
+// 결제 퍼널(GA4). 어디서 손님이 빠지는지 보려고 단계마다 남긴다.
+//   payment_start → (payment_window_closed | payment_window_error) → payment_succeeded | payment_pending | payment_confirm_failed
+type FunnelKind = "card" | "billing";
+function funnel(stage: string, kind: FunnelKind, params: Record<string, string | number | boolean | null | undefined> = {}) {
+  trackEvent(`payment_${stage}`, { kind, ...params });
+}
 export const hasBillingConfig = Boolean(STORE_ID && BILLING_CHANNEL_KEY);
 
 // 카드사 심사에서 결제창 호출을 확인해야 하므로 정식 오픈 전에도 노출한다.
@@ -50,10 +74,13 @@ export async function payReservation(reservation: Reservation): Promise<PayResul
 
   const amount = reservation.price_at_booking ?? 0;
   const paymentId = `wr-${reservation.id.slice(0, 8)}-${Date.now()}`;
+  const passName = reservation.pass_name_snapshot || reservation.pass_type;
+  funnel("start", "card", { pass_type: passName, value: amount });
 
   let response: Awaited<ReturnType<typeof PortOne.requestPayment>>;
   try {
-    response = await PortOne.requestPayment({
+    const sdk = await loadPortOne();
+    response = await sdk.requestPayment({
       storeId: STORE_ID,
       channelKey: CHANNEL_KEY,
       paymentId,
@@ -70,16 +97,23 @@ export async function payReservation(reservation: Reservation): Promise<PayResul
       },
     });
   } catch (error) {
+    funnel("window_error", "card", { pass_type: passName });
     return { ok: false, message: `결제창 오류: ${error instanceof Error ? error.message : String(error)}` };
   }
 
-  if (!response) return { ok: false, message: "결제창을 여는 데 실패했습니다. (응답 없음 — 채널 키/상점 ID를 확인해 주세요)" };
+  if (!response) {
+    funnel("window_error", "card", { pass_type: passName });
+    return { ok: false, message: "결제창을 여는 데 실패했습니다. (응답 없음 — 채널 키/상점 ID를 확인해 주세요)" };
+  }
   if (response.code !== undefined) {
     // 사용자가 창을 닫은 경우 등: PortOne이 코드·메시지를 돌려준다.
+    funnel("window_closed", "card", { pass_type: passName, code: response.code });
     return { ok: false, message: response.message ?? "결제가 취소되었습니다." };
   }
 
-  return confirmPayment(response.paymentId ?? paymentId);
+  const result = await confirmPayment(response.paymentId ?? paymentId);
+  if (result.ok) trackEvent("purchase", { transaction_id: response.paymentId ?? paymentId, value: amount, currency: "KRW", items: passName });
+  return result;
 }
 
 // 서버 검증 호출. 리디렉션 복귀 페이지에서도 재사용한다.
@@ -89,7 +123,10 @@ export async function confirmPayment(paymentId: string, attempt = 0): Promise<Pa
     body: { type: "confirm", paymentId },
   });
   const result = data as { ok?: boolean; pending?: boolean; message?: string } | null;
-  if (error) return { ok: false, message: await invokeErrorMessage(error, "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요.") };
+  if (error) {
+    funnel("confirm_failed", "card", { reason: "invoke" });
+    return { ok: false, message: await invokeErrorMessage(error, "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요.") };
+  }
 
   // 카드사 앱을 거친 결제는 승인 반영이 몇 초 늦을 수 있다. 서버가 '대기'라고
   // 알려 주면 조금 기다렸다 다시 확인한다(조회만 반복하므로 중복 청구는 없다).
@@ -100,6 +137,7 @@ export async function confirmPayment(paymentId: string, attempt = 0): Promise<Pa
 
   // 기다려 봤는데도 대기면, 실패가 아니라 '아직'이다.
   if (result?.pending) {
+    funnel("pending", "card");
     return {
       ok: false,
       pending: true,
@@ -107,7 +145,11 @@ export async function confirmPayment(paymentId: string, attempt = 0): Promise<Pa
     };
   }
 
-  if (!result?.ok) return { ok: false, message: result?.message ?? "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요." };
+  if (!result?.ok) {
+    funnel("confirm_failed", "card", { reason: "server" });
+    return { ok: false, message: result?.message ?? "결제 확인에 실패했습니다. 잠시 후 예약현황에서 다시 확인해 주세요." };
+  }
+  funnel("succeeded", "card");
   return { ok: true, message: result.message ?? "결제가 완료되었습니다." };
 }
 
@@ -125,9 +167,12 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
   const passName = reservation.pass_name_snapshot || reservation.pass_type;
   const issueId = `wrbk-${reservation.id.slice(0, 8)}-${Date.now()}`;
 
+  funnel("start", "billing", { pass_type: passName, value: reservation.price_at_booking ?? 0 });
+
   let response: Awaited<ReturnType<typeof PortOne.requestIssueBillingKey>>;
   try {
-    response = await PortOne.requestIssueBillingKey({
+    const sdk = await loadPortOne();
+    response = await sdk.requestIssueBillingKey({
       storeId: STORE_ID,
       channelKey: BILLING_CHANNEL_KEY,
       billingKeyMethod: "CARD",
@@ -142,6 +187,7 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
       },
     });
   } catch (error) {
+    funnel("window_error", "billing", { pass_type: passName });
     return { ok: false, message: `정기결제 창 오류: ${error instanceof Error ? error.message : String(error)}` };
   }
 
@@ -149,6 +195,7 @@ export async function subscribeMonthly(reservation: Reservation): Promise<PayRes
   // BC카드는 카드사가 정기결제 심사를 거부해 빌링키 발급 자체가 막혀 있다.
   // PG가 주는 원문만 보여주면 회원이 무엇을 해야 할지 알 수 없으므로 대안을 붙인다.
   const fallbackHint = `\n${SITE.booking.recurringUnsupportedCards}는 정기결제 등록이 불가합니다. 다른 카드로 등록하시거나 ‘카드로 결제하기’로 이번 회차를 결제해 주세요.`;
+  if (response.code !== undefined) funnel("window_closed", "billing", { pass_type: passName, code: response.code });
   if (response.code !== undefined) return { ok: false, message: `${response.message ?? "정기결제 등록이 취소되었습니다."}${fallbackHint}` };
   if (!response.billingKey) return { ok: false, message: `카드 등록에 실패했습니다.${fallbackHint}` };
 
@@ -177,8 +224,15 @@ export async function confirmBillingIssue(reservationId: string, billingKey: str
     body: { type: "issue", reservationId, billingKey },
   });
   const result = data as { ok?: boolean; message?: string } | null;
-  if (error) return { ok: false, message: await invokeErrorMessage(error, "정기결제 등록에 실패했습니다.") };
-  if (!result?.ok) return { ok: false, message: result?.message ?? "정기결제 등록에 실패했습니다." };
+  if (error) {
+    funnel("confirm_failed", "billing", { reason: "invoke" });
+    return { ok: false, message: await invokeErrorMessage(error, "정기결제 등록에 실패했습니다.") };
+  }
+  if (!result?.ok) {
+    funnel("confirm_failed", "billing", { reason: "server" });
+    return { ok: false, message: result?.message ?? "정기결제 등록에 실패했습니다." };
+  }
+  funnel("succeeded", "billing");
   return { ok: true, message: result.message ?? "정기결제가 등록되었습니다." };
 }
 
@@ -266,7 +320,8 @@ export async function upgradeToDayPass(quote: UpgradeQuote, customer: { name: st
 
   let response: Awaited<ReturnType<typeof PortOne.requestPayment>>;
   try {
-    response = await PortOne.requestPayment({
+    const sdk = await loadPortOne();
+    response = await sdk.requestPayment({
       storeId: STORE_ID,
       channelKey: CHANNEL_KEY,
       paymentId,

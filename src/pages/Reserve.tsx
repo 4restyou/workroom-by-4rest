@@ -18,7 +18,7 @@ import { maxBookingDateValue,
   todayValue,
 } from "../lib/format";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
-import { canPayOnline, canSubscribe, fetchDayPassUpgradeQuote, payReservation, subscribeMonthly, type UpgradeQuote } from "../lib/portone";
+import { canPayOnline, canSubscribe, fetchDayPassUpgradeQuote, payReservation, preloadPortOne, subscribeMonthly, type UpgradeQuote } from "../lib/portone";
 import { confirmDialog } from "../lib/confirm";
 import { confirmAndUpgrade } from "../lib/dayPassUpgrade";
 import { bookingLabel, checkSameDay, type ExistingBooking } from "../lib/sameDayBooking";
@@ -421,8 +421,10 @@ export default function Reserve() {
     const stepError = currentStepError();
     if (stepError) {
       setError(stepError);
+      trackEvent("reserve_step_blocked", { step });
       return;
     }
+    trackEvent("reserve_step_viewed", { step: step + 1, pass_type: form.pass_type || null });
     goToStep(step + 1);
   }
 
@@ -623,6 +625,7 @@ export default function Reserve() {
       console.error("[reservation] insert failed", { code: submitError?.code, message: submitError?.message ?? "missing inserted row" });
       setError(readableReservationError(submitError ?? { message: "예약 정보를 확인하지 못했습니다." }));
       setErrorRef(`RES-${submitError?.code ?? "UNKNOWN"}`);
+      trackEvent("reservation_submit_failed", { code: submitError?.code ?? "UNKNOWN", pass_type: form.pass_type });
       return;
     }
 
@@ -694,6 +697,11 @@ export default function Reserve() {
       setIsPaymentBusy(false);
     }
   }
+
+  // 신청이 끝나 결제 버튼이 보이면 결제 SDK를 미리 받아 둔다.
+  useEffect(() => {
+    if (submittedReservation) preloadPortOne();
+  }, [submittedReservation]);
 
   const groupedPasses = groupPasses(passes);
   const selectedPassInfo = passes.find((pass) => pass.name === form.pass_type) ?? null;
