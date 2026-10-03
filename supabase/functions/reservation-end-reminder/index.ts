@@ -119,6 +119,14 @@ Deno.serve(async (request) => {
   }
 
   try {
+    // 종료 시간이 지난 입실 기록을 닫고, 다녀간 예약을 이용 완료로 바꾼다.
+    // 같은 5분 주기를 쓰므로 크론을 따로 두지 않는다(migration 0060).
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/close_finished_visits`, {
+      method: "POST",
+      headers: { ...serviceHeaders(), "Content-Type": "application/json" },
+      body: "{}",
+    }).catch((error) => console.error("[reservation-end-reminder] close_finished_visits failed", { message: String(error) }));
+
     const claimResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_reservation_end_reminders`, {
       method: "POST",
       headers: serviceHeaders(),
