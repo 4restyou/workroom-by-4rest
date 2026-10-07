@@ -29,6 +29,7 @@ describe("shouldReport", () => {
     expect(check(new Error("ResizeObserver loop completed with undelivered notifications."))).toBe(false);
     expect(check(new TypeError("Failed to fetch"))).toBe(false);
     expect(check(new TypeError("Load failed"))).toBe(false);
+    expect(check(new TypeError("Script https://work-room.kr/sw.js load failed"))).toBe(false);
   });
   it("배포 직후 낡은 조각 오류는 스스로 새로고침하므로 보내지 않는다", () => {
     expect(check(new TypeError("Failed to fetch dynamically imported module: https://work-room.kr/assets/Reserve-abc.js"))).toBe(false);

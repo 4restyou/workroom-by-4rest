@@ -18,6 +18,9 @@ const NOISE = [
   /ResizeObserver loop/i,
   /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource|Load failed|네트워크 연결이 끊어진 것 같습니다)\.?$/i,
   /AbortError/i,
+  // 서비스 워커(sw.js) 등록·갱신 실패. 네트워크가 잠깐 끊기면 생기고, 앱은 그대로
+  // 동작하며 다음 방문 때 다시 시도한다. 고칠 것이 없는 잡음이다.
+  /sw\.js load failed|ServiceWorker|service worker/i,
   /chrome-extension:|moz-extension:|safari-extension:/i,
 ];
 

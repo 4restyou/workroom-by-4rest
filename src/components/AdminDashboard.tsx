@@ -8,6 +8,7 @@ import { formatDate, formatTimeRange, todayValue, formatPrice } from "../lib/for
 import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminders";
 import { dismissalMap, visibleActions } from "../lib/dismissals";
 import { readAdminMfaState } from "../lib/adminMfa";
+import { memberFollowups, type MemberFollowup } from "../lib/memberFollowups";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
@@ -29,7 +30,7 @@ type AdminDashData = {
   capacity: number;
   hours: { open_time: string | null; close_time: string | null } | null;
   coupons: IssuedCoupon[];
-  dormant: Array<{ id: string; name: string; days: number }>;
+  followups: MemberFollowup[];
 };
 
 type ActionItem = {
@@ -53,29 +54,6 @@ function todayHours(
   const row = hours.find((item) => item.weekday === weekday);
   if (!row || row.is_closed) return null;
   return { open_time: row.open_time, close_time: row.close_time };
-}
-
-// 마지막 방문이 30일을 넘긴 회원. 한 번도 오지 않은 회원은 "휴면"이 아니라
-// 아직 시작하지 않은 것이므로 제외한다.
-function dormantMembers(
-  today: string,
-  members: Array<{ id: string; full_name: string | null }>,
-  visits: Array<{ profile_id: string | null; check_in_at: string }>,
-) {
-  const lastVisit = new Map<string, string>();
-  for (const visit of visits) {
-    if (!visit.profile_id) continue;
-    const day = kstDateShared(visit.check_in_at);
-    const seen = lastVisit.get(visit.profile_id);
-    if (!seen || day > seen) lastVisit.set(visit.profile_id, day);
-  }
-  return members
-    .map((member) => {
-      const last = lastVisit.get(member.id);
-      return last ? { id: member.id, name: member.full_name || "이름 미입력", days: daysBetween(last, today) } : null;
-    })
-    .filter((item): item is { id: string; name: string; days: number } => Boolean(item) && (item as { days: number }).days >= 30)
-    .sort((a, b) => b.days - a.days);
 }
 
 function daysBetween(from: string, to: string) {
@@ -165,10 +143,11 @@ export default function AdminDashboard() {
       capacity: seatResult.error ? 0 : (seatResult.data ?? []).reduce((sum, item) => sum + Number(item.capacity || 0), 0),
       hours: todayHours(today, hourResult.error ? [] : hourResult.data ?? [], exceptionResult.error ? null : exceptionResult.data),
       coupons: couponResult.error ? [] : ((couponResult.data ?? []) as IssuedCoupon[]),
-      dormant: dormantMembers(
+      followups: memberFollowups(
         today,
         memberResult.error ? [] : memberResult.data ?? [],
         visitResult.error ? [] : visitResult.data ?? [],
+        (reservationResult.data ?? []) as Reservation[],
       ),
     });
   }
@@ -282,16 +261,10 @@ export default function AdminDashboard() {
       });
     });
 
-    // 한동안 오지 않은 회원. 이용권이 끝난 뒤 그대로 멀어지는 경우가 많다.
-    (data?.dormant ?? []).slice(0, 5).forEach((member) => {
-      actions.push({
-        key: `dormant-${member.id}`,
-        title: `${member.name} · ${member.days}일째 방문 없음`,
-        detail: "마지막 방문 이후 연락이 없었습니다.",
-        to: `/admin/customer/${member.id}`,
-        // 연락하고 일주일 기다려 본다. 그래도 안 오면 다시 뜬다.
-        snoozeDays: 7,
-      });
+    // 이용권은 있는데 안 오는 회원(일주일마다), 이용이 끝나 멀어진 회원(한 번만).
+    // 규칙은 lib/memberFollowups.ts.
+    (data?.followups ?? []).forEach((item) => {
+      actions.push({ key: item.key, title: item.title, detail: item.detail, to: `/admin/customer/${item.profileId}`, snoozeDays: item.snoozeDays });
     });
 
     // 급한 항목이 조용한 대기 항목에 묻히지 않도록 정렬한다.
