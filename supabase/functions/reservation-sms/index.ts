@@ -53,6 +53,7 @@ const DOOR_PASSWORD = Deno.env.get("DOOR_PASSWORD") ?? "";
 // 월권은 남은 주 단위 정산)과 다르게 "환불 불가"라고 적혀 있으면 중도 해지 때
 // 분쟁의 빌미가 된다. src/lib/site.ts 의 cancellationSummary와 같은 내용을 쓴다.
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "이용 시작 전 취소는 전액 환불됩니다. 시작 후에는 시간권·종일권은 환불이 어렵고, 주간권은 남은 일수·월권은 남은 주 단위로 정산해 환불합니다. (자세한 규정은 홈페이지 이용약관)";
+const EARLY_ENTRY_NOTICE = "예약 시간 10분 전부터 입실할 수 있어요.";
 // 온라인 결제(PG) 정식 오픈 여부. src/lib/site.ts 의 onlinePaymentLive와 함께 맞춰준다.
 const ONLINE_PAYMENT_LIVE = true;
 const ONLINE_PAYMENT_NOTICE = ONLINE_PAYMENT_LIVE
@@ -238,12 +239,14 @@ Deno.serve(async (request) => {
       const message = STATUS_MESSAGE[row.status];
       if (statusChanged && message && row.phone && !mergedIntoUpgrade) {
         const policyLine = row.status === "confirmed" ? `\n${REFUND_NOTICE}` : "";
+        // 일찍 와서 문 앞에서 기다리지 않도록 언제부터 들어올 수 있는지 알려 준다.
+        const arrivalLine = row.status === "confirmed" ? `\n${EARLY_ENTRY_NOTICE}` : "";
         const accessLine = row.status === "confirmed" && DOOR_PASSWORD
           ? `\n출입문 비밀번호: ${DOOR_PASSWORD}`
           : "";
         await sendSms(
           row.phone,
-          `[WORKROOM] ${message}\n${reservationLine(row)}${accessLine}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`,
+          `[WORKROOM] ${message}\n${reservationLine(row)}${arrivalLine}${accessLine}${policyLine}\n문의: 010-4931-3298\n${SITE_URL}`,
           {
             reservationId: row.id,
             recipientKind: "member",

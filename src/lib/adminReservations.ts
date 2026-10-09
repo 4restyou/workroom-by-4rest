@@ -147,6 +147,7 @@ export function buildConfirmedMessage(reservation: Reservation) {
     `인원: ${reservation.people}명`,
     reservation.price_at_booking ? `금액: ${formatPrice(reservation.price_at_booking)}` : null,
     "",
+    "예약 시간 10분 전부터 입실할 수 있어요.",
     "결제와 이용 안내는 방문 전 다시 안내드릴게요.",
     "Out of office, Into Workroom.",
   ]

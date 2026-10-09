@@ -24,6 +24,7 @@ const DEFAULT_ALLOWED_ORIGINS = ["https://work-room.kr", "https://www.work-room.
 // 월권은 남은 주 단위 정산)과 다르게 "환불 불가"라고 적혀 있으면 중도 해지 때
 // 분쟁의 빌미가 된다. src/lib/site.ts 의 cancellationSummary와 같은 내용을 쓴다.
 const REFUND_NOTICE = Deno.env.get("REFUND_NOTICE") ?? "이용 시작 전 취소는 전액 환불됩니다. 시작 후에는 시간권·종일권은 환불이 어렵고, 주간권은 남은 일수·월권은 남은 주 단위로 정산해 환불합니다. (자세한 규정은 홈페이지 이용약관)";
+const EARLY_ENTRY_NOTICE = "예약 시간 10분 전부터 입실할 수 있어요.";
 
 function cors(request: Request) {
   const origin = request.headers.get("origin") ?? "";
@@ -97,7 +98,7 @@ Deno.serve(async (request) => {
   }
 
   const text = body.kind === "confirmed"
-    ? `[WORKROOM] 예약이 확정되었습니다.\n${reservationLine(row)}\n${REFUND_NOTICE}\n문의: 010-4931-3298\n${SITE_URL}`
+    ? `[WORKROOM] 예약이 확정되었습니다.\n${reservationLine(row)}\n${EARLY_ENTRY_NOTICE}\n${REFUND_NOTICE}\n문의: 010-4931-3298\n${SITE_URL}`
     : `[WORKROOM] 예약이 취소되었습니다.\n${reservationLine(row)}\n문의: 010-4931-3298\n${SITE_URL}`;
   const date = new Date().toISOString();
   const salt = crypto.randomUUID().replace(/-/g, "");
