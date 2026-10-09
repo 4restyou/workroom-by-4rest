@@ -54,3 +54,10 @@ describe("visitGuideText", () => {
     }
   });
 });
+
+describe("입실 시각 안내", () => {
+  it("방문 안내 화면과 복사 문구 모두 10분 전 입실을 알린다", () => {
+    expect(visitGuideSections({ cups: 1 })[0].lines).toContain("예약 시간 10분 전부터 입실할 수 있어요.");
+    expect(visitGuideText({ cups: 1 })).toContain("10분 전부터 입실");
+  });
+});

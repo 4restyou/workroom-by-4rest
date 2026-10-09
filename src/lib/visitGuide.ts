@@ -36,6 +36,8 @@ export function visitGuideSections({ cups, doorCode }: GuideOptions): GuideSecti
         SITE.address,
         code ? `출입구 비밀번호 ${code}` : "출입구 비밀번호는 방문 전에 따로 안내드릴게요.",
         `운영 ${SITE.hoursLabel}`,
+        // 확정 문자와 같은 문구. 일찍 와서 문 앞에서 기다리지 않게.
+        "예약 시간 10분 전부터 입실할 수 있어요.",
       ],
     },
     {
