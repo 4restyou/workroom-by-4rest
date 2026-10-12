@@ -9,6 +9,7 @@ import { couponRemindersForToday, type IssuedCoupon } from "../lib/couponReminde
 import { dismissalMap, visibleActions } from "../lib/dismissals";
 import { readAdminMfaState } from "../lib/adminMfa";
 import { memberFollowups, type MemberFollowup } from "../lib/memberFollowups";
+import { duplicatePhoneGroups, type PhoneGroup } from "../lib/accountMerge";
 import { currentOccupancy, peopleByReservationId } from "../lib/occupancy";
 import { isLongTermReservation, reservationCoversDate } from "../lib/reservations";
 import { supabase } from "../lib/supabase";
@@ -31,6 +32,7 @@ type AdminDashData = {
   hours: { open_time: string | null; close_time: string | null } | null;
   coupons: IssuedCoupon[];
   followups: MemberFollowup[];
+  twinGroups: PhoneGroup<{ id: string; phone: string | null; full_name: string | null }>[];
 };
 
 type ActionItem = {
@@ -123,7 +125,8 @@ export default function AdminDashboard() {
       supabase.from("business_date_exceptions").select("date,open_time,close_time,is_closed").eq("date", today).maybeSingle(),
       supabase.from("coupons").select("id,profile_id,label").eq("status", "issued").limit(200),
       // 휴면 판정을 위해 회원과 최근 출석을 가져온다.
-      supabase.from("profiles").select("id,full_name").eq("role", "user").limit(500),
+      // 0065 이전 DB에서도 깨지지 않게 * 로 읽는다(merged_into가 없을 수 있다).
+      supabase.from("profiles").select("*").eq("role", "user").limit(2000),
       supabase.from("attendance").select("profile_id,check_in_at").order("check_in_at", { ascending: false }).limit(2000),
       supabase.from("admin_dismissals").select("key,dismissed_at").limit(500),
     ]);
@@ -132,6 +135,10 @@ export default function AdminDashboard() {
       setLoadError(reservationResult.error?.message ?? attendanceResult.error?.message ?? "운영 현황을 불러오지 못했습니다.");
       return;
     }
+
+    // 다른 계정에 합쳐진 계정은 없는 셈 친다.
+    const activeMembers = (memberResult.error ? [] : (memberResult.data ?? []) as Array<{ id: string; full_name: string | null; phone: string | null; merged_into?: string | null }>)
+      .filter((member) => !member.merged_into);
 
     setLoadError("");
     setDismissals(dismissalResult.error ? new Map() : dismissalMap(dismissalResult.data ?? []));
@@ -143,9 +150,10 @@ export default function AdminDashboard() {
       capacity: seatResult.error ? 0 : (seatResult.data ?? []).reduce((sum, item) => sum + Number(item.capacity || 0), 0),
       hours: todayHours(today, hourResult.error ? [] : hourResult.data ?? [], exceptionResult.error ? null : exceptionResult.data),
       coupons: couponResult.error ? [] : ((couponResult.data ?? []) as IssuedCoupon[]),
+      twinGroups: duplicatePhoneGroups(activeMembers),
       followups: memberFollowups(
         today,
-        memberResult.error ? [] : memberResult.data ?? [],
+        activeMembers,
         visitResult.error ? [] : visitResult.data ?? [],
         (reservationResult.data ?? []) as Reservation[],
       ),
@@ -258,6 +266,20 @@ export default function AdminDashboard() {
         to: `/admin/customer/${reminder.profileId}`,
         // 오늘 안내했으면 됐다. 다음에 또 오면 다시 알린다.
         snoozeDays: 1,
+      });
+    });
+
+    // 같은 연락처로 가입된 계정이 여럿. 예약이 다른 계정에 붙어 출근이 막히는 원인이다.
+    // 합치면 묶음이 사라지고, 합치지 않기로 했으면 확인함으로 영영 숨긴다.
+    (data?.twinGroups ?? []).forEach((group) => {
+      const ids = group.members.map((member) => member.id).sort();
+      const name = group.members.find((member) => member.full_name)?.full_name ?? "이름 미입력";
+      actions.push({
+        key: `twin-${ids.join("-")}`,
+        title: `${name} · 같은 연락처 계정 ${group.members.length}개`,
+        detail: "구글·이메일로 따로 가입했을 수 있어요. 고객 화면에서 하나로 합칠 수 있습니다.",
+        to: `/admin/customer/${group.members[0].id}`,
+        snoozeDays: 36500,
       });
     });
 

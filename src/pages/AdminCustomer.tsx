@@ -10,6 +10,7 @@ import { kstDate as kstDateShared, kstDateTime, kstTime, kstToday } from "../lib
 import { formatDate, formatPrice, formatTimeRange } from "../lib/format";
 import { isLongTermReservation } from "../lib/reservations";
 import type { RevenueLog } from "../lib/revenue";
+import { adminMergeProfiles, normalizePhone } from "../lib/accountMerge";
 import { couponScopeOf, couponScopeOptions, issueCoupon as issueCouponRpc, normalizeCouponPercent, revokeCoupon as revokeCouponRpc } from "../lib/couponIssue";
 import { supabase } from "../lib/supabase";
 import { useFeedbackToast } from "../lib/useFeedbackToast";
@@ -38,6 +39,8 @@ export default function AdminCustomer() {
   const [paymentLogs, setPaymentLogs] = useState<PaymentLogRow[]>([]);
   const [smsLogs, setSmsLogs] = useState<ReservationSmsLog[]>([]);
   const [inquiries, setInquiries] = useState<ReservationInquiry[]>([]);
+  // 같은 연락처로 가입된 다른 계정(구글·이메일 따로 가입 등).
+  const [twins, setTwins] = useState<Profile[]>([]);
   const [note, setNote] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -69,6 +72,14 @@ export default function AdminCustomer() {
     setAttendance((attendanceResult.data ?? []) as Attendance[]);
     setCoupons((couponResult.data ?? []) as Coupon[]);
     setInquiries((inquiryResult.data ?? []) as ReservationInquiry[]);
+
+    const phone = normalizePhone((profileResult.data as Profile).phone);
+    if (phone.length >= 9) {
+      const { data: others } = await supabase.from("profiles").select("*").neq("id", profileId).not("phone", "is", null).limit(2000);
+      setTwins(((others ?? []) as Profile[]).filter((other) => !other.merged_into && other.role !== "admin" && normalizePhone(other.phone) === phone));
+    } else {
+      setTwins([]);
+    }
 
     // 결제·문자 이력은 예약 단위로만 저장된다. 이 회원의 예약 id로 모아 온다.
     const ids = loadedReservations.map((item) => item.id);
@@ -106,6 +117,31 @@ export default function AdminCustomer() {
   const checkedInToday = attendance.some((item) => kstDateShared(item.check_in_at) === today && !item.check_out_at);
   const upcoming = reservations.filter((item) => !item.deleted_at && item.date >= today && (item.status === "pending" || item.status === "confirmed"));
   const past = reservations.filter((item) => !item.deleted_at && !upcoming.includes(item));
+
+  /** 같은 연락처의 다른 계정을 이 계정으로 합친다. 그 계정의 예약·출근·쿠폰·결제 기록이 옮겨진다. */
+  async function mergeTwin(other: Profile) {
+    if (!profile) return;
+    const ok = await confirmDialog({
+      title: "이 계정으로 합칠까요?",
+      description: [
+        `${other.full_name || "이름 미입력"} · ${other.email}`,
+        `→ ${profile.full_name || "이름 미입력"} · ${profile.email}`,
+        "",
+        "아래 계정의 예약·출근 기록·쿠폰·결제 기록이 지금 보고 있는 계정으로 옮겨집니다.",
+        "옮겨진 계정은 지워지지 않고 '합쳐짐'으로 남으며, 그 계정으로는 새 예약을 할 수 없습니다.",
+        "회원이 앞으로 어느 계정으로 로그인할지 꼭 확인한 뒤 진행하세요.",
+      ].join("\n"),
+      confirmLabel: "합치기",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(`merge-${other.id}`);
+    const result = await adminMergeProfiles(other.id, profile.id);
+    setBusy(null);
+    if (!result.ok) { setError(result.message ?? "합치지 못했습니다."); return; }
+    setSuccess(result.message ?? "계정을 합쳤습니다.");
+    await load();
+  }
 
   /** 쿠폰 회수. 쿠폰이 보이는 화면에서는 어디서든 되어야 한다. */
   async function revokeCustomerCoupon(coupon: Coupon) {
@@ -234,6 +270,33 @@ export default function AdminCustomer() {
           <span className={badge("sky")}>누적 결제 {formatPrice(summary.netPaid)}</span>
           {summary.totalRefunded > 0 ? <span className={badge("lilac")}>환불 {formatPrice(summary.totalRefunded)}</span> : null}
         </div>
+
+        {twins.length ? (
+          <Section title="같은 연락처의 다른 계정">
+            <p className="mb-3 text-sm font-medium leading-6 text-workroom-muted">
+              구글과 이메일로 따로 가입한 경우가 많아요. 예약이 다른 계정에 있으면 출근이 막힙니다. 회원이 실제로 쓰는 계정으로 합쳐 주세요.
+            </p>
+            <div className="border-y border-workroom-line bg-white">
+              {twins.map((other) => (
+                <div className="admin-row flex flex-wrap items-center justify-between gap-2 px-4 py-3" key={other.id}>
+                  <Link className="min-w-0" to={`/admin/customer/${other.id}`}>
+                    <p className="truncate text-sm font-semibold underline-offset-4 hover:underline">{other.full_name || "이름 미입력"} · {other.email}</p>
+                    <p className="mt-0.5 text-xs font-medium text-workroom-muted">가입 {other.created_at.slice(0, 10)}</p>
+                  </Link>
+                  <button className={buttonClass("secondary", "sm")} disabled={busy === `merge-${other.id}`} onClick={() => void mergeTwin(other)} type="button">
+                    {busy === `merge-${other.id}` ? "합치는 중…" : "이 계정으로 합치기"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
+        {profile.merged_into ? (
+          <p className={`${tintCard("yellow")} mt-5 p-3 text-sm font-bold`}>
+            이 계정은 다른 계정에 합쳐졌습니다. <Link className="underline" to={`/admin/customer/${profile.merged_into}`}>합쳐진 계정 보기 →</Link>
+          </p>
+        ) : null}
 
         <Section title={`쿠폰 ${activeCoupons.length}장`}>
           {coupons.length ? (

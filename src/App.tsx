@@ -7,6 +7,7 @@ import Footer from "./components/Footer";
 import Header from "./components/Header";
 import PageLoading from "./components/PageLoading";
 import Toaster from "./components/Toaster";
+import AccountMergeCenter from "./components/AccountMergeCenter";
 import { useSession } from "./lib/sessionContext";
 
 // Pages a not-yet-onboarded member may visit (to finish the profile or read
@@ -55,6 +56,7 @@ export default function App() {
       {/* On mobile, the bottom tab bar overlays the bottom edge, so non-admin
           pages get extra bottom padding to keep content clear of it. */}
       <div id="main" className={`flex-1 ${showTabBar ? "pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:pb-0" : ""}`}>
+        {!isAdminRoute ? <AccountMergeCenter /> : null}
         <Suspense fallback={<PageLoading />}>
           <Outlet />
         </Suspense>

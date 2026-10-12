@@ -19,6 +19,8 @@ export type Profile = {
   blocked_reason?: string | null;
   /** 광고 수신에 동의한 시각(migration 0055). 없으면 동의하지 않은 것. */
   marketing_consent_at?: string | null;
+  /** 다른 계정에 합쳐졌으면 그 계정 id(migration 0065). */
+  merged_into?: string | null;
 };
 
 export type Pass = {

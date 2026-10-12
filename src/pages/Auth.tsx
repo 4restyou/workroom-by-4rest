@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import { useCaptcha } from "../components/Turnstile";
+import { readPendingMerge } from "../lib/accountMerge";
 import { oauthLeavesApp } from "../lib/pwa";
 import { authErrorMessage, passwordValidationMessage } from "../lib/auth";
 import { getCurrentProfile, signInWithGoogle } from "../lib/profiles";
@@ -23,6 +24,9 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   // 로그인 벽에서 넘어온 경우 원래 가려던 곳으로 돌려보낸다.
   const nextPath = searchParams.get("next");
+  // 계정 합치기 중이면 어느 계정으로 로그인해야 하는지, 끝났으면 어디로 돌아가면 되는지 알려 준다.
+  const pendingMerge = searchParams.get("merge") ? readPendingMerge() : null;
+  const mergedInto = searchParams.get("merged");
   const [mode, setMode] = useState<AuthMode>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -180,6 +184,16 @@ export default function Auth() {
     <main className="pb-16">
       <Section eyebrow="회원" title="로그인 · 회원가입" accent="lilac">
         <div className={`mx-auto grid max-w-lg gap-5 ${card} p-5 sm:p-6`}>
+          {pendingMerge ? (
+            <p className={`${tintCard("sky")} p-4 text-sm font-bold leading-6`}>
+              계정 합치기 중이에요. 합칠 계정({pendingMerge.target})으로 로그인해 주세요. 로그인하면 자동으로 합쳐집니다.
+            </p>
+          ) : null}
+          {mergedInto !== null ? (
+            <p className={`${tintCard("mint")} p-4 text-sm font-bold leading-6`}>
+              계정을 합쳤어요. 앞으로는 {mergedInto ? `${mergedInto} 계정` : "원래 쓰던 계정"}으로 로그인해 주세요.
+            </p>
+          ) : null}
           {!hasSupabaseConfig ? (
             <p className={`${tintCard("yellow")} p-4 text-sm font-bold`}>
               `.env`에 Supabase URL과 anon key를 넣으면 로그인이 활성화됩니다.

@@ -36,6 +36,7 @@ create table auth.users (
   phone text,
   raw_user_meta_data jsonb default '{}'::jsonb,
   raw_app_meta_data jsonb default '{}'::jsonb,
+  last_sign_in_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -92,6 +93,8 @@ export async function asRole<T>(db: Db, claims: { sub?: string; role: "anon" | "
 }
 
 export async function createUser(db: Db, opts: { role?: "admin" | "user"; name?: string } = {}) {
+  // 앞선 테스트가 남긴 회원 권한으로 만들면 역할 변경이 트리거에 막힌다.
+  await actAs(db, null);
   const email = `${crypto.randomUUID()}@test.local`;
   const { rows } = await db.query<{ id: string }>(
     "insert into auth.users (email, raw_user_meta_data) values ($1, $2) returning id",
